@@ -28,8 +28,23 @@ public sealed partial class MainWindow : Window
         this.InitializeComponent();
     }
 
-    private void myButton_Click(object sender, RoutedEventArgs e)
+    private void IconStudioButton_Click(object sender, RoutedEventArgs e)
     {
-        myButton.Content = "Clicked";
+
+    }
+
+    private void ActionStudioButton_Click(object sender, RoutedEventArgs e)
+    {
+
+    }
+
+    private void SelectProfilesButton_Click(object sender, RoutedEventArgs e)
+    {
+
+    }
+
+    private void ProfileEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+
     }
 }

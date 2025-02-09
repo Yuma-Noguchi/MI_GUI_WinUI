@@ -9,7 +9,59 @@
     mc:Ignorable="d"
     Title="MI_GUI_WinUI">
 
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <Button x:Name="myButton" Click="myButton_Click">Click Me</Button>
-    </StackPanel>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Grid.Row="0" HorizontalAlignment="Center" Margin="0,40,0,36" Spacing="24">
+            <Image Source="Assets/motioninputgames-logo.png" Width="92" Height="92"/>
+            <TextBlock Text="MotionInput Configuration" Style="{StaticResource DisplayTextBlockStyle}"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1" RowSpacing="24" ColumnSpacing="24" Margin="36,0,36,36">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Row="0" Grid.Column="0" Click="IconStudioButton_Click" Style="{StaticResource MainWindowButtonStyle}">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Image Source="Assets/iconstudio-logo.svg" Width="52" Height="52"/>
+                        <TextBlock Text="Icon Studio" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+            <Button Grid.Row="0" Grid.Column="1" Click="ActionStudioButton_Click" Style="{StaticResource MainWindowButtonStyle}">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Image Source="Assets/actionstudio-logo.svg" Width="52" Height="52"/>
+                        <TextBlock Text="Action Studio" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+            <Button Grid.Row="1" Grid.Column="0" Click="SelectProfilesButton_Click" Style="{StaticResource MainWindowButtonStyle}">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Image Source="Assets/selectprofiles-logo.svg" Width="52" Height="52"/>
+                        <TextBlock Text="Select Profiles" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+            <Button Grid.Row="1" Grid.Column="1" Click="ProfileEditorButton_Click" Style="{StaticResource MainWindowButtonStyle}">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Image Source="Assets/profileeditor-logo.svg" Width="52" Height="52"/>
+                        <TextBlock Text="Profile Editor" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+        </Grid>
+    </Grid>
+
 </Window>
