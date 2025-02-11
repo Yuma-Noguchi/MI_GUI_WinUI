@@ -40,6 +40,9 @@ public sealed partial class MainWindow : Window
 
     private void SelectProfilesButton_Click(object sender, RoutedEventArgs e)
     {
+        // transition to SelectProfiles.xaml
+        var selectProfilesPage = new SelectProfiles();
+        this.Content = selectProfilesPage;
 
     }
 

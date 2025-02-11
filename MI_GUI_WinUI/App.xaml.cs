@@ -16,6 +16,7 @@ using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,8 @@ public partial class App : Application
 
         Ioc.Default.ConfigureServices(new ServiceCollection()
         .AddSingleton<MainWindowViewModel>()
+        .AddSingleton<SelectProfilesViewModel>()
+        .AddSingleton<ProfileService>()
         .BuildServiceProvider());
     }
 
