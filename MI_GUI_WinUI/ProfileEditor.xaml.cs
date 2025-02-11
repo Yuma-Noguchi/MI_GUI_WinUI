@@ -23,9 +23,19 @@ namespace MI_GUI_WinUI
     /// </summary>
     public sealed partial class ProfileEditor : Page
     {
-        public ProfileEditor()
+        private Models.Profile _profile;
+
+        public ProfileEditor(Models.Profile profile)
         {
             this.InitializeComponent();
+            _profile = profile;
+            LoadProfile();
+        }
+
+        private void LoadProfile()
+        {
+            // TODO: Load profile data into the editor
+            // This will be implemented when we add the profile editing UI
         }
     }
 }

@@ -9,26 +9,88 @@
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+    <Grid Margin="36,32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+              Text="Select Profiles" 
+              Style="{StaticResource TitleTextBlockStyle}"
+              VerticalAlignment="Center"/>
+            <Button Grid.Column="1"
+             Margin="5,0"
+             Click="HelpButton_Click"
+             Tag="{Binding ProfileName}">
+                <SymbolIcon Symbol="Help"/>
+            </Button>
+            <Button Grid.Column="2"
+             Click="HomeButton_Click"
+             Tag="{Binding ProfileName}">
+                <SymbolIcon Symbol="Home"/>
+            </Button>
+        </Grid>
+
+
+        <AutoSuggestBox
+            Grid.Row="1"
+            Margin="0,24"
+            HorizontalAlignment="Left"
+            PlaceholderText="Search Profiles"
+            TextChanged="SearchProfiles_TextChanged"
+            QueryIcon="Find"
+            QuerySubmitted="SearchProfiles_QuerySubmitted"
+            SuggestionChosen="SearchProfiles_SuggestionChosen"/>
+
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
                      VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding previews}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Vertical"
-                                  HorizontalAlignment="Center"
-                                  Spacing="20"/>
+                                  HorizontalAlignment="Center"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="10"
-                                Background="LightGray"
-                                BorderBrush="Gray"
-                                BorderThickness="1"
-                                CornerRadius="4">
-                            <ContentPresenter Content="{Binding}"/>
-                        </Border>
+                        <StackPanel>
+                            <Border Margin="10"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <ContentPresenter Content="{Binding Canvas}"/>
+                            </Border>
+                            <Grid Margin="10,5,10,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                         Text="{Binding ProfileName}"
+                                         FontSize="14"
+                                         VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Margin="5,0"
+                                        Click="EditProfile_Click"
+                                        Tag="{Binding ProfileName}">
+                                    <SymbolIcon Symbol="Edit"/>
+                                </Button>
+                                <Button Grid.Column="2"
+                                        Click="DeleteProfile_Click"
+                                        Tag="{Binding ProfileName}">
+                                    <SymbolIcon Symbol="Delete"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

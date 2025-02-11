@@ -40,4 +40,44 @@ public sealed partial class SelectProfiles : Page
 
     public SelectProfilesViewModel ViewModel { get; }
 
+    private void EditProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is string profileName)
+        {
+            ViewModel.EditProfile(profileName);
+        }
+    }
+
+    private void DeleteProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is string profileName)
+        {
+            ViewModel.DeleteProfile(profileName);
+        }
+    }
+
+    private void HelpButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Help();
+    }
+
+    private void HomeButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.Home();
+    }
+
+    private void SearchProfiles_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs e)
+    {
+        //ViewModel.SearchProfiles(SearchProfiles.Text);
+    }
+
+    private void SearchProfiles_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        //ViewModel.SearchProfiles(args.QueryText);
+    }
+
+    private void SearchProfiles_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+    {
+        //ViewModel.SearchProfiles(args.SelectedItem.ToString());
+    }
 }

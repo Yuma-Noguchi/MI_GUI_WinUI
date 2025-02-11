@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -22,7 +22,13 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
     private List<Profile> _profiles;
 
-    public ObservableCollection<Canvas> previews { get; } = new ObservableCollection<Canvas>();
+    public class ProfilePreview
+    {
+        public Canvas Canvas { get; set; }
+        public string ProfileName { get; set; }
+    }
+
+    public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
 
     private readonly ProfileService _profileService;
 
@@ -59,7 +65,8 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                 Width = 640,
                 Height = 480,
                 Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGray),
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                DataContext = new { ProfileName = profile.Name }
             };
             if (profile.GuiElements != null)
             {
@@ -91,7 +98,46 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                     
                 }
             }
-            previews.Add(preview);
+            var profilePreview = new ProfilePreview
+            {
+                Canvas = preview,
+                ProfileName = profile.Name
+            };
+            previews.Add(profilePreview);
         }
+    }
+
+    public void EditProfile(string profileName)
+    {
+        var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
+        if (profileIndex >= 0)
+        {
+            var window = new Window();
+            var profileEditor = new ProfileEditor(_profiles[profileIndex]);
+            window.Content = profileEditor;
+            window.Activate();
+        }
+    }
+
+    public void DeleteProfile(string profileName)
+    {
+        var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
+        if (profileIndex >= 0)
+        {
+            _profiles.RemoveAt(profileIndex);
+            _profileService.SaveProfilesToJson(_profiles, profilesFolderPath);
+            GenerateGuiElementsPreview();
+        }
+    }
+
+    internal void Home()
+    {
+        // change current page to MainWindow
+        throw new NotImplementedException();
+    }
+
+    internal void Help()
+    {
+        throw new NotImplementedException();
     }
 }

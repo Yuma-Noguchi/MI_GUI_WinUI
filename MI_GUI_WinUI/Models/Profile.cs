@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -106,6 +106,9 @@ public struct Profile
 
     [JsonProperty("speech")] // Newtonsoft.Json attribute
     public required Dictionary<string, SpeechCommand> SpeechCommands { get; set; } // Dictionary for speech commands
+
+    [Newtonsoft.Json.JsonIgnore]
+    public string Name { get; set; }
 }
 
 // public class JsonReaderNewtonsoft
@@ -191,35 +194,50 @@ public struct Profile
 // }
 public class ProfileService
 {
-    public List<Profile> ReadProfileFromJson(string filePath)
+    public List<Profile> ReadProfileFromJson(string folderPath)
     {
-        string FilePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, filePath);
+        string fullPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, folderPath);
         List<Profile> profiles = new List<Profile>();
 
-        if (!Directory.Exists(FilePath))
+        if (!Directory.Exists(fullPath))
         {
-            throw new DirectoryNotFoundException($"Directory not found at path: {FilePath}");
+            throw new DirectoryNotFoundException($"Directory not found at path: {fullPath}");
         }
-        else
+
+        foreach (var file in Directory.EnumerateFiles(fullPath))
         {
-            // loop through all the files in the folder
-            foreach (var file in Directory.EnumerateFiles(FilePath))
-            {
-                // Read the file
-                string jsonString = File.ReadAllText(file);
+            // Read the file
+            string jsonString = File.ReadAllText(file);
 
-                // Deserialize the JSON string to a Profile object
-                Profile profile = JsonConvert.DeserializeObject<Profile>(jsonString);
+            // Deserialize the JSON string to a Profile object
+            Profile profile = JsonConvert.DeserializeObject<Profile>(jsonString);
+            
+            // Set the name from the filename (without extension)
+            profile.Name = Path.GetFileNameWithoutExtension(file);
 
-                // Add the Profile object to the list
-                profiles.Add(profile);
-            }
+            profiles.Add(profile);
         }
 
         return profiles;
     }
 
-    public static void WriteConfigToJsonFile(Profile profile, string filePath)
+    public void SaveProfilesToJson(List<Profile> profiles, string folderPath)
+    {
+        string fullPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, folderPath);
+        
+        if (!Directory.Exists(fullPath))
+        {
+            Directory.CreateDirectory(fullPath);
+        }
+
+        foreach (var profile in profiles)
+        {
+            string filePath = Path.Combine(fullPath, $"{profile.Name}.json");
+            WriteConfigToJsonFile(profile, filePath);
+        }
+    }
+
+    private static void WriteConfigToJsonFile(Profile profile, string filePath)
     {
         //if (config == null)
         //{
