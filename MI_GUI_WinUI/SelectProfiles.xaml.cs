@@ -1,41 +1,30 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
+using Microsoft.UI.Windowing;
+using CommunityToolkit.Mvvm.DependencyInjection;
 using MI_GUI_WinUI.ViewModels;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
 
 namespace MI_GUI_WinUI;
 
 /// <summary>
-/// An empty page that can be used on its own or navigated to within a Frame.
+/// SelectProfiles page for managing profile selection and operations.
 /// </summary>
 public sealed partial class SelectProfiles : Page
 {
+    private Window parentWindow;
+    
     public SelectProfiles()
     {
         this.InitializeComponent();
-
         ViewModel = Ioc.Default.GetService<SelectProfilesViewModel>();
-
-        // Set the data context for the page
         DataContext = ViewModel;
-        
-        // Generate the previews
         ViewModel.GenerateGuiElementsPreview();
+    }
+
+    public void Initialize(Window window)
+    {
+        parentWindow = window;
+        ViewModel.Window = window;
     }
 
     public SelectProfilesViewModel ViewModel { get; }
@@ -63,7 +52,18 @@ public sealed partial class SelectProfiles : Page
 
     private void HomeButton_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Home();
+        if (parentWindow != null)
+        {
+            // Create and activate a new MainWindow
+            var mainWindow = new MainWindow();
+            mainWindow.Activate();
+
+            // Hide current window
+            if (parentWindow.AppWindow != null)
+            {
+                parentWindow.AppWindow.Hide();
+            }
+        }
     }
 
     private void SearchProfiles_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs e)
@@ -79,5 +79,29 @@ public sealed partial class SelectProfiles : Page
     private void SearchProfiles_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
     {
         //ViewModel.SearchProfiles(args.SelectedItem.ToString());
+    }
+
+    private void OpenProfilePopup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.CommandParameter is SelectProfilesViewModel.ProfilePreview preview)
+        {
+            ViewModel.SelectedProfilePreview = preview.Clone();
+            ViewModel.IsPopupOpen = true;
+        }
+    }
+
+    private void SelectProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedProfilePreview != null && parentWindow != null)
+        {
+            ViewModel.SelectedProfile = ViewModel.SelectedProfilePreview.ProfileName;
+            parentWindow.AppWindow.Hide();
+        }
+    }
+
+    private void BackToList_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.IsPopupOpen = false;
+        ViewModel.SelectedProfilePreview = null;
     }
 }

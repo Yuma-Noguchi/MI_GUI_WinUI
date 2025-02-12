@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -212,8 +212,8 @@ public class ProfileService
             // Deserialize the JSON string to a Profile object
             Profile profile = JsonConvert.DeserializeObject<Profile>(jsonString);
             
-            // Set the name from the filename (without extension)
-            profile.Name = Path.GetFileNameWithoutExtension(file);
+            // Set the display name from the filename
+            profile.Name = ProfileNameHelper.GetDisplayNameFromFileName(file);
 
             profiles.Add(profile);
         }
@@ -232,7 +232,8 @@ public class ProfileService
 
         foreach (var profile in profiles)
         {
-            string filePath = Path.Combine(fullPath, $"{profile.Name}.json");
+            string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profile.Name);
+            string filePath = Path.Combine(fullPath, $"{fileName}.json");
             WriteConfigToJsonFile(profile, filePath);
         }
     }

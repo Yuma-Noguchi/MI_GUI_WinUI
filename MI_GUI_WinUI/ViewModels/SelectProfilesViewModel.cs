@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -11,6 +11,7 @@ using MI_GUI_WinUI.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Windowing;
 using Windows.Storage;
 
 namespace MI_GUI_WinUI.ViewModels;
@@ -20,12 +21,77 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
     [ObservableProperty]
     private string _selectedProfile;
 
+    [ObservableProperty]
+    private bool _isPopupOpen;
+
+    [ObservableProperty]
+    private ProfilePreview _selectedProfilePreview;
+
+    private Window _window;
+    public Window Window
+    {
+        get => _window;
+        set
+        {
+            _window = value;
+            _appWindow = _window.AppWindow;
+        }
+    }
+
+    private AppWindow _appWindow;
+
     private List<Profile> _profiles;
+
+    private Profile? GetProfileByName(string name)
+    {
+        return _profiles?.FirstOrDefault(p => p.Name == name);
+    }
 
     public class ProfilePreview
     {
         public Canvas Canvas { get; set; }
         public string ProfileName { get; set; }
+
+        public ProfilePreview Clone()
+        {
+            return new ProfilePreview
+            {
+                ProfileName = this.ProfileName,
+                Canvas = CloneCanvas(this.Canvas)
+            };
+        }
+
+        private static Canvas CloneCanvas(Canvas original)
+        {
+            Canvas clone = new Canvas
+            {
+                Width = original.Width,
+                Height = original.Height,
+                Background = original.Background,
+                HorizontalAlignment = original.HorizontalAlignment
+            };
+
+            foreach (UIElement child in original.Children)
+            {
+                if (child is Image originalImage)
+                {
+                    Image clonedImage = new Image
+                    {
+                        Source = originalImage.Source,
+                        Width = originalImage.Width,
+                        Height = originalImage.Height,
+                        Stretch = originalImage.Stretch
+                    };
+
+                    Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage));
+                    Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage));
+
+                    clone.Children.Add(clonedImage);
+                }
+            }
+
+            return clone;
+        }
     }
 
     public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
@@ -44,7 +110,6 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
         System.Diagnostics.Debug.WriteLine($"Loaded {_profiles?.Count ?? 0} profiles from {profilesFolderPath}");
     }
 
-    // Generate a preview of the GUI elements
     public async void GenerateGuiElementsPreview()
     {
         System.Diagnostics.Debug.WriteLine("Starting GenerateGuiElementsPreview");
@@ -94,8 +159,6 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                         System.Diagnostics.Debug.WriteLine($"Error loading image: {ex.Message}");
                         continue;
                     }
-
-                    
                 }
             }
             var profilePreview = new ProfilePreview
@@ -132,12 +195,20 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
     internal void Home()
     {
-        // change current page to MainWindow
-        throw new NotImplementedException();
+        if (_window != null)
+        {
+            var mainWindow = new MainWindow();
+            mainWindow.Activate();
+            
+            if (_window.AppWindow != null)
+            {
+                _window.AppWindow.Hide();
+            }
+        }
     }
 
     internal void Help()
     {
-        throw new NotImplementedException();
+        // TODO: Implement help functionality
     }
 }

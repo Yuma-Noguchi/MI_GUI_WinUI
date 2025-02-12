@@ -16,26 +16,25 @@ using Windows.Foundation.Collections;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
-namespace MI_GUI_WinUI
+namespace MI_GUI_WinUI;
+
+/// <summary>
+/// An empty page that can be used on its own or navigated to within a Frame.
+/// </summary>
+public sealed partial class ProfileEditor : Page
 {
-    /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
-    /// </summary>
-    public sealed partial class ProfileEditor : Page
+    private Models.Profile _profile;
+
+    public ProfileEditor(Models.Profile profile)
     {
-        private Models.Profile _profile;
+        this.InitializeComponent();
+        _profile = profile;
+        LoadProfile();
+    }
 
-        public ProfileEditor(Models.Profile profile)
-        {
-            this.InitializeComponent();
-            _profile = profile;
-            LoadProfile();
-        }
-
-        private void LoadProfile()
-        {
-            // TODO: Load profile data into the editor
-            // This will be implemented when we add the profile editing UI
-        }
+    private void LoadProfile()
+    {
+        // TODO: Load profile data into the editor
+        // This will be implemented when we add the profile editing UI
     }
 }
