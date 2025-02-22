@@ -175,10 +175,10 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
         var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
         if (profileIndex >= 0)
         {
-            var window = new Window();
-            var profileEditor = new ProfileEditor(_profiles[profileIndex]);
-            window.Content = profileEditor;
-            window.Activate();
+            //var window = new Window();
+            //var profileEditor = new ProfileEditor(_profiles[profileIndex]);
+            //window.Content = profileEditor;
+            //window.Activate();
         }
     }
 
