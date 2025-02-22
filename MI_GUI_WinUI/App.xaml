@@ -8,9 +8,57 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
-            <!-- Other app resources here -->
+
+            <!-- Button Styles -->
+            <Style x:Key="HomeButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="20"/>
+            </Style>
+
+            <!-- Colors -->
+            <SolidColorBrush x:Key="Primary500Color" Color="#37A9DE"/>
+            <SolidColorBrush x:Key="Primary700Color" Color="#2980B9"/>
+            <SolidColorBrush x:Key="Primary300Color" Color="#67C5F0"/>
+            <SolidColorBrush x:Key="Primary100Color" Color="#E0F7FA"/>
+
+            <!-- Secondary Colors -->
+            <SolidColorBrush x:Key="Secondary500Color" Color="#66BB6A"/>
+            <SolidColorBrush x:Key="Secondary700Color" Color="#43A047"/>
+            <SolidColorBrush x:Key="Secondary300Color" Color="#9CCC65"/>
+
+            <!-- Neutral Grays (Light Theme versions) -->
+            <SolidColorBrush x:Key="Neutral900Color" Color="#212121"/>
+            <SolidColorBrush x:Key="Neutral700Color" Color="#616161"/>
+            <SolidColorBrush x:Key="Neutral500Color" Color="#9E9E9E"/>
+            <SolidColorBrush x:Key="Neutral300Color" Color="#E0E0E0"/>
+            <SolidColorBrush x:Key="Neutral100Color" Color="#F5F5F5"/>
+            <SolidColorBrush x:Key="WhiteColor" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="BlackColor" Color="#000000"/>
+
+            <!-- Semantic/Functional Colors -->
+            <SolidColorBrush x:Key="SuccessColor" Color="#4CAF50"/>
+            <SolidColorBrush x:Key="ErrorColor" Color="#F44336"/>
+            <SolidColorBrush x:Key="WarningColor" Color="#FFC107"/>
+            <SolidColorBrush x:Key="InfoColor" Color="#03A9F4"/>
+
+            <!-- Button Style -->
+            <Style x:Key="MainWindowButtonStyle" TargetType="Button">
+                <Setter Property="FontSize" Value="40"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Padding" Value="20"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="VerticalAlignment" Value="Stretch"/>
+                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="Background" Value="{StaticResource Primary500Color}"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
