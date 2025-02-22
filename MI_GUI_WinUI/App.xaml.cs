@@ -1,50 +1,85 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Microsoft.UI.Xaml.Shapes;
-using Windows.ApplicationModel;
-using Windows.ApplicationModel.Activation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
+﻿using Microsoft.UI.Xaml;
+using MI_GUI_WinUI.Models;
+using MI_GUI_WinUI.ViewModels;
+using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Pages;
+using CommunityToolkit.Mvvm.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace MI_GUI_WinUI;
 
-namespace MI_GUI_WinUI
+/// <summary>
+/// Provides application-specific behavior to supplement the default Application class.
+/// </summary>
+public partial class App : Application
 {
+    private readonly WindowManager _windowManager;
+    private bool _isClosing;
+
     /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
+    /// Initializes the singleton application object. This is the first line of authored code
+    /// executed, and as such is the logical equivalent of main() or WinMain().
     /// </summary>
-    public partial class App : Application
+    public App()
     {
-        /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
-        public App()
-        {
-            this.InitializeComponent();
-        }
+        this.InitializeComponent();
+        _windowManager = new WindowManager();
 
-        /// <summary>
-        /// Invoked when the application is launched.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
-        {
-            m_window = new MainWindow();
-            m_window.Activate();
-        }
+        // Configure services
+        var services = new ServiceCollection();
 
-        private Window? m_window;
+        // Register window management
+        services.AddSingleton(_windowManager);
+
+        // Register navigation
+        services.AddSingleton<INavigationService, NavigationService>();
+
+        // Register view models
+        services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton<SelectProfilesViewModel>();
+        services.AddSingleton<ActionStudioViewModel>();
+        services.AddSingleton<IconStudioViewModel>();
+        services.AddSingleton<ProfileEditorViewModel>();
+
+        // Register pages
+        services.AddTransient<HomePage>();
+        services.AddTransient<SelectProfilesPage>();
+        services.AddTransient<ActionStudioPage>();
+        services.AddTransient<IconStudioPage>();
+        services.AddTransient<ProfileEditorPage>();
+
+        // Register controls
+        services.AddTransient<Controls.PageHeader>();
+
+        // Build and configure services
+        var serviceProvider = services.BuildServiceProvider();
+        Ioc.Default.ConfigureServices(serviceProvider);
+
+        this.UnhandledException += App_UnhandledException;
+    }
+
+    /// <summary>
+    /// Invoked when the application is launched.
+    /// </summary>
+    /// <param name="args">Details about the launch request and process.</param>
+    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    {
+        // Ensure we have a window created when the app launches
+        if (_windowManager.MainWindow == null && !_isClosing)
+        {
+            _windowManager.InitializeMainWindow();
+        }
+    }
+
+    private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        // Log the exception
+        e.Handled = true;
+    }
+
+    public new void Exit()
+    {
+        _isClosing = true;
+        base.Exit();
     }
 }
