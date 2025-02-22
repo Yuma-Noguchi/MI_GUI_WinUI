@@ -42,10 +42,14 @@ public partial class App : Application
         services.AddSingleton<ProfileEditorViewModel>();
 
         // Register pages
+        services.AddTransient<HomePage>();
         services.AddTransient<SelectProfilesPage>();
         services.AddTransient<ActionStudioPage>();
         services.AddTransient<IconStudioPage>();
         services.AddTransient<ProfileEditorPage>();
+
+        // Register controls
+        services.AddTransient<Controls.PageHeader>();
 
         // Build and configure services
         var serviceProvider = services.BuildServiceProvider();

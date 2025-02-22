@@ -8,11 +8,20 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
-            <!-- Other app resources here -->
 
-            <!-- Move Primary Colors Outside ThemeDictionaries -->
+            <!-- Button Styles -->
+            <Style x:Key="HomeButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="FontSize" Value="20"/>
+            </Style>
+
+            <!-- Colors -->
             <SolidColorBrush x:Key="Primary500Color" Color="#37A9DE"/>
             <SolidColorBrush x:Key="Primary700Color" Color="#2980B9"/>
             <SolidColorBrush x:Key="Primary300Color" Color="#67C5F0"/>

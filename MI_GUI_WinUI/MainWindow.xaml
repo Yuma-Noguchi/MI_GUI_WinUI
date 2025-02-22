@@ -7,43 +7,9 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    x:DefaultBindMode="OneWay">
+    Title="MI_GUI_WinUI">
 
-    <NavigationView x:Name="NavView"
-                    PaneDisplayMode="Left"
-                    IsBackButtonVisible="Visible"
-                    IsSettingsVisible="False"
-                    PaneTitle="MotionInput">
-
-        <NavigationView.Header>
-            <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,20" Spacing="24">
-                    <Image Source="Assets/motioninputgames-logo.png" Width="52" Height="52"/>
-                    <TextBlock Text="MotionInput Configuration" Style="{StaticResource DisplayTextBlockStyle}"/>
-                </StackPanel>
-            </Grid>
-        </NavigationView.Header>
-
-        <NavigationView.MenuItems>
-            <NavigationViewItem Icon="List" Content="Select Profiles" Tag="SelectProfiles"/>
-            <NavigationViewItem Content="Action Studio" Tag="ActionStudio">
-                <NavigationViewItem.Icon>
-                    <ImageIcon Source="Assets/actionstudio-logo.svg"/>
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="Icon Studio" Tag="IconStudio">
-                <NavigationViewItem.Icon>
-                    <ImageIcon Source="Assets/iconstudio-logo.svg"/>
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-            <NavigationViewItem Content="Profile Editor" Tag="ProfileEditor">
-                <NavigationViewItem.Icon>
-                    <ImageIcon Source="Assets/profileeditor-logo.svg"/>
-                </NavigationViewItem.Icon>
-            </NavigationViewItem>
-        </NavigationView.MenuItems>
-
+    <Grid>
         <Frame x:Name="ContentFrame"/>
-
-    </NavigationView>
+    </Grid>
 </Window>

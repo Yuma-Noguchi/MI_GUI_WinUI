@@ -3,11 +3,23 @@
     x:Class="MI_GUI_WinUI.Pages.SelectProfilesPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:MI_GUI_WinUI"
+    xmlns:controls="using:MI_GUI_WinUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
     <Grid>
-        <TextBlock Text="Select Profiles Page" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <controls:PageHeader Grid.Row="0" Title="Select Profiles"/>
+
+        <!-- Main content -->
+        <Grid Grid.Row="1" Margin="20">
+            <TextBlock Text="Select Profiles Content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
     </Grid>
 </Page>
