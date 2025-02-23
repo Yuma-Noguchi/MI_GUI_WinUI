@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -145,7 +145,7 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
     private readonly ProfileService _profileService;
 
-    private string profilesFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\profiles");
+    private string profilesFolderPath = "MotionInput\\data\\profiles";
 
     private string guiElementsFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\assets");
 
@@ -157,15 +157,32 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
     public async Task InitializeAsync()
     {
-        // Reset state
-        IsPopupOpen = false;
-        SelectedProfilePreview = null;
-        ErrorMessage = null;
-
-        // Load profiles if needed
-        if (_profiles.Count == 0)
+        try
         {
-            await LoadProfilesAsync();
+            IsLoading = true;
+            
+            // Reset state
+            IsPopupOpen = false;
+            SelectedProfilePreview = null;
+            ErrorMessage = null;
+
+            // Load profiles if needed
+            if (_profiles.Count == 0)
+            {
+                await LoadProfilesAsync();
+            }
+            
+            // Generate previews after loading
+            GenerateGuiElementsPreviews();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in InitializeAsync");
+            ErrorMessage = "Failed to initialize. Please try again.";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
@@ -250,7 +267,6 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
     {
         try
         {
-            IsLoading = true;
             ErrorMessage = null;
             previews.Clear();
 
@@ -280,10 +296,6 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
         {
             _logger.LogError(ex, "Error generating previews");
             ErrorMessage = "Failed to generate profile previews.";
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 
