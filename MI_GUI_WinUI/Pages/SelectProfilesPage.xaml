@@ -54,7 +54,7 @@
 
             <!-- Loading State -->
             <Grid Grid.Row="3"
-                  Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityInverseConverter}}">
+                   Visibility="{Binding IsLoading}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressRing IsActive="True" Width="50" Height="50"/>
                     <TextBlock Text="Loading profiles..."
