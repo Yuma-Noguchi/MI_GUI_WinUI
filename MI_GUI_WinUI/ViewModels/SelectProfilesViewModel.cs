@@ -1,64 +1,111 @@
-﻿﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MI_GUI_WinUI.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Windowing;
 using Windows.Storage;
+using Windows.Storage.Streams;
 
 namespace MI_GUI_WinUI.ViewModels;
 
 public partial class SelectProfilesViewModel : ObservableObject, INotifyPropertyChanged
 {
-    [ObservableProperty]
-    private string _selectedProfile;
+    private readonly ILogger<SelectProfilesViewModel> _logger;
+    private readonly Dictionary<string, ProfilePreview> _previewCache = new();
 
     [ObservableProperty]
-    private bool _isPopupOpen;
+    private string? _selectedProfile;
 
     [ObservableProperty]
-    private ProfilePreview _selectedProfilePreview;
+    private bool _isPopupOpen = false;
 
-    private Window _window;
-    public Window Window
+    [ObservableProperty]
+    private ProfilePreview? _selectedProfilePreview;
+
+    [ObservableProperty]
+    private bool _isLoading;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private string? _errorMessage;
+
+    private Window? _window;
+    public Window? Window
     {
         get => _window;
         set
         {
             _window = value;
-            _appWindow = _window.AppWindow;
+            _appWindow = _window?.AppWindow;
         }
     }
 
-    private AppWindow _appWindow;
-
-    private List<Profile> _profiles;
+    private AppWindow? _appWindow;
+    private List<Profile> _profiles = new();
+    private List<Profile> _filteredProfiles = new();
 
     private Profile? GetProfileByName(string name)
     {
         return _profiles?.FirstOrDefault(p => p.Name == name);
     }
 
+    private void UpdateFilteredProfiles()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(SearchText))
+            {
+                _filteredProfiles = _profiles.ToList();
+            }
+            else
+            {
+                _filteredProfiles = _profiles
+                    .Where(p => p.Name != null && p.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+            
+            GenerateGuiElementsPreviews();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating filtered profiles");
+            _filteredProfiles = new List<Profile>();
+            ErrorMessage = "Error filtering profiles.";
+        }
+    }
+
     public class ProfilePreview
     {
-        public Canvas Canvas { get; set; }
-        public string ProfileName { get; set; }
+        public required Canvas Canvas { get; set; }
+        public required string ProfileName { get; set; }
 
-        public ProfilePreview Clone()
+        private ProfilePreview() { } // Private constructor to enforce using the initialization syntax
+
+        public static ProfilePreview Create(Canvas canvas, string profileName)
         {
             return new ProfilePreview
             {
-                ProfileName = this.ProfileName,
-                Canvas = CloneCanvas(this.Canvas)
+                Canvas = canvas,
+                ProfileName = profileName
             };
+        }
+
+        public ProfilePreview Clone()
+        {
+            return ProfilePreview.Create(CloneCanvas(this.Canvas), this.ProfileName);
         }
 
         private static Canvas CloneCanvas(Canvas original)
@@ -98,33 +145,152 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
     private readonly ProfileService _profileService;
 
-    private string profilesFolderPath = "MotionInput\\data\\profiles";
+    private string profilesFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\profiles");
 
     private string guiElementsFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\assets");
 
-    public SelectProfilesViewModel(ProfileService profileService)
+    public SelectProfilesViewModel(ProfileService profileService, ILogger<SelectProfilesViewModel> logger)
     {
-        System.Diagnostics.Debug.WriteLine("Initializing SelectProfilesViewModel");
+        _logger = logger;
         _profileService = profileService;
-        _profiles = _profileService.ReadProfileFromJson(profilesFolderPath);
-        System.Diagnostics.Debug.WriteLine($"Loaded {_profiles?.Count ?? 0} profiles from {profilesFolderPath}");
     }
 
-    public async void GenerateGuiElementsPreview()
+    public async Task InitializeAsync()
     {
-        System.Diagnostics.Debug.WriteLine("Starting GenerateGuiElementsPreview");
-        previews.Clear();
-        System.Diagnostics.Debug.WriteLine($"Total profiles to process: {_profiles?.Count ?? 0}");
+        // Reset state
+        IsPopupOpen = false;
+        SelectedProfilePreview = null;
+        ErrorMessage = null;
 
-        if (_profiles == null || _profiles.Count == 0)
+        // Load profiles if needed
+        if (_profiles.Count == 0)
         {
-            System.Diagnostics.Debug.WriteLine("No profiles found to generate previews from");
-            return;
+            await LoadProfilesAsync();
         }
+    }
 
-        foreach (Profile profile in _profiles)
+    private void ClosePopup()
+    {
+        try
         {
-            System.Diagnostics.Debug.WriteLine($"Creating preview with {profile.GuiElements?.Count ?? 0} GUI elements");
+            IsPopupOpen = false;
+            SelectedProfilePreview = null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error closing popup");
+            ErrorMessage = "Error closing popup.";
+        }
+    }
+
+    public async Task ClosePopupAsync()
+    {
+        try
+        {
+            IsPopupOpen = false;
+            SelectedProfilePreview = null;
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error closing popup");
+            ErrorMessage = "Error closing popup.";
+        }
+    }
+
+    public void HandleBackNavigation()
+    {
+        if (IsPopupOpen)
+        {
+            ClosePopup();
+        }
+    }
+
+    public async Task OpenPopupAsync(ProfilePreview preview)
+    {
+        try
+        {
+            // Reset any existing state
+            ClosePopup();
+                
+            // Set new state
+            SelectedProfilePreview = preview.Clone();
+            IsPopupOpen = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error opening popup");
+            ErrorMessage = "Error opening profile preview.";
+        }
+    }
+
+    private async Task LoadProfilesAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+            _profiles = await _profileService.ReadProfilesFromJsonAsync(profilesFolderPath);
+            _logger.LogInformation($"Loaded {_profiles?.Count ?? 0} profiles from {profilesFolderPath}");
+            UpdateFilteredProfiles();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading profiles");
+            ErrorMessage = "Failed to load profiles. Please try again.";
+            _profiles = new List<Profile>();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    public async void GenerateGuiElementsPreviews()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+            previews.Clear();
+
+            if (_filteredProfiles == null || _filteredProfiles.Count == 0)
+            {
+                _logger.LogInformation("No profiles to generate previews from");
+                return;
+            }
+
+            foreach (var profile in _filteredProfiles)
+            {
+                if (_previewCache.TryGetValue(profile.Name, out var cachedPreview))
+                {
+                    previews.Add(cachedPreview);
+                    continue;
+                }
+
+                var preview = await GeneratePreviewForProfileAsync(profile);
+                if (preview != null)
+                {
+                    _previewCache[profile.Name] = preview;
+                    previews.Add(preview);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating previews");
+            ErrorMessage = "Failed to generate profile previews.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task<ProfilePreview?> GeneratePreviewForProfileAsync(Profile profile)
+    {
+        try
+        {
             Canvas preview = new Canvas
             {
                 Width = 640,
@@ -133,6 +299,7 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                 HorizontalAlignment = HorizontalAlignment.Center,
                 DataContext = new { ProfileName = profile.Name }
             };
+
             if (profile.GuiElements != null)
             {
                 foreach (GuiElement guiElement in profile.GuiElements)
@@ -140,56 +307,102 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                     try
                     {
                         string guiElementFilePath = Path.Combine(guiElementsFolderPath, guiElement.Skin);
-                    
-                        Image image = new Image
-                        {
-                            Source = new BitmapImage(new Uri(guiElementFilePath)),
-                            Width = guiElement.Radius,
-                            Height = guiElement.Radius,
-                            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
-                        };
+                        var image = await LoadImageAsync(guiElementFilePath, guiElement);
                         
-                        Canvas.SetLeft(image, guiElement.Position[0] - guiElement.Radius);
-                        Canvas.SetTop(image, guiElement.Position[1] - guiElement.Radius);
-
-                        preview.Children.Add(image);
+                        if (image != null)
+                        {
+                            Canvas.SetLeft(image, guiElement.Position[0] - guiElement.Radius);
+                            Canvas.SetTop(image, guiElement.Position[1] - guiElement.Radius);
+                            preview.Children.Add(image);
+                        }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error loading image: {ex.Message}");
-                        continue;
+                        _logger.LogError(ex, $"Error loading image for {guiElement.Skin}");
                     }
                 }
             }
-            var profilePreview = new ProfilePreview
+
+            return ProfilePreview.Create(preview, profile.Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error generating preview for profile {profile.Name}");
+            return null;
+        }
+    }
+
+    private async Task<Image?> LoadImageAsync(string imagePath, GuiElement element)
+    {
+        try
+        {
+            var bitmap = new BitmapImage();
+            using var fileStream = File.OpenRead(imagePath);
+            var memoryStream = new MemoryStream();
+            await fileStream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+            var randomAccessStream = memoryStream.AsRandomAccessStream();
+            await bitmap.SetSourceAsync(randomAccessStream);
+
+            return new Image
             {
-                Canvas = preview,
-                ProfileName = profile.Name
+                Source = bitmap,
+                Width = element.Radius,
+                Height = element.Radius,
+                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
             };
-            previews.Add(profilePreview);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Failed to load image: {imagePath}");
+            return null;
         }
     }
 
-    public void EditProfile(string profileName)
+    public async Task EditProfileAsync(string profileName)
     {
-        var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
-        if (profileIndex >= 0)
+        try
         {
-            //var window = new Window();
-            //var profileEditor = new ProfileEditor(_profiles[profileIndex]);
-            //window.Content = profileEditor;
-            //window.Activate();
+            var profile = GetProfileByName(profileName);
+            if (profile != null)
+            {
+                //var window = new Window();
+                //var profileEditor = new ProfileEditor(profile);
+                //window.Content = profileEditor;
+                //window.Activate();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error editing profile: {profileName}");
+            ErrorMessage = "Failed to open profile editor.";
         }
     }
 
-    public void DeleteProfile(string profileName)
+    public async Task DeleteProfileAsync(string profileName)
     {
-        var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
-        if (profileIndex >= 0)
+        try
         {
-            _profiles.RemoveAt(profileIndex);
-            _profileService.SaveProfilesToJson(_profiles, profilesFolderPath);
-            GenerateGuiElementsPreview();
+            IsLoading = true;
+            ErrorMessage = null;
+            
+            var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
+            if (profileIndex >= 0)
+            {
+                _profiles.RemoveAt(profileIndex);
+                await _profileService.SaveProfilesToJsonAsync(_profiles, profilesFolderPath);
+                _previewCache.Remove(profileName);
+                UpdateFilteredProfiles();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error deleting profile: {profileName}");
+            ErrorMessage = "Failed to delete profile.";
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
