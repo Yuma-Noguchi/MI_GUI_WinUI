@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
 using MI_GUI_WinUI.Pages;
+using CommunityToolkit.Mvvm.DependencyInjection;
 
 namespace MI_GUI_WinUI.Services
 {
@@ -10,7 +11,10 @@ namespace MI_GUI_WinUI.Services
     {
         bool CanGoBack { get; }
         void Initialize(Frame frame);
-        bool Navigate<T>(object parameter = null) where T : Page;
+        bool Navigate<T>(object? parameter = null) where T : Page;
+        bool Navigate<TPage, TViewModel>(object? parameter = null)
+            where TPage : Page
+            where TViewModel : class;
         bool GoBack();
         event EventHandler<string> NavigationChanged;
     }
@@ -29,7 +33,7 @@ namespace MI_GUI_WinUI.Services
             _frame.Navigated += Frame_Navigated;
         }
 
-        public bool Navigate<T>(object parameter = null) where T : Page
+        public bool Navigate<T>(object? parameter = null) where T : Page
         {
             if (_frame == null) return false;
 
@@ -38,6 +42,24 @@ namespace MI_GUI_WinUI.Services
             if (result)
             {
                 NavigationChanged?.Invoke(this, pageType.Name);
+            }
+            return result;
+        }
+
+        public bool Navigate<TPage, TViewModel>(object? parameter = null)
+            where TPage : Page
+            where TViewModel : class
+        {
+            if (_frame == null) return false;
+
+            // Get ViewModel from DI
+            var viewModel = Ioc.Default.GetRequiredService<TViewModel>();
+            
+            // Navigate with ViewModel as parameter
+            var result = _frame.Navigate(typeof(TPage), viewModel);
+            if (result)
+            {
+                NavigationChanged?.Invoke(this, typeof(TPage).Name);
             }
             return result;
         }

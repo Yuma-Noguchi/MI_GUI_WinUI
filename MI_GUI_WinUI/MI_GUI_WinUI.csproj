@@ -33,13 +33,11 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="CommunityToolkit.WinUI.Converters" Version="8.1.240916" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250205002" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-	<Folder Include="MotionInput\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -72,7 +70,7 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <Page Update="Pages\SelectProfiles.xaml">
+    <Page Update="Pages\SelectProfilesPage.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
@@ -86,6 +84,12 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
+
+  <ItemGroup>
+		<Content Include="MotionInput\**">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
   <ItemGroup>
     <Content Include="Assets\*.*" />

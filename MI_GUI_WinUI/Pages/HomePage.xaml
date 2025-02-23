@@ -28,7 +28,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
-            <Button x:Name="IconStudioButton" Grid.Row="0" Grid.Column="0" Style="{StaticResource MainWindowButtonStyle}">
+            <Button x:Name="IconStudioButton" x:FieldModifier="public" Grid.Row="0" Grid.Column="0" Style="{StaticResource MainWindowButtonStyle}">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <Image Source="/Assets/iconstudio-logo.svg" Width="52" Height="52"/>
@@ -37,7 +37,7 @@
                 </Button.Content>
             </Button>
             
-            <Button x:Name="ActionStudioButton" Grid.Row="0" Grid.Column="1" Style="{StaticResource MainWindowButtonStyle}">
+            <Button x:Name="ActionStudioButton" x:FieldModifier="public" Grid.Row="0" Grid.Column="1" Style="{StaticResource MainWindowButtonStyle}">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <Image Source="/Assets/actionstudio-logo.svg" Width="52" Height="52"/>
@@ -46,7 +46,7 @@
                 </Button.Content>
             </Button>
             
-            <Button x:Name="SelectProfilesButton" Grid.Row="1" Grid.Column="0" Style="{StaticResource MainWindowButtonStyle}">
+            <Button x:Name="SelectProfilesButton" x:FieldModifier="public" Grid.Row="1" Grid.Column="0" Style="{StaticResource MainWindowButtonStyle}">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <Image Source="/Assets/selectprofiles-logo.svg" Width="52" Height="52"/>
