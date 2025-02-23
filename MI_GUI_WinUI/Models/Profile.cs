@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,8 +6,9 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Windows.Storage;
-using Newtonsoft.Json; // Using Newtonsoft.Json
-using Newtonsoft.Json.Converters; // Might be needed for custom converters (though probably not in this simple case)
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 
 namespace MI_GUI_WinUI.Models;
@@ -194,77 +195,160 @@ public struct Profile
 // }
 public class ProfileService
 {
-    public List<Profile> ReadProfileFromJson(string folderPath)
+    private readonly Dictionary<string, Profile> _profileCache;
+    private readonly string _baseProfilePath;
+    private readonly ILogger<ProfileService> _logger;
+    private readonly JsonSerializerSettings _jsonSettings;
+    
+    public ProfileService(ILogger<ProfileService> logger)
     {
-        string fullPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, folderPath);
+        _logger = logger;
+        _profileCache = new Dictionary<string, Profile>();
+        _baseProfilePath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+        _jsonSettings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            Error = (sender, args) =>
+            {
+                _logger.LogError($"JSON Error: {args.ErrorContext.Error.Message}");
+                args.ErrorContext.Handled = true;
+            }
+        };
+    }
+
+    public async Task<List<Profile>> ReadProfilesFromJsonAsync(string folderPath)
+    {
+        string fullPath = Path.Combine(_baseProfilePath, folderPath);
         List<Profile> profiles = new List<Profile>();
 
         if (!Directory.Exists(fullPath))
         {
+            _logger.LogError($"Directory not found: {fullPath}");
             throw new DirectoryNotFoundException($"Directory not found at path: {fullPath}");
-        }
-
-        foreach (var file in Directory.EnumerateFiles(fullPath))
-        {
-            // Read the file
-            string jsonString = File.ReadAllText(file);
-
-            // Deserialize the JSON string to a Profile object
-            Profile profile = JsonConvert.DeserializeObject<Profile>(jsonString);
-            
-            // Set the display name from the filename
-            profile.Name = ProfileNameHelper.GetDisplayNameFromFileName(file);
-
-            profiles.Add(profile);
-        }
-
-        return profiles;
-    }
-
-    public void SaveProfilesToJson(List<Profile> profiles, string folderPath)
-    {
-        string fullPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, folderPath);
-        
-        if (!Directory.Exists(fullPath))
-        {
-            Directory.CreateDirectory(fullPath);
-        }
-
-        foreach (var profile in profiles)
-        {
-            string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profile.Name);
-            string filePath = Path.Combine(fullPath, $"{fileName}.json");
-            WriteConfigToJsonFile(profile, filePath);
-        }
-    }
-
-    private static void WriteConfigToJsonFile(Profile profile, string filePath)
-    {
-        //if (config == null)
-        //{
-        //    throw new ArgumentNullException(nameof(config), "Config object cannot be null.");
-        //}
-
-        if (string.IsNullOrEmpty(filePath))
-        {
-            throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
         }
 
         try
         {
-            // Serialize the Config object to a JSON string
-            string jsonString = JsonConvert.SerializeObject(profile, Formatting.Indented); // Formatting.Indented for pretty JSON
+            foreach (var file in Directory.EnumerateFiles(fullPath, "*.json"))
+            {
+                if (await LoadProfileFromFileAsync(file) is Profile profile)
+                {
+                    profiles.Add(profile);
+                }
+            }
 
-            // Write the JSON string to the file
-            File.WriteAllText(filePath, jsonString);
+            // Update cache
+            _profileCache.Clear();
+            foreach (var profile in profiles)
+            {
+                _profileCache[profile.Name] = profile;
+            }
+
+            return profiles;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error reading profiles from {folderPath}");
+            throw;
+        }
+    }
+
+    private async Task<Profile?> LoadProfileFromFileAsync(string filePath)
+    {
+        try
+        {
+            // Check cache first
+            string profileName = ProfileNameHelper.GetDisplayNameFromFileName(filePath);
+            if (_profileCache.TryGetValue(profileName, out Profile cachedProfile))
+            {
+                return cachedProfile;
+            }
+
+            // Read and parse file
+            string jsonString = await File.ReadAllTextAsync(filePath);
+            var profile = JsonConvert.DeserializeObject<Profile>(jsonString, _jsonSettings);
+            
+            if (profile.GuiElements == null || profile.Poses == null || profile.GlobalConfig == null)
+            {
+                _logger.LogWarning($"Invalid profile format in {filePath}");
+                return null;
+            }
+
+            profile.Name = profileName;
+            return profile;
         }
         catch (JsonException ex)
         {
-            throw new JsonException($"Error serializing Config object to JSON. {ex.Message}", ex);
+            _logger.LogError(ex, $"JSON parsing error in {filePath}");
+            return null;
         }
-        catch (IOException ioEx)
+        catch (Exception ex)
         {
-            throw new IOException($"Error writing JSON to file: {filePath}. {ioEx.Message}", ioEx);
+            _logger.LogError(ex, $"Error loading profile from {filePath}");
+            return null;
         }
+    }
+
+    public async Task SaveProfilesToJsonAsync(List<Profile> profiles, string folderPath)
+    {
+        string fullPath = Path.Combine(_baseProfilePath, folderPath);
+        
+        try
+        {
+            if (!Directory.Exists(fullPath))
+            {
+                Directory.CreateDirectory(fullPath);
+            }
+
+            foreach (var profile in profiles)
+            {
+                await SaveProfileToFileAsync(profile, fullPath);
+            }
+
+            // Update cache
+            _profileCache.Clear();
+            foreach (var profile in profiles)
+            {
+                _profileCache[profile.Name] = profile;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error saving profiles to {folderPath}");
+            throw;
+        }
+    }
+
+    private async Task SaveProfileToFileAsync(Profile profile, string folderPath)
+    {
+        if (string.IsNullOrEmpty(profile.Name))
+        {
+            throw new ArgumentException("Profile name cannot be empty", nameof(profile));
+        }
+
+        string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profile.Name);
+        string filePath = Path.Combine(folderPath, $"{fileName}.json");
+
+        try
+        {
+            string jsonString = JsonConvert.SerializeObject(profile, _jsonSettings);
+            await File.WriteAllTextAsync(filePath, jsonString);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error saving profile to {filePath}");
+            throw;
+        }
+    }
+
+    public Profile? GetProfileFromCache(string profileName)
+    {
+        _profileCache.TryGetValue(profileName, out Profile profile);
+        return profile;
+    }
+
+    public void ClearCache()
+    {
+        _profileCache.Clear();
     }
 }

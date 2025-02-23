@@ -1,10 +1,13 @@
-﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Pages;
+using MI_GUI_WinUI.Converters;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
 
 namespace MI_GUI_WinUI;
 
@@ -15,6 +18,10 @@ public partial class App : Application
 {
     private readonly WindowManager _windowManager;
     private bool _isClosing;
+    private readonly IServiceProvider _serviceProvider;
+
+    public static new App Current => (App)Application.Current;
+    public IServiceProvider Services => _serviceProvider;
 
     /// <summary>
     /// Initializes the singleton application object. This is the first line of authored code
@@ -28,11 +35,24 @@ public partial class App : Application
         // Configure services
         var services = new ServiceCollection();
 
-        // Register window management
-        services.AddSingleton(_windowManager);
+        // Register logging
+        services.AddSingleton<LoggingService>();
+        services.AddLogging(builder =>
+        {
+            builder.ClearProviders();
+            builder.SetMinimumLevel(LogLevel.Debug);
+            builder.Services.AddSingleton<ILoggerProvider>(sp =>
+                new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
+        });
+
+        // Register window management first as other services might depend on it
+        services.AddSingleton<WindowManager>(_windowManager);
 
         // Register navigation
         services.AddSingleton<INavigationService, NavigationService>();
+
+        // Register services
+        services.AddSingleton<ProfileService>();
 
         // Register view models
         services.AddSingleton<MainWindowViewModel>();
@@ -40,6 +60,10 @@ public partial class App : Application
         services.AddSingleton<ActionStudioViewModel>();
         services.AddSingleton<IconStudioViewModel>();
         services.AddSingleton<ProfileEditorViewModel>();
+
+        // Register converters
+        services.AddSingleton<StringToBoolConverter>();
+        services.AddSingleton<BoolToVisibilityInverseConverter>();
 
         // Register pages
         services.AddTransient<HomePage>();
@@ -52,8 +76,8 @@ public partial class App : Application
         services.AddTransient<Controls.PageHeader>();
 
         // Build and configure services
-        var serviceProvider = services.BuildServiceProvider();
-        Ioc.Default.ConfigureServices(serviceProvider);
+        _serviceProvider = services.BuildServiceProvider();
+        Ioc.Default.ConfigureServices(_serviceProvider);
 
         this.UnhandledException += App_UnhandledException;
     }
