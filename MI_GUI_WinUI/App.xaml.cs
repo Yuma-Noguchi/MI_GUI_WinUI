@@ -1,5 +1,4 @@
-﻿﻿﻿﻿using Microsoft.UI.Xaml;
-using MI_GUI_WinUI.Models;
+﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Pages;

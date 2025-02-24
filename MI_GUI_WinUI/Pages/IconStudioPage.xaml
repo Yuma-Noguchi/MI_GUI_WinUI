@@ -9,17 +9,154 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid>
+    <Grid Margin="36,40">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Header -->
         <controls:PageHeader Grid.Row="0" Title="Icon Studio"/>
 
-        <!-- Main content -->
-        <Grid Grid.Row="1" Margin="20">
-            <TextBlock Text="Icon Studio Content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="0,24,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Input Panel -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Prompt Input -->
+                <TextBox Grid.Row="0"
+                         Header="Describe your icon"
+                         PlaceholderText="E.g., A minimalist blue star with soft glow"
+                         Text="{Binding Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         Height="100"
+                         Margin="0,0,0,16"/>
+
+                <!-- Generation Controls -->
+                <StackPanel Grid.Row="1" Spacing="8">
+                    <Button Content="Generate Icon"
+                            Command="{Binding GenerateIconCommand}"
+                            IsEnabled="{Binding CanGenerate}"
+                            Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Stretch"/>
+
+                    <InfoBar
+                        IsOpen="{Binding HasError}"
+                        Message="{Binding ErrorMessage}"
+                        Severity="Error"
+                        IsClosable="True"/>
+                </StackPanel>
+
+                <!-- Generation History -->
+                <ScrollViewer Grid.Row="2" Margin="0,16,0,0">
+                    <ItemsRepeater>
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="8"/>
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Height="64" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="64"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                    <TextBlock Grid.Column="1"
+                                             Text="{Binding Prompt}"
+                                             TextTrimming="CharacterEllipsis"
+                                             VerticalAlignment="Center"
+                                             Margin="8,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Preview Panel -->
+            <Grid Grid.Column="1" Margin="24,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Preview Container -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    
+                    <!-- Loading State -->
+                    <StackPanel Visibility="{Binding IsGenerating}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center">
+                        <ProgressRing IsActive="True"
+                                    Width="50"
+                                    Height="50"/>
+                        <TextBlock Text="Generating icon..."
+                                 Style="{StaticResource BodyTextBlockStyle}"
+                                 Margin="0,12,0,0"/>
+                        <TextBlock Text="This may take a few moments"
+                                 Style="{StaticResource CaptionTextBlockStyle}"
+                                 Opacity="0.7"
+                                 Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Preview Image -->
+                    <Grid Visibility="{Binding HasPreview}">
+                        <Image Source="{Binding PreviewImage}"
+                               Stretch="Uniform"
+                               MaxWidth="512"
+                               MaxHeight="512"/>
+                    </Grid>
+                </Border>
+
+                <!-- Actions -->
+                <StackPanel Grid.Row="1"
+                          Orientation="Horizontal"
+                          HorizontalAlignment="Center"
+                          Spacing="8"
+                          Margin="0,16,0,0"
+                          Visibility="{Binding HasPreview}">
+                    <Button Content="Save"
+                            Command="{Binding SaveIconCommand}"
+                            Style="{StaticResource AccentButtonStyle}">
+                        <Button.Icon>
+                            <FontIcon Glyph="&#xE74E;"/>
+                        </Button.Icon>
+                    </Button>
+                    <Button Content="Regenerate"
+                            Command="{Binding RegenerateIconCommand}">
+                        <Button.Icon>
+                            <FontIcon Glyph="&#xE72C;"/>
+                        </Button.Icon>
+                    </Button>
+                    <Button Content="Discard"
+                            Command="{Binding DiscardIconCommand}">
+                        <Button.Icon>
+                            <FontIcon Glyph="&#xE74D;"/>
+                        </Button.Icon>
+                    </Button>
+                </StackPanel>
+            </Grid>
         </Grid>
+
+        <!-- Error Info -->
+        <InfoBar Grid.Row="1"
+                 IsOpen="{Binding HasError}"
+                 Message="{Binding ErrorMessage}"
+                 Severity="Error"
+                 VerticalAlignment="Bottom"/>
     </Grid>
 </Page>

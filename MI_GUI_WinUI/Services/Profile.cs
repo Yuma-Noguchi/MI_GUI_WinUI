@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,8 +10,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-
-namespace MI_GUI_WinUI.Models;
+namespace MI_GUI_WinUI.Services;
 
 public struct ActionConfig
 {
@@ -114,84 +113,84 @@ public struct Profile
 
 // public class JsonReaderNewtonsoft
 // {
-    
 
-    // public static void Main(string[] args)
-    // {
-    //     string filePath = "config.json"; // Replace with the actual path to your JSON file
 
-    //     if (!File.Exists(filePath))
-    //     {
-    //         Console.WriteLine($"Error: JSON file not found at path: {filePath}");
-    //         return;
-    //     }
+// public static void Main(string[] args)
+// {
+//     string filePath = "config.json"; // Replace with the actual path to your JSON file
 
-    //     Config mainConfig = ReadConfigFromJsonFileNewtonsoft(filePath);
+//     if (!File.Exists(filePath))
+//     {
+//         Console.WriteLine($"Error: JSON file not found at path: {filePath}");
+//         return;
+//     }
 
-    //     Console.WriteLine("Config Data (using Newtonsoft.Json):");
-    //     Console.WriteLine("------------------");
+//     Config mainConfig = ReadConfigFromJsonFileNewtonsoft(filePath);
 
-    //     Console.WriteLine("\nGlobal Config:");
-    //     if (mainConfig.GlobalConfig != null)
-    //     {
-    //         foreach (var kvp in mainConfig.GlobalConfig)
-    //         {
-    //             Console.WriteLine($"  {kvp.Key}: {kvp.Value}");
-    //         }
-    //     }
+//     Console.WriteLine("Config Data (using Newtonsoft.Json):");
+//     Console.WriteLine("------------------");
 
-    //     Console.WriteLine("\nGUI Elements:");
-    //     if (mainConfig.GuiElements != null)
-    //     {
-    //         foreach (var guiElement in mainConfig.GuiElements)
-    //         {
-    //             Console.WriteLine($"  File: {guiElement.File}");
-    //             Console.WriteLine($"  Position: [{string.Join(", ", guiElement.Position)}]");
-    //             Console.WriteLine($"  Radius: {guiElement.Radius}");
-    //             Console.WriteLine($"  Skin: {guiElement.Skin}");
-    //             Console.WriteLine($"  Triggered Skin: {guiElement.TriggeredSkin}");
-    //             Console.WriteLine($"  Action Class: {guiElement.Action.ClassName}");
-    //             Console.WriteLine($"  Action Method: {guiElement.Action.MethodName}");
-    //             Console.WriteLine($"  Action Args: [{string.Join(", ", guiElement.Action.Arguments)}]");
-    //             Console.WriteLine("  ------------------");
-    //         }
-    //     }
+//     Console.WriteLine("\nGlobal Config:");
+//     if (mainConfig.GlobalConfig != null)
+//     {
+//         foreach (var kvp in mainConfig.GlobalConfig)
+//         {
+//             Console.WriteLine($"  {kvp.Key}: {kvp.Value}");
+//         }
+//     }
 
-    //     Console.WriteLine("\nPose Configs:");
-    //     if (mainConfig.Poses != null)
-    //     {
-    //         foreach (var poseConfig in mainConfig.Poses)
-    //         {
-    //             Console.WriteLine($"  File: {poseConfig.File}");
-    //             Console.WriteLine($"  X: {poseConfig.X}, Y: {poseConfig.Y}");
-    //             Console.WriteLine($"  Jitter Correction Strength: {poseConfig.JitterCorrectionStrength}");
-    //             Console.WriteLine($"  Finger: {poseConfig.Finger}");
-    //             Console.WriteLine($"  Pinch Threshold: {poseConfig.PinchThreshold}");
-    //             Console.WriteLine($"  Unpinch Threshold: {poseConfig.UnpinchThreshold}");
-    //             if (poseConfig.Action.ClassName != null) // Check if Action is present
-    //             {
-    //                 Console.WriteLine($"  Action Class: {poseConfig.Action.ClassName}");
-    //                 Console.WriteLine($"  Action Method: {poseConfig.Action.MethodName}");
-    //                 Console.WriteLine($"  Action Args: [{string.Join(", ", poseConfig.Action.Arguments)}]");
-    //             }
-    //             Console.WriteLine("  ------------------");
-    //         }
-    //     }
+//     Console.WriteLine("\nGUI Elements:");
+//     if (mainConfig.GuiElements != null)
+//     {
+//         foreach (var guiElement in mainConfig.GuiElements)
+//         {
+//             Console.WriteLine($"  File: {guiElement.File}");
+//             Console.WriteLine($"  Position: [{string.Join(", ", guiElement.Position)}]");
+//             Console.WriteLine($"  Radius: {guiElement.Radius}");
+//             Console.WriteLine($"  Skin: {guiElement.Skin}");
+//             Console.WriteLine($"  Triggered Skin: {guiElement.TriggeredSkin}");
+//             Console.WriteLine($"  Action Class: {guiElement.Action.ClassName}");
+//             Console.WriteLine($"  Action Method: {guiElement.Action.MethodName}");
+//             Console.WriteLine($"  Action Args: [{string.Join(", ", guiElement.Action.Arguments)}]");
+//             Console.WriteLine("  ------------------");
+//         }
+//     }
 
-    //     Console.WriteLine("\nSpeech Commands:");
-    //     if (mainConfig.SpeechCommands != null)
-    //     {
-    //         foreach (var kvp in mainConfig.SpeechCommands)
-    //         {
-    //             SpeechCommand speechCommand = kvp.Value;
-    //             Console.WriteLine($"  Command: {kvp.Key}");
-    //             Console.WriteLine($"  Action Class: {speechCommand.Action.ClassName}");
-    //             Console.WriteLine($"  Action Method: {speechCommand.Action.MethodName}");
-    //             Console.WriteLine($"  Action Args: [{string.Join(", ", speechCommand.Action.Arguments)}]");
-    //             Console.WriteLine("  ------------------");
-    //         }
-    //     }
-    // }
+//     Console.WriteLine("\nPose Configs:");
+//     if (mainConfig.Poses != null)
+//     {
+//         foreach (var poseConfig in mainConfig.Poses)
+//         {
+//             Console.WriteLine($"  File: {poseConfig.File}");
+//             Console.WriteLine($"  X: {poseConfig.X}, Y: {poseConfig.Y}");
+//             Console.WriteLine($"  Jitter Correction Strength: {poseConfig.JitterCorrectionStrength}");
+//             Console.WriteLine($"  Finger: {poseConfig.Finger}");
+//             Console.WriteLine($"  Pinch Threshold: {poseConfig.PinchThreshold}");
+//             Console.WriteLine($"  Unpinch Threshold: {poseConfig.UnpinchThreshold}");
+//             if (poseConfig.Action.ClassName != null) // Check if Action is present
+//             {
+//                 Console.WriteLine($"  Action Class: {poseConfig.Action.ClassName}");
+//                 Console.WriteLine($"  Action Method: {poseConfig.Action.MethodName}");
+//                 Console.WriteLine($"  Action Args: [{string.Join(", ", poseConfig.Action.Arguments)}]");
+//             }
+//             Console.WriteLine("  ------------------");
+//         }
+//     }
+
+//     Console.WriteLine("\nSpeech Commands:");
+//     if (mainConfig.SpeechCommands != null)
+//     {
+//         foreach (var kvp in mainConfig.SpeechCommands)
+//         {
+//             SpeechCommand speechCommand = kvp.Value;
+//             Console.WriteLine($"  Command: {kvp.Key}");
+//             Console.WriteLine($"  Action Class: {speechCommand.Action.ClassName}");
+//             Console.WriteLine($"  Action Method: {speechCommand.Action.MethodName}");
+//             Console.WriteLine($"  Action Args: [{string.Join(", ", speechCommand.Action.Arguments)}]");
+//             Console.WriteLine("  ------------------");
+//         }
+//     }
+// }
 // }
 public class ProfileService
 {
@@ -199,7 +198,7 @@ public class ProfileService
     private readonly string _baseProfilePath;
     private readonly ILogger<ProfileService> _logger;
     private readonly JsonSerializerSettings _jsonSettings;
-    
+
     public ProfileService(ILogger<ProfileService> logger)
     {
         _logger = logger;
@@ -267,7 +266,7 @@ public class ProfileService
             // Read and parse file
             string jsonString = await File.ReadAllTextAsync(filePath);
             var profile = JsonConvert.DeserializeObject<Profile>(jsonString, _jsonSettings);
-            
+
             if (profile.GuiElements == null || profile.Poses == null || profile.GlobalConfig == null)
             {
                 _logger.LogWarning($"Invalid profile format in {filePath}");
@@ -292,7 +291,7 @@ public class ProfileService
     public async Task SaveProfilesToJsonAsync(List<Profile> profiles, string folderPath)
     {
         string fullPath = Path.Combine(_baseProfilePath, folderPath);
-        
+
         try
         {
             if (!Directory.Exists(fullPath))

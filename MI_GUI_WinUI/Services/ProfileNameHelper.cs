@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace MI_GUI_WinUI.Models
+namespace MI_GUI_WinUI.Services
 {
     public static class ProfileNameHelper
     {
