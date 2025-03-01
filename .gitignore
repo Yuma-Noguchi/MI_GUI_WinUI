@@ -351,4 +351,13 @@ MigrationBackup/
 
 MotionInput/
 
-.md
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.out
+*.bcf
