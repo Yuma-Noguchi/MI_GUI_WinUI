@@ -1,0 +1,53 @@
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.w18
+
+# Bibliography files
+main.bbl
+main.blg
+
+# PDF output (uncomment if you don't want to track the compiled PDF)
+# report/main.pdf
+
+# Minted files
+_minted*
+*.pyg
+
+# Other temporary files
+.DS_Store
+.vscode
+*~
+
+# Build directories
+build/
+dist/
+
+# Python virtual environment (if using one for Pygments)
+venv/
+env/
+.env/
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+
+# Editor backup files
+*.bak
+*~
+
+# System Files
+.DS_Store
+Thumbs.db

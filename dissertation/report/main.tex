@@ -1,0 +1,51 @@
+\documentclass[12pt,a4paper]{report}
+
+% Load UCL thesis style
+\usepackage{styles/ucl_thesis}
+
+\begin{document}
+
+% Front matter
+\pagenumbering{roman}
+\input{chapters/title}        % Title page
+\cleardoublepage
+
+\input{chapters/abstract}     % Abstract
+\cleardoublepage
+\setcounter{page}{1}
+
+\input{chapters/declaration}  % Declaration of originality
+\cleardoublepage
+
+\input{chapters/acknowledgements}  % Acknowledgements
+\cleardoublepage
+
+% Table of contents
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+
+% Main chapters
+\cleardoublepage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\input{chapters/introduction}    % Chapter 1
+\input{chapters/background}      % Chapter 2
+\input{chapters/requirements}    % Chapter 3
+\input{chapters/implementation}  % Chapter 4
+\input{chapters/testing}        % Chapter 5
+\input{chapters/conclusion}      % Chapter 6
+
+% Bibliography
+\phantomsection
+\addcontentsline{toc}{chapter}{References}
+\printbibliography[title={References}]
+
+% Appendices
+\appendix
+\input{chapters/appendices}
+
+\end{document}
