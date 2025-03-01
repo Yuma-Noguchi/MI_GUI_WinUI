@@ -1,0 +1,121 @@
+% UCL Thesis Style File
+
+% Essential packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage[style=ieee]{biblatex}
+\usepackage{amsmath}         % For mathematical formulas
+\usepackage{listings}
+\usepackage[outputdir=report]{minted}          % For code highlighting with correct output directory
+\usepackage{booktabs}        % For professional tables
+\usepackage{hyperref}
+\usepackage{cleveref}        % For smart references
+\usepackage[a4paper,width=150mm,top=25mm,bottom=25mm]{geometry}  % UCL margins
+\usepackage{setspace}        % For line spacing
+\usepackage{fancyhdr}        % For headers and footers
+\usepackage{float}           % For figure placement
+\usepackage{caption}         % For figure captions
+\usepackage{subcaption}      % For subfigures
+\usepackage{enumitem}        % For list customization
+\usepackage{acronym}         % For acronym management
+\usepackage{tocloft}         % For ToC customization
+\usepackage{xcolor}          % For colored text and backgrounds
+
+% Page style configuration
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\slshape\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14.5pt}
+
+% Chapter style configuration
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+{\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-50pt}{40pt}
+
+% Line spacing
+\onehalfspacing
+
+% Figure settings
+\graphicspath{{figures/}}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+
+% Code listing settings
+\lstset{
+    language=[Sharp]C,
+    basicstyle=\footnotesize\ttfamily,
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    tabsize=2,
+    breaklines=true,
+    showstringspaces=false,
+    captionpos=b
+}
+
+% Define C# language for listings
+\lstdefinelanguage{csharp}{
+    language=[Sharp]C,
+    morekeywords={var,async,await,string,get,set,where,select,from,orderby,ascending,descending},
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+    morestring=[b]",
+}
+
+\usemintedstyle{friendly}
+\setminted{
+  frame=single,
+  framesep=2mm,
+  baselinestretch=1.2,
+  fontsize=\footnotesize,
+  linenos
+}
+
+% Hyperref settings
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    citecolor=blue,
+    pdftitle={MotionInput Configuration GUI},
+    pdfauthor={Your Name},
+    pdfsubject={Computer Science BSc Project},
+    pdfkeywords={MotionInput, GUI, Accessibility, Gaming}
+}
+
+% Caption settings
+\captionsetup{
+    format=hang,
+    font=small,
+    labelfont=bf
+}
+
+% Table settings
+\renewcommand{\arraystretch}{1.2}
+
+% Custom commands
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\figref}[1]{Figure~\ref{#1}}
+\newcommand{\tabref}[1]{Table~\ref{#1}}
+\newcommand{\secref}[1]{Section~\ref{#1}}
+\newcommand{\chapref}[1]{Chapter~\ref{#1}}
+
+% Bibliography settings
+\addbibresource{../report/bibliography/references.bib}
+
+% Minted settings for code examples
+\setminted{
+    breaklines=true,
+    breakanywhere=true,
+    frame=single,
+    fontsize=\footnotesize,
+    linenos=true,
+    tabsize=4,
+    style=friendly,
+    encoding=utf8
+}
