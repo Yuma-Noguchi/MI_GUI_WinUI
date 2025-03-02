@@ -16,7 +16,6 @@ namespace MI_GUI_WinUI.ViewModels
     public partial class ProfileEditorViewModel : ObservableObject
     {
         private readonly string _baseAppPath;
-        private readonly float GRID_SNAP_SIZE = 20f;
         private readonly string PROFILES_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MotionInput", "Profiles");
 
         [ObservableProperty]
@@ -24,9 +23,6 @@ namespace MI_GUI_WinUI.ViewModels
 
         [ObservableProperty]
         private string validationMessage = string.Empty;
-
-        [ObservableProperty]
-        private bool isGridSnapEnabled;
 
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
@@ -82,10 +78,6 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         public void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
         {
-            if (IsGridSnapEnabled)
-            {
-                buttonInfo.Position = GetSnappedPosition(buttonInfo.Position);
-            }
             CanvasButtons.Add(buttonInfo);
         }
 
@@ -94,14 +86,12 @@ namespace MI_GUI_WinUI.ViewModels
             var existingButton = CanvasButtons.FirstOrDefault(b => b.Button.Name == buttonInfo.Button.Name);
             if (existingButton != null)
             {
-                var position = IsGridSnapEnabled ? GetSnappedPosition(buttonInfo.Position) : buttonInfo.Position;
                 var index = CanvasButtons.IndexOf(existingButton);
                 CanvasButtons[index] = new ButtonPositionInfo
                 {
                     Button = buttonInfo.Button,
-                    Position = position,
-                    Size = buttonInfo.Size,
-                    SnapPosition = IsGridSnapEnabled ? position : null
+                    Position = buttonInfo.Position,
+                    Size = buttonInfo.Size
                 };
             }
         }
@@ -175,9 +165,7 @@ namespace MI_GUI_WinUI.ViewModels
                 var profile = new Profile
                 {
                     Name = ProfileName,
-                    GlobalConfig = new Dictionary<string, string> {
-                        { "grid_snap", IsGridSnapEnabled.ToString() }
-                    },
+                    GlobalConfig = new Dictionary<string, string>(),
                     GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
                     Poses = new List<PoseConfig>(),
                     SpeechCommands = new Dictionary<string, SpeechCommand>()
@@ -233,12 +221,6 @@ namespace MI_GUI_WinUI.ViewModels
                     CanvasButtons.Add(ConvertFromGuiElement(element));
                 }
 
-                if (profile.GlobalConfig != null &&
-                    profile.GlobalConfig.TryGetValue("grid_snap", out string? gridSnapValue))
-                {
-                    IsGridSnapEnabled = bool.TryParse(gridSnapValue, out bool value) && value;
-                }
-
                 ValidationMessage = "Profile loaded successfully";
             }
             catch (Exception ex)
@@ -253,12 +235,5 @@ namespace MI_GUI_WinUI.ViewModels
                    CustomButtons.FirstOrDefault(b => b.Name == buttonName);
         }
 
-        private Point GetSnappedPosition(Point position)
-        {
-            return new Point(
-                Math.Round(position.X / GRID_SNAP_SIZE) * GRID_SNAP_SIZE,
-                Math.Round(position.Y / GRID_SNAP_SIZE) * GRID_SNAP_SIZE
-            );
-        }
     }
 }
