@@ -361,3 +361,6 @@ MotionInput/
 *.lot
 *.out
 *.bcf
+
+MI_GUI_WinUI\AI_Models\
+
