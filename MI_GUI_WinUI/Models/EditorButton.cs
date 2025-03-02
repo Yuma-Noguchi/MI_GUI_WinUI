@@ -1,89 +1,40 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 using Windows.Foundation;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace MI_GUI_WinUI.Models
 {
-    public partial class EditorButton : ObservableObject
+    public class EditorButton
     {
-        [ObservableProperty]
-        private string _name = string.Empty;
-
-        [ObservableProperty]
-        private string _file = string.Empty;
-
-        [ObservableProperty]
-        private string _category = string.Empty;
-
-        [ObservableProperty]
-        private string _iconPath = string.Empty;
-
-        [ObservableProperty]
-        private string _skin = string.Empty;
-
-        [ObservableProperty]
-        private string _triggeredSkin = string.Empty;
-
-        [ObservableProperty]
-        private int _radius;
-
-        [ObservableProperty]
-        private Point _position;
-
-        [ObservableProperty]
-        private ActionConfig _action = new()
-        {
-            ClassName = string.Empty,
-            MethodName = string.Empty,
-            Arguments = new System.Collections.Generic.List<string>()
-        };
-
-        public GuiElement ToGuiElement()
-        {
-            return new GuiElement
-            {
-                File = File,
-                Position = new System.Collections.Generic.List<int> { (int)Position.X, (int)Position.Y },
-                Radius = Radius,
-                Skin = Skin,
-                TriggeredSkin = TriggeredSkin,
-                Action = Action
-            };
-        }
-
-        public static EditorButton FromGuiElement(GuiElement element)
-        {
-            return new EditorButton
-            {
-                File = element.File,
-                Name = element.File, // Use File as Name for display purposes
-                Position = new Point(element.Position[0], element.Position[1]),
-                Radius = element.Radius,
-                Skin = element.Skin,
-                TriggeredSkin = element.TriggeredSkin,
-                Action = element.Action,
-                IconPath = element.File // Set IconPath to File for image display
-            };
-        }
-
+        public string Name { get; set; } = string.Empty;
+        public string IconPath { get; set; } = string.Empty;
+        public string TriggeredIconPath { get; set; } = string.Empty;
+        public Size Size { get; set; } = new Size(60, 60);
+        public string Category { get; set; } = string.Empty;
+        public string? Action { get; set; }
+        public bool IsDefault { get; set; }
+        
         public EditorButton Clone()
         {
             return new EditorButton
             {
-                Name = Name,
-                File = File,
-                Category = Category,
-                IconPath = IconPath,
-                Skin = Skin,
-                TriggeredSkin = TriggeredSkin,
-                Radius = Radius,
-                Position = Position,
-                Action = new ActionConfig
-                {
-                    ClassName = Action.ClassName,
-                    MethodName = Action.MethodName,
-                    Arguments = new System.Collections.Generic.List<string>(Action.Arguments)
-                }
+                Name = this.Name,
+                IconPath = this.IconPath,
+                TriggeredIconPath = this.TriggeredIconPath,
+                Size = this.Size,
+                Category = this.Category,
+                Action = this.Action,
+                IsDefault = this.IsDefault
             };
+        }
+
+        // Helper method to get triggered icon path
+        public string GetTriggeredIconPath()
+        {
+            if (!string.IsNullOrEmpty(TriggeredIconPath))
+                return TriggeredIconPath;
+                
+            return IconPath.Replace(".png", "_triggered.png");
         }
     }
 }
