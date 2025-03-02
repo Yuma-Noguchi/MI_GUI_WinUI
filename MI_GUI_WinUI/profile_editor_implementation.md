@@ -1,70 +1,128 @@
-# Profile Editor Implementation Progress
+# Profile Editor Implementation
 
-## Completed Tasks
+## Overview
+The Profile Editor allows users to create and customize control profiles by dragging and dropping buttons onto a canvas. Users can save and load profiles, which are compatible with the existing profile format used by the core Motion Input software.
 
-1. Models Implementation
-   - ✓ Updated EditorButton model with proper properties and conversion methods
-   - ✓ Created ButtonPositionInfo model for drag-drop operations
-   - ✓ Aligned with existing Profile and GuiElement structures
+## Key Components
 
-2. XAML UI Implementation
-   - ✓ Created main layout with split panels
-   - ✓ Implemented ItemsRepeater for button collections
-   - ✓ Added drag-drop event handlers
-   - ✓ Added grid snap toggle and profile name input
-   - ✓ Setup toolbar with command buttons
-   - ✓ Added drop animation storyboard
+### Models
 
-3. ViewModel Implementation
-   - ✓ Added collections for default and custom buttons
-   - ✓ Implemented basic CRUD operations
-   - ✓ Added grid snap functionality
-   - ✓ Setup proper image path handling
-   - ✓ Added profile save/load functionality
+#### EditorButton
+- Represents a button that can be placed on the canvas
+- Properties:
+  - Name
+  - IconPath
+  - TriggeredIconPath
+  - Size
+  - Category
+  - Action
+  - IsDefault
 
-## Remaining Tasks
+#### ButtonPositionInfo
+- Tracks a button's position and layout information on the canvas
+- Properties:
+  - Button (EditorButton)
+  - Position
+  - SnapPosition
+  - Size
 
-1. Asset Management
-   - [ ] Setup proper asset directory structure
-   - [ ] Copy default gamepad images to correct location
-   - [ ] Verify image loading paths
-   - [ ] Add error handling for missing images
+### Controls
 
-2. Drag and Drop Operations
-   - [ ] Test drag-drop functionality
-   - [ ] Implement proper position calculation
-   - [ ] Add visual feedback during drag
-   - [ ] Test grid snapping
+#### ResizableImage
+- Custom control that allows resizing through corner grips
+- Features:
+  - Grip visibility on hover
+  - Aspect ratio preservation during resize
+  - Size constraints
+  - Smooth animations
 
-3. Button Actions
-   - [ ] Add context menu for button actions
-   - [ ] Implement action configuration dialog
-   - [ ] Add button removal functionality
-   - [ ] Add button position editing
+### View Model (ProfileEditorViewModel)
 
-4. Profile Management
-   - [ ] Test profile saving and loading
-   - [ ] Add profile validation
-   - [ ] Implement profile backup
-   - [ ] Add error recovery
+#### Properties
+- DefaultButtons: Pre-defined Xbox controller buttons
+- CustomButtons: User-created buttons from IconStudio
+- CanvasButtons: Buttons currently placed on the canvas
+- ProfileName
+- ValidationMessage
+- IsGridSnapEnabled
 
-5. Testing and Debug
-   - [ ] Add logging for key operations
-   - [ ] Test error handling
-   - [ ] Verify memory management
-   - [ ] Test large profile performance
+#### Commands
+- NewProfile: Clears the current profile
+- SaveProfile: Saves profile to JSON file
+- LoadProfile: Loads profile from JSON file
+- AddButtonToCanvas: Adds button to canvas at specific position
 
-## Next Steps
+#### Key Methods
+- ConvertToGuiElement: Converts ButtonPositionInfo to GuiElement for saving
+- ConvertFromGuiElement: Converts GuiElement to ButtonPositionInfo when loading
+- CreateDefaultActionConfig: Creates default button press action
+- UpdateButtonPosition: Updates button position with optional grid snapping
 
-1. Set up asset directories and copy required images
-2. Test basic drag and drop functionality
-3. Implement button actions and context menu
-4. Add comprehensive error handling
-5. Test profile save/load operations
+### Profile JSON Structure
 
-## Known Issues
+```json
+{
+  "config": {
+    "grid_snap": "true|false"
+  },
+  "gui": [
+    {
+      "file": "button_name",
+      "pos": [x, y],
+      "radius": 30,
+      "skin": "path/to/normal/icon.png",
+      "triggered_skin": "path/to/triggered/icon.png",
+      "action": {
+        "class": "XboxController",
+        "method": "PressButton",
+        "args": ["button_name"]
+      }
+    }
+  ],
+  "poses": [],
+  "speech": {}
+}
+```
 
-1. Image loading paths need verification
-2. Drop animation timing might need adjustment
-3. Grid snap size might need fine-tuning
-4. Error handling needs improvement
+## Workflow
+
+1. User opens Profile Editor
+2. Drags buttons from sidebar onto canvas
+3. Positions and resizes buttons as needed
+4. Optionally enables grid snapping for precise placement
+5. Enters profile name
+6. Saves profile
+
+## Implementation Notes
+
+### Grid Snapping
+- Grid size is 20x20 pixels
+- When enabled, button positions snap to nearest grid intersection
+- Snap positions are cached to improve performance
+
+### Drag and Drop
+- Uses WinUI drag-drop APIs
+- Supports both default and custom buttons
+- Validates dropped content
+- Shows preview feedback during drag
+
+### File Management
+- Profiles saved to user's Documents/MotionInput/Profiles directory
+- Uses Newtonsoft.Json for compatibility with existing profile format
+- Maintains all required profile sections (gui, poses, speech, config)
+
+### UI/UX Considerations
+- Snap-to-grid toggle for precise placement
+- Visual feedback during drag operations
+- Animated button placement
+- Button resizing maintains aspect ratio
+- Validation messages for error states
+
+## Future Enhancements
+
+1. Preview mode to test button layouts
+2. Undo/redo functionality
+3. Custom action editor integration
+4. Button categories and filtering
+5. Template/preset support
+6. Profile sharing capabilities

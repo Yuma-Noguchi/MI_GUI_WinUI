@@ -4,131 +4,134 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:models="using:MI_GUI_WinUI.Models"
-    mc:Ignorable="d">
+    xmlns:controls="using:MI_GUI_WinUI.Controls"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Header -->
-        <TextBlock Text="Profile Editor" 
-                 Style="{StaticResource TitleTextBlockStyle}"
-                 Margin="12,8,0,8"
-                 Grid.ColumnSpan="2"/>
+        <!-- Left Panel - Button List -->
+        <Grid Grid.Column="0" Padding="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Left Panel - Button Selection -->
-        <ScrollViewer Grid.Row="1" Grid.Column="0" 
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="12">
-                <!-- Profile Name Input -->
-                <TextBox PlaceholderText="Enter profile name"
-                         Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
-                         Margin="0,0,0,12"/>
-
-                <!-- Grid Snap Toggle -->
-                <ToggleSwitch Header="Grid Snap"
-                             IsOn="{x:Bind ViewModel.IsGridSnapEnabled, Mode=TwoWay}"
-                             Margin="0,0,0,12"/>
-
-                <!-- Default Buttons -->
-                <TextBlock Text="Default Buttons"
-                         Style="{StaticResource SubtitleTextBlockStyle}"
-                         Margin="0,0,0,8"/>
-                
-                <ItemsRepeater ItemsSource="{x:Bind ViewModel.DefaultButtons}">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="60" MinItemHeight="60" 
-                                         MaximumRowsOrColumns="3" 
-                                         ItemsJustification="SpaceEvenly"/>
-                    </ItemsRepeater.Layout>
-                    <ItemsRepeater.ItemTemplate>
-                        <DataTemplate x:DataType="models:EditorButton">
-                            <Image Source="{x:Bind IconPath}"
-                                   Width="60" Height="60"
-                                   Margin="4"
-                                   Tag="{x:Bind Name}"
-                                   CanDrag="True"
-                                   DragStarting="Image_DragStarting"
-                                   DropCompleted="Image_DropCompleted"/>
-                        </DataTemplate>
-                    </ItemsRepeater.ItemTemplate>
-                </ItemsRepeater>
-
-                <!-- Custom Buttons -->
-                <TextBlock Text="Custom Buttons"
-                         Style="{StaticResource SubtitleTextBlockStyle}"
-                         Margin="0,12,0,8"/>
-                
-                <ItemsRepeater ItemsSource="{x:Bind ViewModel.CustomButtons}">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="60" MinItemHeight="60" 
-                                         MaximumRowsOrColumns="3" 
-                                         ItemsJustification="SpaceEvenly"/>
-                    </ItemsRepeater.Layout>
-                    <ItemsRepeater.ItemTemplate>
-                        <DataTemplate x:DataType="models:EditorButton">
-                            <Image Source="{x:Bind IconPath}"
-                                   Width="60" Height="60"
-                                   Margin="4"
-                                   Tag="{x:Bind Name}"
-                                   CanDrag="True"
-                                   DragStarting="Image_DragStarting"
-                                   DropCompleted="Image_DropCompleted"/>
-                        </DataTemplate>
-                    </ItemsRepeater.ItemTemplate>
-                </ItemsRepeater>
+            <!-- Profile Name Input -->
+            <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,16">
+                <TextBox
+                    PlaceholderText="Enter Profile Name"
+                    Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
+                    Width="240"/>
+                <TextBlock
+                    Text="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                    Foreground="{ThemeResource SystemErrorTextColor}"
+                    TextWrapping="Wrap"/>
             </StackPanel>
-        </ScrollViewer>
+
+            <!-- Grid Snap Toggle -->
+            <ToggleSwitch
+                Grid.Row="1"
+                Header="Grid Snap"
+                IsOn="{x:Bind ViewModel.IsGridSnapEnabled, Mode=TwoWay}"
+                OffContent="Off"
+                OnContent="On"
+                Margin="0,0,0,16"/>
+
+            <!-- Button Lists -->
+            <ScrollViewer Grid.Row="2" Margin="0,0,0,16">
+                <StackPanel Spacing="16">
+                    <!-- Default Buttons -->
+                    <StackPanel>
+                        <TextBlock
+                            Text="Default Buttons"
+                            Style="{ThemeResource SubtitleTextBlockStyle}"
+                            Margin="0,0,0,8"/>
+                        <ItemsRepeater ItemsSource="{x:Bind ViewModel.DefaultButtons}">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout
+                                    MinItemWidth="70"
+                                    MinItemHeight="70"
+                                    MinRowSpacing="8"
+                                    MinColumnSpacing="8"/>
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate>
+                                    <Image
+                                        Source="{Binding IconPath}"
+                                        Width="60" Height="60"
+                                        Tag="{Binding Name}"
+                                        CanDrag="True"
+                                        DragStarting="Image_DragStarting"
+                                        DropCompleted="Image_DropCompleted"/>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                    </StackPanel>
+
+                    <!-- Custom Buttons -->
+                    <StackPanel>
+                        <TextBlock
+                            Text="Custom Buttons"
+                            Style="{ThemeResource SubtitleTextBlockStyle}"
+                            Margin="0,0,0,8"/>
+                        <ItemsRepeater ItemsSource="{x:Bind ViewModel.CustomButtons}">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout
+                                    MinItemWidth="70"
+                                    MinItemHeight="70"
+                                    MinRowSpacing="8"
+                                    MinColumnSpacing="8"/>
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate>
+                                    <Image
+                                        Source="{Binding IconPath}"
+                                        Width="60" Height="60"
+                                        Tag="{Binding Name}"
+                                        CanDrag="True"
+                                        DragStarting="Image_DragStarting"
+                                        DropCompleted="Image_DropCompleted"/>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Action Buttons -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                <Button 
+                    Content="New"
+                    Command="{x:Bind ViewModel.NewProfileCommand}"/>
+                <Button 
+                    Content="Save"
+                    Command="{x:Bind ViewModel.SaveProfileCommand}"/>
+                <Button 
+                    Content="Load"
+                    Command="{x:Bind ViewModel.LoadProfileCommand}"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Right Panel - Canvas -->
-        <Grid Grid.Row="1" Grid.Column="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-            <!-- Canvas for button placement -->
-            <Canvas x:Name="EditorCanvas"
-                    AllowDrop="True"
-                    DragOver="EditorCanvas_DragOver"
-                    Drop="EditorCanvas_Drop"
-                    Background="Transparent"
-                    Margin="12">
-                <Canvas.Resources>
-                    <Storyboard x:Name="DropAnimation">
-                        <DoubleAnimation Storyboard.TargetProperty="ScaleX"
-                                       From="0.8" To="1"
-                                       Duration="0:0:0.2">
-                            <DoubleAnimation.EasingFunction>
-                                <ElasticEase Oscillations="1"/>
-                            </DoubleAnimation.EasingFunction>
-                        </DoubleAnimation>
-                        <DoubleAnimation Storyboard.TargetProperty="ScaleY"
-                                       From="0.8" To="1"
-                                       Duration="0:0:0.2">
-                            <DoubleAnimation.EasingFunction>
-                                <ElasticEase Oscillations="1"/>
-                            </DoubleAnimation.EasingFunction>
-                        </DoubleAnimation>
-                    </Storyboard>
-                </Canvas.Resources>
+        <Border 
+            Grid.Column="1" 
+            BorderBrush="{ThemeResource SystemBaseLowColor}"
+            BorderThickness="1,0,0,0">
+            <Canvas
+                x:Name="EditorCanvas"
+                Background="Transparent"
+                AllowDrop="True"
+                DragOver="EditorCanvas_DragOver"
+                Drop="EditorCanvas_Drop">
+                <!-- Grid lines if needed -->
             </Canvas>
-
-            <!-- Toolbar -->
-            <CommandBar VerticalAlignment="Bottom">
-                <AppBarButton Icon="Delete" Label="Clear" Command="{x:Bind ViewModel.NewProfileCommand}"/>
-                <AppBarButton Icon="Save" Label="Save" Command="{x:Bind ViewModel.SaveProfileCommand}"/>
-                <AppBarButton Icon="OpenFile" Label="Load" Command="{x:Bind ViewModel.LoadProfileCommand}"/>
-            </CommandBar>
-            
-            <!-- Validation Message -->
-            <InfoBar IsOpen="{x:Bind ViewModel.ValidationMessage, Mode=OneWay, Converter={StaticResource StringToBoolConverter}}"
-                     Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
-                     Severity="Informational"
-                     VerticalAlignment="Top"/>
-        </Grid>
+        </Border>
     </Grid>
 </Page>

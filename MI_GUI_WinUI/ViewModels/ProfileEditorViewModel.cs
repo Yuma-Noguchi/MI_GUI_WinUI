@@ -1,47 +1,42 @@
+using System;
+using System.Linq;
+using System.Collections.ObjectModel;
+using Windows.Foundation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.Logging;
-using Microsoft.UI.Xaml;
-using System;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
-using Windows.Foundation;
 using MI_GUI_WinUI.Models;
-using System.Threading.Tasks;
-using System.Linq;
 using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ProfileEditorViewModel : ObservableObject
     {
-        private readonly ILogger<ProfileEditorViewModel> _logger;
-        private readonly ProfileService _profileService;
         private readonly string _baseAppPath;
-        
+        private readonly float GRID_SNAP_SIZE = 20f;
+        private readonly string PROFILES_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MotionInput", "Profiles");
+
+        [ObservableProperty]
+        private string profileName = string.Empty;
+
+        [ObservableProperty]
+        private string validationMessage = string.Empty;
+
+        [ObservableProperty]
+        private bool isGridSnapEnabled;
+
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
-        public ObservableCollection<EditorButton> CanvasButtons { get; } = new();
+        public ObservableCollection<ButtonPositionInfo> CanvasButtons { get; } = new();
 
-        [ObservableProperty]
-        private string _profileName = string.Empty;
-
-        [ObservableProperty]
-        private string _validationMessage = string.Empty;
-
-        [ObservableProperty]
-        private bool _isGridSnapEnabled;
-
-        private const int GRID_SIZE = 20; // Grid size in pixels
-
-        public ProfileEditorViewModel(ILogger<ProfileEditorViewModel> logger, ProfileService profileService)
+        public ProfileEditorViewModel()
         {
-            _logger = logger;
-            _profileService = profileService;
             _baseAppPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
-
             InitializeDefaultButtons();
-            InitializeCustomButtons();
+            LoadCustomButtons();
         }
 
         private void InitializeDefaultButtons()
@@ -70,81 +65,97 @@ namespace MI_GUI_WinUI.ViewModels
                 DefaultButtons.Add(new EditorButton
                 {
                     Name = button.Name,
-                    File = $"{button.BasePath}.png", // Store just the filename in File property
+                    IconPath = normalImagePath, // Store just the filename in File property
+                    TriggeredIconPath = triggeredImagePath,
                     Category = "Default",
-                    IconPath = normalImagePath,
-                    Skin = $"{button.BasePath}.png",
-                    TriggeredSkin = $"{button.BasePath}_triggered.png",
-                    Radius = 30 // Default size for all buttons
+                    Action = null,
+                    IsDefault = true
                 });
             }
         }
 
-        private void InitializeCustomButtons()
+        private void LoadCustomButtons()
         {
-            // Custom buttons will be loaded from user's saved buttons
-            // TODO: Implement custom button loading from IconStudio
+            // TODO: Load custom buttons from IconStudio
         }
 
         [RelayCommand]
-        private void AddButtonToCanvas(ButtonPositionInfo info)
+        public void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
         {
-            try
+            if (IsGridSnapEnabled)
             {
-                var newButton = info.Button.Clone();
-                newButton.Position = GetSnappedPosition(info.Position);
-
-                CanvasButtons.Add(newButton);
-                ValidationMessage = string.Empty;
+                buttonInfo.Position = GetSnappedPosition(buttonInfo.Position);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error adding button to canvas");
-                ValidationMessage = "Failed to add button to canvas";
-            }
+            CanvasButtons.Add(buttonInfo);
         }
 
-        [RelayCommand]
-        private void UpdateButtonPosition(ButtonPositionInfo info)
+        public void UpdateButtonPosition(ButtonPositionInfo buttonInfo)
         {
-            try
+            var existingButton = CanvasButtons.FirstOrDefault(b => b.Button.Name == buttonInfo.Button.Name);
+            if (existingButton != null)
             {
-                if (info.Button != null)
+                var position = IsGridSnapEnabled ? GetSnappedPosition(buttonInfo.Position) : buttonInfo.Position;
+                var index = CanvasButtons.IndexOf(existingButton);
+                CanvasButtons[index] = new ButtonPositionInfo
                 {
-                    var position = GetSnappedPosition(info.Position);
-                    info.Button.Position = position;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating button position");
-                ValidationMessage = "Failed to update button position";
+                    Button = buttonInfo.Button,
+                    Position = position,
+                    Size = buttonInfo.Size,
+                    SnapPosition = IsGridSnapEnabled ? position : null
+                };
             }
         }
 
         [RelayCommand]
-        private void RemoveButton(EditorButton button)
+        public void NewProfile()
         {
-            if (button != null)
-            {
-                CanvasButtons.Remove(button);
-                ValidationMessage = string.Empty;
-            }
+            ProfileName = string.Empty;
+            ValidationMessage = string.Empty;
+            CanvasButtons.Clear();
         }
 
-        private Point GetSnappedPosition(Point position)
+        private ActionConfig CreateDefaultActionConfig(EditorButton button)
         {
-            if (!IsGridSnapEnabled)
-                return position;
+            return new ActionConfig
+            {
+                ClassName = "XboxController",
+                MethodName = "PressButton",
+                Arguments = new List<string> { button.Name }
+            };
+        }
 
-            return new Point(
-                Math.Round(position.X / GRID_SIZE) * GRID_SIZE,
-                Math.Round(position.Y / GRID_SIZE) * GRID_SIZE
-            );
+        private GuiElement ConvertToGuiElement(ButtonPositionInfo buttonInfo)
+        {
+            return new GuiElement
+            {
+                File = buttonInfo.Button.Name,
+                Position = new List<int> { (int)buttonInfo.Position.X, (int)buttonInfo.Position.Y },
+                Radius = (int)(buttonInfo.Size.Width / 2),
+                Skin = buttonInfo.Button.IconPath,
+                TriggeredSkin = buttonInfo.Button.GetTriggeredIconPath(),
+                Action = CreateDefaultActionConfig(buttonInfo.Button)
+            };
+        }
+
+        private ButtonPositionInfo ConvertFromGuiElement(GuiElement element)
+        {
+            var button = FindSourceButton(element.File)?.Clone() ?? new EditorButton
+            {
+                Name = element.File,
+                IconPath = element.Skin,
+                TriggeredIconPath = element.TriggeredSkin
+            };
+
+            return new ButtonPositionInfo
+            {
+                Button = button,
+                Position = new Point(element.Position[0], element.Position[1]),
+                Size = new Size(element.Radius * 2, element.Radius * 2)
+            };
         }
 
         [RelayCommand]
-        private async Task SaveProfile()
+        public async Task SaveProfile()
         {
             try
             {
@@ -157,68 +168,90 @@ namespace MI_GUI_WinUI.ViewModels
                 var profile = new Profile
                 {
                     Name = ProfileName,
-                    GlobalConfig = new System.Collections.Generic.Dictionary<string, string>(),
-                    GuiElements = CanvasButtons.Select(b => b.ToGuiElement()).ToList(),
-                    Poses = new System.Collections.Generic.List<PoseConfig>(),
-                    SpeechCommands = new System.Collections.Generic.Dictionary<string, SpeechCommand>()
+                    GlobalConfig = new Dictionary<string, string> {
+                        { "grid_snap", IsGridSnapEnabled.ToString() }
+                    },
+                    GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
+                    Poses = new List<PoseConfig>(),
+                    SpeechCommands = new Dictionary<string, SpeechCommand>()
                 };
 
-                await _profileService.SaveProfilesToJsonAsync(
-                    new System.Collections.Generic.List<Profile> { profile }, 
-                    Path.Combine("MotionInput", "data", "profiles")
-                );
+                if (!Directory.Exists(PROFILES_DIR))
+                {
+                    Directory.CreateDirectory(PROFILES_DIR);
+                }
+
+                var filePath = Path.Combine(PROFILES_DIR, $"{ProfileName}.json");
+                var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
+                await File.WriteAllTextAsync(filePath, json);
 
                 ValidationMessage = "Profile saved successfully";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving profile");
-                ValidationMessage = "Failed to save profile";
+                ValidationMessage = $"Error saving profile: {ex.Message}";
             }
         }
 
         [RelayCommand]
-        private async Task LoadProfile()
+        public async Task LoadProfile()
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(ProfileName))
                 {
-                    ValidationMessage = "Please enter a profile name";
+                    ValidationMessage = "Please enter a profile name to load";
                     return;
                 }
 
-                var profile = _profileService.GetProfileFromCache(ProfileName);
-                if (profile == null)
+                var filePath = Path.Combine(PROFILES_DIR, $"{ProfileName}.json");
+                if (!File.Exists(filePath))
                 {
                     ValidationMessage = "Profile not found";
                     return;
                 }
 
-                // Clear existing buttons
-                CanvasButtons.Clear();
+                var json = await File.ReadAllTextAsync(filePath);
+                var profile = JsonConvert.DeserializeObject<Profile>(json);
 
-                // Add buttons from the loaded profile
-                foreach (var element in profile.Value.GuiElements)
+                if (profile.GuiElements == null)
                 {
-                    CanvasButtons.Add(EditorButton.FromGuiElement(element));
+                    ValidationMessage = "Error loading profile: Invalid format";
+                    return;
+                }
+
+                CanvasButtons.Clear();
+                foreach (var element in profile.GuiElements)
+                {
+                    CanvasButtons.Add(ConvertFromGuiElement(element));
+                }
+
+                if (profile.GlobalConfig != null && 
+                    profile.GlobalConfig.TryGetValue("grid_snap", out string? gridSnapValue))
+                {
+                    IsGridSnapEnabled = bool.TryParse(gridSnapValue, out bool value) && value;
                 }
 
                 ValidationMessage = "Profile loaded successfully";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading profile");
-                ValidationMessage = "Failed to load profile";
+                ValidationMessage = $"Error loading profile: {ex.Message}";
             }
         }
 
-        [RelayCommand]
-        private void NewProfile()
+        private EditorButton? FindSourceButton(string buttonName)
         {
-            ProfileName = string.Empty;
-            CanvasButtons.Clear();
-            ValidationMessage = string.Empty;
+            return DefaultButtons.FirstOrDefault(b => b.Name == buttonName) ??
+                   CustomButtons.FirstOrDefault(b => b.Name == buttonName);
+        }
+
+        private Point GetSnappedPosition(Point position)
+        {
+            return new Point(
+                Math.Round(position.X / GRID_SNAP_SIZE) * GRID_SNAP_SIZE,
+                Math.Round(position.Y / GRID_SNAP_SIZE) * GRID_SNAP_SIZE
+            );
         }
     }
 }
