@@ -1,123 +1,224 @@
-# Select Profiles Page Implementation Plan
+# Profile Editor Implementation Plan
 
-## 1. Profile Loading and Management
+## Phase 1: Basic Structure Implementation
 
-### Improve Profile Service
-- Add error handling for malformed JSON files
-- Implement caching for better performance
-- Add validation for required profile fields
-- Support for profile categories/grouping
-- Add profile metadata (last modified date, description, etc.)
+### ProfileEditorViewModel
 
-### Profile Model Enhancements
-- Add validation attributes for required fields
-- Add profile versioning support
-- Include profile thumbnails/preview images
-
-## 2. UI/UX Improvements
-
-### Profile Grid View
-- Implement virtualization for better performance with many profiles
-- Add profile sorting options (name, date, category)
-- Improve profile preview generation
-  - Cache generated previews
-  - Improve layout algorithm for GUI elements
-  - Add placeholder for missing images
-  - Add loading state while previews generate
-
-### Search and Filter
-- Implement real-time search functionality
-  - Search by profile name
-  - Search by profile content/tags
-  - Fuzzy matching for better results
-- Add filter options:
-  - By category
-  - By date modified
-  - By usage frequency
-
-### Profile Selection Popup
-- Enhance blur effect implementation
-  - Use Windows.UI.Composition APIs for better performance
-  - Add animation for smooth transitions
-- Improve popup content:
-  - Add profile details/description
-  - Show last modified date
-  - Display profile metadata
-  - Add quick actions (edit, duplicate, etc.)
-
-## 3. Technical Implementation Steps
-
-1. ProfileService Enhancements:
 ```csharp
-public class ProfileService {
-    private Dictionary<string, Profile> _profileCache;
-    private Dictionary<string, ProfilePreview> _previewCache;
+public partial class ProfileEditorViewModel : ViewModelBase
+{
+    private readonly ILogger<ProfileEditorViewModel> _logger;
+    private readonly ProfileService _profileService;
+    private readonly WindowManager _windowManager;
     
-    // Add caching
-    public async Task<List<Profile>> LoadProfilesAsync()
-    // Add validation
-    private void ValidateProfile(Profile profile)
-    // Add preview caching
-    public async Task<ProfilePreview> GetProfilePreviewAsync(Profile profile)
+    // Observable Properties
+    [ObservableProperty]
+    private string _title = "Profile Editor";
+    
+    [ObservableProperty]
+    private Profile? _currentProfile;
+    
+    [ObservableProperty]
+    private ObservableCollection<ButtonTemplate> _defaultButtons;
+    
+    [ObservableProperty]
+    private ObservableCollection<ButtonTemplate> _customButtons;
+    
+    [ObservableProperty]
+    private string? _errorMessage;
+    
+    [ObservableProperty]
+    private bool _isLoading;
+    
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+    
+    // Canvas Properties
+    [ObservableProperty]
+    private Canvas _previewCanvas;
+    
+    [ObservableProperty]
+    private bool _showGrid;
+    
+    [ObservableProperty]
+    private bool _snapToGrid;
+    
+    // Constructor injection following DI pattern
+    public ProfileEditorViewModel(
+        ILogger<ProfileEditorViewModel> logger,
+        INavigationService navigationService,
+        ProfileService profileService,
+        WindowManager windowManager) : base(logger, navigationService)
+    {
+        _logger = logger;
+        _profileService = profileService;
+        _windowManager = windowManager;
+    }
+    
+    // Initialize pattern from architecture
+    public override async Task InitializeAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            await LoadButtonTemplatesAsync();
+            InitializeCanvas();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error initializing ProfileEditor");
+            ErrorMessage = "Failed to initialize editor.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+    
+    // Cleanup pattern from architecture
+    public override void Cleanup()
+    {
+        // Clear collections
+        DefaultButtons.Clear();
+        CustomButtons.Clear();
+        
+        // Clear canvas
+        PreviewCanvas.Children.Clear();
+        
+        // Reset state
+        CurrentProfile = null;
+        ErrorMessage = null;
+    }
 }
 ```
 
-2. SelectProfilesViewModel Improvements:
+### Page XAML Structure
+
+```xaml
+<Page x:Class="MI_GUI_WinUI.Pages.ProfileEditorPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="using:MI_GUI_WinUI.Controls">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/> <!-- Button sidebar -->
+            <ColumnDefinition Width="*"/>   <!-- Canvas area -->
+            <ColumnDefinition Width="250"/> <!-- Properties panel -->
+        </Grid.ColumnDefinitions>
+        
+        <!-- Header -->
+        <controls:PageHeader Grid.Row="0" Grid.ColumnSpan="3" 
+                           Title="{x:Bind ViewModel.Title, Mode=OneWay}"/>
+        
+        <!-- Button Sidebar -->
+        <Grid Grid.Row="1" Grid.Column="0">
+            <!-- Implementation in Phase 2 -->
+        </Grid>
+        
+        <!-- Canvas Area -->
+        <Grid Grid.Row="1" Grid.Column="1">
+            <!-- Implementation in Phase 2 -->
+        </Grid>
+        
+        <!-- Properties Panel -->
+        <Grid Grid.Row="1" Grid.Column="2">
+            <!-- Implementation in Phase 2 -->
+        </Grid>
+        
+        <!-- Loading Overlay -->
+        <Grid Grid.RowSpan="2" Grid.ColumnSpan="3" 
+              Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}">
+            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"/>
+        </Grid>
+        
+        <!-- Error Message -->
+        <InfoBar Grid.RowSpan="2" Grid.ColumnSpan="3"
+                IsOpen="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource StringToBoolConverter}}"
+                Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                Severity="Error"/>
+    </Grid>
+</Page>
+```
+
+### Page Code-Behind
+
 ```csharp
-public class SelectProfilesViewModel {
-    // Add search/filter support
-    private void UpdateFilteredProfiles()
-    // Add sorting support
-    private void SortProfiles()
-    // Improve preview generation
-    private async Task GeneratePreviewAsync(Profile profile)
+public sealed partial class ProfileEditorPage : Page
+{
+    private ProfileEditorViewModel? _viewModel;
+    
+    public ProfileEditorPage()
+    {
+        this.InitializeComponent();
+        
+        // Get ViewModel from DI
+        if (_viewModel == null)
+        {
+            _viewModel = Ioc.Default.GetRequiredService<ProfileEditorViewModel>();
+            SetViewModel(_viewModel);
+        }
+    }
+    
+    private void SetViewModel(ProfileEditorViewModel viewModel)
+    {
+        _viewModel = viewModel;
+        if (Application.Current is App app)
+        {
+            var windowManager = app.Services.GetRequiredService<WindowManager>();
+            _viewModel.Window = windowManager.MainWindow;
+        }
+        this.DataContext = _viewModel;
+    }
+    
+    protected override async void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        
+        try
+        {
+            if (_viewModel != null)
+            {
+                await _viewModel.InitializeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.ErrorMessage = $"Error initializing page: {ex.Message}";
+            }
+        }
+    }
+    
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        _viewModel?.Cleanup();
+        _viewModel = null;
+    }
 }
 ```
 
-3. SelectProfilesPage UI Updates:
-- Update XAML for better performance
-- Add animations for smooth transitions
-- Implement proper MVVM pattern
-- Add proper error handling and loading states
+## Next Steps
 
-## 4. Implementation Order
+After implementing this basic structure, we'll proceed with:
 
-1. Core Improvements:
-   - Profile service enhancements
-   - Caching implementation
-   - Profile validation
+1. Button Templates Model Implementation
+2. Drag-Drop Infrastructure
+3. Canvas Interaction Logic
+4. Properties Panel Implementation
 
-2. UI Framework:
-   - Virtualization support
-   - Preview generation improvements
-   - Blur effect enhancement
+Each phase will follow the same architectural patterns:
+- ViewModels inherit from ViewModelBase
+- Use ObservableObject and ObservableProperty attributes
+- Implement proper error handling and logging
+- Follow resource management guidelines
+- Use dependency injection for services
 
-3. Feature Implementation:
-   - Search functionality
-   - Filter options
-   - Sorting capabilities
-
-4. Polish:
-   - Animations
-   - Loading states
-   - Error handling
-   - UI refinements
-
-## 5. Performance Considerations
-
-- Use virtualization for profile grid
-- Implement lazy loading for profile previews
-- Cache generated previews
-- Optimize blur effect implementation
-- Use background threads for JSON parsing
-- Implement proper disposal of resources
-
-## 6. Error Handling
-
-- Add proper error handling for:
-  - File I/O operations
-  - JSON parsing
-  - Image loading
-  - Network operations
-- Show user-friendly error messages
-- Implement logging for debugging
+Once this implementation plan is approved, we can switch to Code mode to begin the implementation.

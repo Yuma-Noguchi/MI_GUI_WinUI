@@ -1,5 +1,4 @@
-﻿﻿﻿﻿using Microsoft.UI.Xaml;
-using MI_GUI_WinUI.Models;
+﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Pages;
@@ -8,6 +7,7 @@ using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using MI_GUI_WinUI.Models;
 
 namespace MI_GUI_WinUI;
 

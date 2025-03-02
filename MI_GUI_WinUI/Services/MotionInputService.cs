@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json; // Using Newtonsoft.Json
 using Newtonsoft.Json.Linq; // Using Newtonsoft.Json.Linq
 
-namespace MI_GUI_WinUI.Models;
+namespace MI_GUI_WinUI.Services;
 
 
 public class MotionInputService
