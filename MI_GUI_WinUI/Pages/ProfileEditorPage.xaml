@@ -30,7 +30,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Profile Name Input -->
@@ -114,9 +113,45 @@
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
+            </Grid>
+            
+            <Grid Grid.Column="1" >
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Right Panel - Canvas -->
+                <Border 
+                    Grid.Row="0"
+                    BorderBrush="{ThemeResource SystemBaseLowColor}"
+                    BorderThickness="1,0,0,0"
+                    Padding="16">
+                    <Border
+                        BorderBrush="{ThemeResource SystemListLowColor}"
+                        BorderThickness="2"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        CornerRadius="8">
+                        <Grid>
+                            <TextBlock
+                                Text="Drop Buttons Here"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontSize="20"
+                                Opacity="0.5"/>
+                            <Canvas
+                                x:Name="EditorCanvas"
+                                Background="Transparent"
+                                AllowDrop="True"
+                                DragOver="EditorCanvas_DragOver"
+                                Drop="EditorCanvas_Drop"/>
+                        </Grid>
+                    </Border>
+                </Border>
 
                 <!-- Action Buttons -->
-                <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="10,10" HorizontalAlignment="Right">
                     <Button 
                         Content="New"
                         Command="{x:Bind ViewModel.NewProfileCommand}"/>
@@ -131,21 +166,6 @@
                         Command="{x:Bind ViewModel.LoadProfileCommand}"/>
                 </StackPanel>
             </Grid>
-
-            <!-- Right Panel - Canvas -->
-            <Border 
-                Grid.Column="1" 
-                BorderBrush="{ThemeResource SystemBaseLowColor}"
-                BorderThickness="1,0,0,0">
-                <Canvas
-                    x:Name="EditorCanvas"
-                    Background="Transparent"
-                    AllowDrop="True"
-                    DragOver="EditorCanvas_DragOver"
-                    Drop="EditorCanvas_Drop">
-                    <!-- Grid lines if needed -->
-                </Canvas>
-            </Border>
         </Grid>
     </Grid>
 </Page>
