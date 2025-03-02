@@ -28,7 +28,6 @@
             <Grid Grid.Column="0" Padding="16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -44,17 +43,8 @@
                         TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <!-- Grid Snap Toggle -->
-                <ToggleSwitch
-                    Grid.Row="1"
-                    Header="Grid Snap"
-                    IsOn="{x:Bind ViewModel.IsGridSnapEnabled, Mode=TwoWay}"
-                    OffContent="Off"
-                    OnContent="On"
-                    Margin="0,0,0,16"/>
-
                 <!-- Button Lists -->
-                <ScrollViewer Grid.Row="2" Margin="0,0,0,16">
+                <ScrollViewer Grid.Row="1" Margin="0,0,0,16">
                     <StackPanel Spacing="16">
                         <!-- Default Buttons -->
                         <StackPanel>
