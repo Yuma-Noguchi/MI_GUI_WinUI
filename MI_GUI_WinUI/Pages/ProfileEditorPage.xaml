@@ -9,129 +9,143 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <!-- Left Panel - Button List -->
-        <Grid Grid.Column="0" Padding="16">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <!-- Header -->
+        <controls:PageHeader Grid.Row="0" Title="Profile Editor"/>
 
-            <!-- Profile Name Input -->
-            <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,16">
-                <TextBox
-                    PlaceholderText="Enter Profile Name"
-                    Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
-                    Width="240"/>
-                <TextBlock
-                    Text="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
-                    Foreground="{ThemeResource SystemErrorTextColor}"
-                    TextWrapping="Wrap"/>
-            </StackPanel>
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <!-- Grid Snap Toggle -->
-            <ToggleSwitch
-                Grid.Row="1"
-                Header="Grid Snap"
-                IsOn="{x:Bind ViewModel.IsGridSnapEnabled, Mode=TwoWay}"
-                OffContent="Off"
-                OnContent="On"
-                Margin="0,0,0,16"/>
+            <!-- Left Panel - Button List -->
+            <Grid Grid.Column="0" Padding="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <!-- Button Lists -->
-            <ScrollViewer Grid.Row="2" Margin="0,0,0,16">
-                <StackPanel Spacing="16">
-                    <!-- Default Buttons -->
-                    <StackPanel>
-                        <TextBlock
-                            Text="Default Buttons"
-                            Style="{ThemeResource SubtitleTextBlockStyle}"
-                            Margin="0,0,0,8"/>
-                        <ItemsRepeater ItemsSource="{x:Bind ViewModel.DefaultButtons}">
-                            <ItemsRepeater.Layout>
-                                <UniformGridLayout
-                                    MinItemWidth="70"
-                                    MinItemHeight="70"
-                                    MinRowSpacing="8"
-                                    MinColumnSpacing="8"/>
-                            </ItemsRepeater.Layout>
-                            <ItemsRepeater.ItemTemplate>
-                                <DataTemplate>
-                                    <Image
-                                        Source="{Binding IconPath}"
-                                        Width="60" Height="60"
-                                        Tag="{Binding Name}"
-                                        CanDrag="True"
-                                        DragStarting="Image_DragStarting"
-                                        DropCompleted="Image_DropCompleted"/>
-                                </DataTemplate>
-                            </ItemsRepeater.ItemTemplate>
-                        </ItemsRepeater>
-                    </StackPanel>
-
-                    <!-- Custom Buttons -->
-                    <StackPanel>
-                        <TextBlock
-                            Text="Custom Buttons"
-                            Style="{ThemeResource SubtitleTextBlockStyle}"
-                            Margin="0,0,0,8"/>
-                        <ItemsRepeater ItemsSource="{x:Bind ViewModel.CustomButtons}">
-                            <ItemsRepeater.Layout>
-                                <UniformGridLayout
-                                    MinItemWidth="70"
-                                    MinItemHeight="70"
-                                    MinRowSpacing="8"
-                                    MinColumnSpacing="8"/>
-                            </ItemsRepeater.Layout>
-                            <ItemsRepeater.ItemTemplate>
-                                <DataTemplate>
-                                    <Image
-                                        Source="{Binding IconPath}"
-                                        Width="60" Height="60"
-                                        Tag="{Binding Name}"
-                                        CanDrag="True"
-                                        DragStarting="Image_DragStarting"
-                                        DropCompleted="Image_DropCompleted"/>
-                                </DataTemplate>
-                            </ItemsRepeater.ItemTemplate>
-                        </ItemsRepeater>
-                    </StackPanel>
+                <!-- Profile Name Input -->
+                <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,16">
+                    <TextBox
+                        PlaceholderText="Enter Profile Name"
+                        Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
+                        Width="240"/>
+                    <TextBlock
+                        Text="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                        Foreground="{ThemeResource SystemErrorTextColor}"
+                        TextWrapping="Wrap"/>
                 </StackPanel>
-            </ScrollViewer>
 
-            <!-- Action Buttons -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
-                <Button 
-                    Content="New"
-                    Command="{x:Bind ViewModel.NewProfileCommand}"/>
-                <Button 
-                    Content="Save"
-                    Command="{x:Bind ViewModel.SaveProfileCommand}"/>
-                <Button 
-                    Content="Load"
-                    Command="{x:Bind ViewModel.LoadProfileCommand}"/>
-            </StackPanel>
+                <!-- Grid Snap Toggle -->
+                <ToggleSwitch
+                    Grid.Row="1"
+                    Header="Grid Snap"
+                    IsOn="{x:Bind ViewModel.IsGridSnapEnabled, Mode=TwoWay}"
+                    OffContent="Off"
+                    OnContent="On"
+                    Margin="0,0,0,16"/>
+
+                <!-- Button Lists -->
+                <ScrollViewer Grid.Row="2" Margin="0,0,0,16">
+                    <StackPanel Spacing="16">
+                        <!-- Default Buttons -->
+                        <StackPanel>
+                            <TextBlock
+                                Text="Default Buttons"
+                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Margin="0,0,0,8"/>
+                            <ItemsRepeater ItemsSource="{x:Bind ViewModel.DefaultButtons}">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout
+                                        MinItemWidth="70"
+                                        MinItemHeight="70"
+                                        MinRowSpacing="8"
+                                        MinColumnSpacing="8"/>
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Image
+                                            Source="{Binding IconPath}"
+                                            Width="60" Height="60"
+                                            Tag="{Binding Name}"
+                                            CanDrag="True"
+                                            DragStarting="Image_DragStarting"
+                                            DropCompleted="Image_DropCompleted"/>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </StackPanel>
+
+                        <!-- Custom Buttons -->
+                        <StackPanel>
+                            <TextBlock
+                                Text="Custom Buttons"
+                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Margin="0,0,0,8"/>
+                            <ItemsRepeater ItemsSource="{x:Bind ViewModel.CustomButtons}">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout
+                                        MinItemWidth="70"
+                                        MinItemHeight="70"
+                                        MinRowSpacing="8"
+                                        MinColumnSpacing="8"/>
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Image
+                                            Source="{Binding IconPath}"
+                                            Width="60" Height="60"
+                                            Tag="{Binding Name}"
+                                            CanDrag="True"
+                                            DragStarting="Image_DragStarting"
+                                            DropCompleted="Image_DropCompleted"/>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                    <Button 
+                        Content="New"
+                        Command="{x:Bind ViewModel.NewProfileCommand}"/>
+                    <Button 
+                        Content="Clear Canvas"
+                        Command="{x:Bind ViewModel.ClearCanvasCommand}"/>
+                    <Button 
+                        Content="Save"
+                        Command="{x:Bind ViewModel.SaveProfileCommand}"/>
+                    <Button 
+                        Content="Load"
+                        Command="{x:Bind ViewModel.LoadProfileCommand}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Right Panel - Canvas -->
+            <Border 
+                Grid.Column="1" 
+                BorderBrush="{ThemeResource SystemBaseLowColor}"
+                BorderThickness="1,0,0,0">
+                <Canvas
+                    x:Name="EditorCanvas"
+                    Background="Transparent"
+                    AllowDrop="True"
+                    DragOver="EditorCanvas_DragOver"
+                    Drop="EditorCanvas_Drop">
+                    <!-- Grid lines if needed -->
+                </Canvas>
+            </Border>
         </Grid>
-
-        <!-- Right Panel - Canvas -->
-        <Border 
-            Grid.Column="1" 
-            BorderBrush="{ThemeResource SystemBaseLowColor}"
-            BorderThickness="1,0,0,0">
-            <Canvas
-                x:Name="EditorCanvas"
-                Background="Transparent"
-                AllowDrop="True"
-                DragOver="EditorCanvas_DragOver"
-                Drop="EditorCanvas_Drop">
-                <!-- Grid lines if needed -->
-            </Canvas>
-        </Border>
     </Grid>
 </Page>

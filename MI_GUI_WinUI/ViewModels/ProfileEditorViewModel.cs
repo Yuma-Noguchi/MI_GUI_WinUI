@@ -114,6 +114,13 @@ namespace MI_GUI_WinUI.ViewModels
             CanvasButtons.Clear();
         }
 
+        [RelayCommand]
+        public void ClearCanvas()
+        {
+            CanvasButtons.Clear();
+            ValidationMessage = string.Empty;
+        }
+
         private ActionConfig CreateDefaultActionConfig(EditorButton button)
         {
             return new ActionConfig
