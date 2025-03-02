@@ -233,7 +233,7 @@ namespace MI_GUI_WinUI.ViewModels
                     CanvasButtons.Add(ConvertFromGuiElement(element));
                 }
 
-                if (profile.GlobalConfig != null && 
+                if (profile.GlobalConfig != null &&
                     profile.GlobalConfig.TryGetValue("grid_snap", out string? gridSnapValue))
                 {
                     IsGridSnapEnabled = bool.TryParse(gridSnapValue, out bool value) && value;
