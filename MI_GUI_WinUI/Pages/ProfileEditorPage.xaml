@@ -7,6 +7,7 @@
     xmlns:controls="using:MI_GUI_WinUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:canvas="using:Microsoft.UI.Xaml.Controls.Primitives"
     mc:Ignorable="d">
 
     <Grid>
@@ -19,7 +20,113 @@
 
         <!-- Main content -->
         <Grid Grid.Row="1" Margin="20">
-            <TextBlock Text="Profile Editor Content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250"/> <!-- Sidebar -->
+                <ColumnDefinition Width="*"/> <!-- Canvas area -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Sidebar with draggable buttons -->
+            <Grid Grid.Column="0" Margin="0,0,20,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Search and filter -->
+                <TextBox Grid.Row="0" 
+                         PlaceholderText="Search buttons..."
+                         Margin="0,0,0,10"/>
+
+                <!-- Button categories -->
+                <TabView Grid.Row="1">
+                    <TabView.TabItems>
+                        <TabViewItem Header="Default Buttons">
+                            <ScrollViewer>
+                                <StackPanel Spacing="12" Margin="0,8,0,8">
+                                    <!-- Default Xbox buttons -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12">
+                                        <Image Source="ms-appx:///MotionInput/data/assets/gamepad/a.png"
+                                               Width="50" Height="50"
+                                               CanDrag="True"
+                                               DragStarting="Image_DragStarting"
+                                               DropCompleted="Image_DropCompleted"
+                                               Tag="A"/>
+                                    </Border>
+                                    
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12">
+                                        <Image Source="ms-appx:///MotionInput/data/assets/gamepad/b.png"
+                                               Width="50" Height="50"
+                                               CanDrag="True"
+                                               DragStarting="Image_DragStarting"
+                                               DropCompleted="Image_DropCompleted"
+                                               Tag="B"/>
+                                    </Border>
+                                    
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12">
+                                        <Image Source="ms-appx:///MotionInput/data/assets/gamepad/x.png"
+                                               Width="50" Height="50"
+                                               CanDrag="True"
+                                               DragStarting="Image_DragStarting"
+                                               DropCompleted="Image_DropCompleted"
+                                               Tag="X"/>
+                                    </Border>
+                                    
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="12">
+                                        <Image Source="ms-appx:///MotionInput/data/assets/gamepad/y.png"
+                                               Width="50" Height="50"
+                                               CanDrag="True"
+                                               DragStarting="Image_DragStarting"
+                                               DropCompleted="Image_DropCompleted"
+                                               Tag="Y"/>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabViewItem>
+                        <TabViewItem Header="Custom Buttons">
+                            <TextBlock Text="Custom buttons will appear here" 
+                                    HorizontalAlignment="Center" 
+                                    VerticalAlignment="Center"/>
+                        </TabViewItem>
+                    </TabView.TabItems>
+                </TabView>
+            </Grid>
+
+            <!-- Canvas area for button placement -->
+            <Grid x:Name="CanvasHolder" 
+                  Grid.Column="1"
+                  Background="Transparent"
+                  AllowDrop="True">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0">
+                    <Canvas x:Name="EditorCanvas"
+                            Background="Transparent"
+                            MinWidth="400"
+                            MinHeight="300"
+                            Margin="20"
+                            AllowDrop="True"
+                            DragOver="EditorCanvas_DragOver"
+                            Drop="EditorCanvas_Drop"/>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Page>
