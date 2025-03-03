@@ -5,21 +5,93 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:MI_GUI_WinUI"
     xmlns:controls="using:MI_GUI_WinUI.Controls"
+    xmlns:models="using:MI_GUI_WinUI.Models"
+    xmlns:vm="using:MI_GUI_WinUI.ViewModels"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    x:DefaultBindMode="OneWay">
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <controls:PageHeader Grid.Row="0" Title="Icon Studio"/>
+        <controls:PageHeader Grid.Row="0" Title="{x:Bind ViewModel.Title, Mode=OneWay}"/>
 
         <!-- Main content -->
         <Grid Grid.Row="1" Margin="20">
-            <TextBlock Text="Icon Studio Content" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Settings Panel -->
+            <StackPanel Grid.Column="0" Spacing="12">
+                <!-- GPU/CPU Selection -->
+                <ToggleSwitch Header="Use GPU"
+                            IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
+                            IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
+                
+                <!-- Prompt Input -->
+                <TextBox Header="Prompt"
+                        Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        Height="100"
+                        PlaceholderText="Enter a description of the icon you want to generate..."
+                        IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
+                
+                <!-- Generate Button -->
+                <Button Content="Generate Icon"
+                        Command="{x:Bind ViewModel.GenerateCommand}"
+                        IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"
+                        HorizontalAlignment="Stretch"/>
+
+                <!-- Generation Progress -->
+                <ProgressRing IsActive="{x:Bind ViewModel.IsGenerating, Mode=OneWay}"
+                            Width="50" Height="50"
+                            HorizontalAlignment="Center"/>
+                
+                <!-- Save Section -->
+                <StackPanel Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}">
+                    <TextBox Header="Icon Name"
+                            Text="{x:Bind ViewModel.IconName, Mode=TwoWay}"
+                            PlaceholderText="Enter a name for your icon..."
+                            Margin="0,12,0,0"/>
+                    <Button Content="Save Icon"
+                            Command="{x:Bind ViewModel.SaveCommand}"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,12,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Preview Panel -->
+            <Grid Grid.Column="1">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Width="200"
+                        Height="200"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    
+                    <!-- Center the 60x60 preview with a border -->
+                    <Border Width="60"
+                            Height="60"
+                            Background="Transparent"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="30">
+                        
+                        <Image Source="{x:Bind ViewModel.PreviewImage, Mode=OneWay}"
+                               Stretch="UniformToFill"/>
+                    </Border>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Page>

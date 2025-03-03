@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -53,6 +53,7 @@ public partial class App : Application
 
         // Register services
         services.AddSingleton<ProfileService>();
+        services.AddSingleton<IStableDiffusionService, StableDiffusionService>();
 
         // Register view models
         services.AddSingleton<MainWindowViewModel>();
