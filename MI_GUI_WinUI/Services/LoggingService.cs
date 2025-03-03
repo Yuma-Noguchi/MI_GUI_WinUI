@@ -15,7 +15,8 @@ public class LoggingService
     {
         try
         {
-            var localFolder = ApplicationData.Current.LocalFolder;
+            var folder_path = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+            var localFolder = await StorageFolder.GetFolderFromPathAsync(folder_path);
             var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
             var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.OpenIfExists);
 

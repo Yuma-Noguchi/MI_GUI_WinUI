@@ -113,26 +113,40 @@ namespace MI_GUI_WinUI.Services
             try
             {
                 // Create input tensor for text encoder
-                var inputTensor = new List<NamedOnnxValue>
+                var inputTensor = new NamedOnnxValue[]
                 {
-                    NamedOnnxValue.CreateFromTensor("input_ids", 
-                        new DenseTensor<long>(tokens, new[] { 1, tokens.Length }))
+            NamedOnnxValue.CreateFromTensor("input_ids", new DenseTensor<long>(tokens, new[] { 1, tokens.Length }))
                 };
 
                 // Run text encoder
                 using var output = await Task.Run(() => _textEncoder.Run(inputTensor));
 
-                // Get last hidden state (text embeddings)
-                var lastHiddenState = output.First(x => x.Name == "last_hidden_state")
-                    .AsEnumerable<float>()
-                    .ToArray();
+                // Debug log available output names (helpful for debugging)
+                _logger.LogDebug("Text encoder output names: {names}", string.Join(", ", output.Select(x => x.Name)));
 
+                // Directly try to get "text_embeddings" output
+                NamedOnnxValue embeddingOutput = null;
+                try
+                {
+                    embeddingOutput = output.First(x => x.Name == "text_embeddings");
+                }
+                catch (InvalidOperationException)
+                {
+                    // Log a warning if "text_embeddings" is not found, fallback to first output
+                    _logger.LogWarning("Output 'text_embeddings' not found. Using fallback output.");
+                    embeddingOutput = output.First();
+                    _logger.LogDebug("Using fallback output tensor with name: {name}", embeddingOutput.Name); // Optional: Log fallback name
+                }
+
+                // Get embeddings as float array
+                var lastHiddenState = embeddingOutput.AsEnumerable<float>().ToArray();
                 _logger.LogDebug("Text encoded successfully, shape: {length}", lastHiddenState.Length);
+
                 return lastHiddenState;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during text encoding");
+                _logger.LogError(ex, "Error during text encoding: {message}", ex.Message);
                 throw;
             }
         }
@@ -172,11 +186,11 @@ namespace MI_GUI_WinUI.Services
                     // Prepare input tensors for UNet
                     var inputTensors = new List<NamedOnnxValue>
                     {
-                        NamedOnnxValue.CreateFromTensor("sample", 
+                        NamedOnnxValue.CreateFromTensor("latent", 
                             new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 })),
                         NamedOnnxValue.CreateFromTensor("timestep", 
                             new DenseTensor<long>(new[] { t }, new[] { 1 })),
-                        NamedOnnxValue.CreateFromTensor("encoder_hidden_states", 
+                        NamedOnnxValue.CreateFromTensor("text_embed", 
                             new DenseTensor<float>(textEmbeddings, new[] { 1, 77, 768 }))
                     };
 
@@ -184,11 +198,11 @@ namespace MI_GUI_WinUI.Services
                     var uncondEmbedding = new float[textEmbeddings.Length];
                     var uncondInput = new List<NamedOnnxValue>
                     {
-                        NamedOnnxValue.CreateFromTensor("sample", 
+                        NamedOnnxValue.CreateFromTensor("latent", 
                             new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 })),
                         NamedOnnxValue.CreateFromTensor("timestep", 
                             new DenseTensor<long>(new[] { t }, new[] { 1 })),
-                        NamedOnnxValue.CreateFromTensor("encoder_hidden_states", 
+                        NamedOnnxValue.CreateFromTensor("text_embed", 
                             new DenseTensor<float>(uncondEmbedding, new[] { 1, 77, 768 }))
                     };
 
@@ -196,10 +210,10 @@ namespace MI_GUI_WinUI.Services
                     using var uncondOutput = await Task.Run(() => _unet.Run(uncondInput));
                     using var condOutput = await Task.Run(() => _unet.Run(inputTensors));
 
-                    var uncondPred = uncondOutput.First(x => x.Name == "out_sample")
+                    var uncondPred = uncondOutput.First(x => x.Name == "noise_pred")
                         .AsEnumerable<float>()
                         .ToArray();
-                    var condPred = condOutput.First(x => x.Name == "out_sample")
+                    var condPred = condOutput.First(x => x.Name == "noise_pred")
                         .AsEnumerable<float>()
                         .ToArray();
 
@@ -287,7 +301,7 @@ namespace MI_GUI_WinUI.Services
                 // Create input tensor for VAE
                 var inputTensor = new List<NamedOnnxValue>
                 {
-                    NamedOnnxValue.CreateFromTensor("latent_sample",
+                    NamedOnnxValue.CreateFromTensor("latent",
                         new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 }))
                 };
 
@@ -301,10 +315,26 @@ namespace MI_GUI_WinUI.Services
 
                 // Convert to image format (0-255 range)
                 var rgbImage = new byte[256 * 256 * 3];
-                for (int i = 0; i < imageArray.Length; i++)
+                int pixelIndex = 0; // Index for rgbImage (0 to 196607)
+                for (int y = 0; y < 256; y++) // Iterate over image height (rows)
                 {
-                    var value = (byte)Math.Clamp((imageArray[i] + 1) * 127.5f, 0, 255);
-                    rgbImage[i] = value;
+                    for (int x = 0; x < 256; x++) // Iterate over image width (columns)
+                    {
+                        // Calculate index in imageArray for the current pixel (x, y) and channel
+                        int arrayIndexBase = (y * 256 + x) * 4; // Base index for 4 channels
+
+                        // Assuming channels are ordered like R, G, B, A (or similar - check VAE output docs if available)
+                        // Extract R, G, B channels from imageArray (take first 3 channels, ignore 4th if needed)
+                        float rFloat = imageArray[arrayIndexBase + 0];
+                        float gFloat = imageArray[arrayIndexBase + 1];
+                        float bFloat = imageArray[arrayIndexBase + 2];
+                        // float aFloat = imageArray[arrayIndexBase + 3]; // If you want to use alpha or inspect it
+
+                        // Convert to byte and clamp for R channel
+                        rgbImage[pixelIndex++] = (byte)Math.Clamp((rFloat + 1) * 127.5f, 0, 255); // R
+                        rgbImage[pixelIndex++] = (byte)Math.Clamp((gFloat + 1) * 127.5f, 0, 255); // G
+                        rgbImage[pixelIndex++] = (byte)Math.Clamp((bFloat + 1) * 127.5f, 0, 255); // B
+                    }
                 }
 
                 // Create bitmap from raw bytes
