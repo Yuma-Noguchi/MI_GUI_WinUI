@@ -16,20 +16,21 @@ namespace MI_GUI_WinUI.Pages
             ViewModel = App.Current.Services.GetService<IconStudioViewModel>();
             DataContext = ViewModel;
             this.Loaded += IconStudioPage_Loaded;
+            this.Unloaded += Page_Unloaded;
         }
 
-        private void IconStudioPage_Loaded(object sender, RoutedEventArgs e)
+        private async void IconStudioPage_Loaded(object sender, RoutedEventArgs e)
         {
             if (PulseStoryboard != null)
             {
                 PulseStoryboard.Begin();
             }
 
-            // Initialize the view model
+            // Ensure we have valid ViewModel and XamlRoot
             if (ViewModel != null)
             {
                 ViewModel.XamlRoot = this.XamlRoot;
-                _ = ViewModel.InitializeAsync();
+                await ViewModel.InitializeAsync();
             }
         }
 

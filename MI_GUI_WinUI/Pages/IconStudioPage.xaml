@@ -37,11 +37,57 @@
 
             <!-- Settings Panel -->
             <StackPanel Grid.Column="0" Spacing="12">
+                <!-- Initialization Status/Error -->
+                <Grid>
+                    <Border Visibility="{x:Bind ViewModel.IsInitializing, Mode=OneWay}"
+                            Background="{ThemeResource SystemFillColorNeutralBackground}"
+                            BorderBrush="{ThemeResource SystemFillColorCautionBackground}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{x:Bind ViewModel.InitializationStatus, Mode=OneWay}"
+                                     Style="{StaticResource BodyTextBlockStyle}"
+                                     TextWrapping="Wrap"
+                                     Foreground="{ThemeResource SystemAccentColorLight1}"/>
+                            <ProgressBar IsIndeterminate="True" Height="2"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Visibility="{x:Bind ViewModel.InitializationFailed, Mode=OneWay}"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="⚠️ Initialization Failed"
+                                         Style="{StaticResource SubtitleTextBlockStyle}"
+                                         Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                <TextBlock Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                                         Style="{StaticResource BodyTextBlockStyle}"
+                                         Foreground="{ThemeResource TextFillColorSecondary}"
+                                         TextWrapping="Wrap"/>
+                            </StackPanel>
+                            
+                            <Button Content="Try Again"
+                                    Command="{x:Bind ViewModel.RetryInitializationCommand}"
+                                    Style="{ThemeResource AccentButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
                 <!-- GPU/CPU Selection -->
-                <ToggleSwitch Header="Use GPU"
-                            IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
-                            IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
-                
+                <StackPanel>
+                    <ToggleSwitch Header="Use GPU"
+                                IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
+                                IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
+                    <TextBlock Text="GPU acceleration requires DirectML support"
+                             Style="{StaticResource CaptionTextBlockStyle}"
+                             Foreground="{ThemeResource TextFillColorSecondary}"/>
+                </StackPanel>
+
                 <!-- Prompt Input -->
                 <TextBox Header="Prompt"
                         Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"
@@ -49,13 +95,13 @@
                         TextWrapping="Wrap"
                         Height="100"
                         PlaceholderText="Enter a description of the icon you want to generate..."
-                        IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
+                        IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
                 
                 <!-- Generate Button -->
                 <Button Content="Generate Icon"
                         Command="{x:Bind ViewModel.GenerateCommand}"
-                        IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"
-                        HorizontalAlignment="Stretch"/>
+                        HorizontalAlignment="Stretch"
+                        Style="{ThemeResource AccentButtonStyle}"/>
 
                 <!-- Generation Progress -->
                 <Grid Visibility="{x:Bind ViewModel.IsGenerating, Mode=OneWay}">

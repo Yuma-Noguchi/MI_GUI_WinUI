@@ -30,6 +30,18 @@ namespace MI_GUI_WinUI.ViewModels
         private string _title = "Icon Studio";
 
         [ObservableProperty]
+        private bool _isInitializing;
+
+        [ObservableProperty]
+        private string _initializationStatus = string.Empty;
+
+        [ObservableProperty]
+        private bool _initializationFailed;
+
+        [ObservableProperty]
+        private string _errorMessage = string.Empty;
+
+        [ObservableProperty]
         private string _prompt = string.Empty;
 
         [ObservableProperty]
@@ -63,14 +75,28 @@ namespace MI_GUI_WinUI.ViewModels
         };
 
         public bool IsNotGenerating => !IsGenerating;
+        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt) && !InitializationFailed;
 
         partial void OnIsGeneratingChanged(bool value)
         {
             OnPropertyChanged(nameof(IsNotGenerating));
+            OnPropertyChanged(nameof(CanGenerate));
             if (!value)
             {
                 GenerationProgress = 0;
             }
+        }
+
+        partial void OnIsInitializingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsReady));
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
+        partial void OnPromptChanged(string value)
+        {
+            OnPropertyChanged(nameof(CanGenerate));
         }
 
         [ObservableProperty]
@@ -89,27 +115,9 @@ namespace MI_GUI_WinUI.ViewModels
             _sdService = sdService;
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanGenerate))]
         private async Task GenerateAsync()
         {
-            if (!_sdService.IsInitialized)
-            {
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Icon Studio is not initialized. Please try restarting the application.", XamlRoot);
-                }
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(Prompt))
-            {
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Please enter a prompt for icon generation.", XamlRoot);
-                }
-                return;
-            }
-
             try
             {
                 IsGenerating = true;
@@ -252,30 +260,69 @@ namespace MI_GUI_WinUI.ViewModels
 
         public async Task InitializeAsync()
         {
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+
+            if (_sdService.IsInitialized)
+                return;
+
             try
             {
-                if (!_sdService.IsInitialized)
+                IsInitializing = true;
+                InitializationStatus = "Starting initialization...";
+
+                InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
+                await _sdService.Initialize(UseGpu);
+                
+                InitializationStatus = "Initialization complete";
+                if (XamlRoot != null)
                 {
-                    await _sdService.Initialize(UseGpu);
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowMessage(
-                            $"Icon Studio initialized successfully with {(UseGpu ? "GPU" : "CPU")} acceleration.", 
-                            "Initialization Complete", 
-                            XamlRoot);
-                    }
+                    await Utils.DialogHelper.ShowMessage(
+                        $"Icon Studio initialized successfully with {(UseGpu ? "GPU" : "CPU")} acceleration.", 
+                        "Initialization Complete", 
+                        XamlRoot);
+                }
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                _logger.LogError(ex, "AI Models directory not found");
+                InitializationFailed = true;
+                ErrorMessage = "AI Models directory not found. Please ensure the models are properly installed.";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
+                }
+            }
+            catch (FileNotFoundException ex)
+            {
+                _logger.LogError(ex, "Required model file not found");
+                InitializationFailed = true;
+                ErrorMessage = $"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to initialize Icon Studio");
+                InitializationFailed = true;
+                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
                 if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowError(
-                        $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. Please check if ONNX model files are present in the AI_Models directory.",
-                        XamlRoot);
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
                 }
             }
+            finally
+            {
+                IsInitializing = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task RetryInitializationAsync()
+        {
+            await InitializeAsync();
         }
 
         public void Cleanup()
@@ -285,6 +332,7 @@ namespace MI_GUI_WinUI.ViewModels
             GenerationProgress = 0;
             StatusMessage = string.Empty;
             ProgressState = GenerationProgressState.Loading;
+            InitializationStatus = string.Empty;
         }
     }
 }

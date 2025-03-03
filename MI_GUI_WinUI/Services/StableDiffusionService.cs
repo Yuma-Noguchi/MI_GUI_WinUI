@@ -17,7 +17,7 @@ namespace MI_GUI_WinUI.Services
     {
         private readonly ILogger<StableDiffusionService> _logger;
         private InferenceSession? _unet;
-        private InferenceSession? _tokenizer;
+        private CLIPTokenizer? _tokenizer;
         private InferenceSession? _textEncoder;
         private InferenceSession? _vae;
         private bool _useGpu;
@@ -54,7 +54,7 @@ namespace MI_GUI_WinUI.Services
             try
             {
                 // 1. Tokenize input prompt
-                var inputTokens = await TokenizeText(settings.Prompt);
+                var inputTokens = TokenizeText(settings.Prompt);
                 progress?.Report(5);
 
                 // 2. Encode text
@@ -87,31 +87,16 @@ namespace MI_GUI_WinUI.Services
             }
         }
 
-        private async Task<long[]> TokenizeText(string text)
+        private long[] TokenizeText(string text)
         {
             if (_tokenizer == null)
                 throw new InvalidOperationException("Tokenizer not initialized");
 
             try
             {
-                // Create input tensor
-                var inputTensor = new List<NamedOnnxValue>
-                {
-                    NamedOnnxValue.CreateFromTensor("string_input", 
-                        new DenseTensor<string>(new string[] { text }, new[] { 1 }))
-                };
-
-                // Run tokenizer
-                using var output = await Task.Run(() => _tokenizer.Run(inputTensor));
-
-                // Get input IDs from output
-                var inputIds = output.First(x => x.Name == "input_ids")
-                    .AsEnumerable<long>()
-                    .Take(77) // Max length for Stable Diffusion
-                    .ToArray();
-
+                var tokens = _tokenizer.Tokenize(text);
                 _logger.LogDebug("Text tokenized successfully: {text}", text);
-                return inputIds;
+                return tokens;
             }
             catch (Exception ex)
             {
@@ -401,29 +386,50 @@ namespace MI_GUI_WinUI.Services
 
         private async Task LoadModel()
         {
-            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AI_Models", "StableDiffusion");
+            var modelPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "AI_Models", "StableDiffusion");
+            _logger.LogInformation("Looking for AI_Models in base directory: {baseDir}", modelPath);
+
             if (!Directory.Exists(modelPath))
             {
-                throw new DirectoryNotFoundException($"Model directory not found: {modelPath}");
+                throw new DirectoryNotFoundException(
+                    $"Could not find AI_Models directory in any of the following locations:{Environment.NewLine}{modelPath}");
             }
 
+            _logger.LogInformation("Using model path: {modelPath}", modelPath);
+
+            var requiredFiles = new[] { "text_encoder.onnx", "unet.onnx", "vae_decoder.onnx", "vocab.json", "merges.txt" };
+            foreach (var file in requiredFiles)
+            {
+                var filePath = Path.Combine(modelPath, file);
+                if (!File.Exists(filePath))
+                {
+                    throw new FileNotFoundException($"Required model file not found: {file}", filePath);
+                }
+                _logger.LogInformation("Found required model file: {file}", file);
+            }
+
+            _logger.LogInformation("Configuring inference session options...");
             var sessionOptions = new SessionOptions();
             if (_useGpu)
             {
                 try
                 {
+                    _logger.LogInformation("Attempting to initialize DirectML provider...");
                     sessionOptions.AppendExecutionProvider_DML(0);
-                    _logger.LogInformation("Using DirectML (GPU) execution provider");
+                    _logger.LogInformation("Successfully initialized DirectML (GPU) execution provider");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to initialize DirectML provider, falling back to CPU");
+                    _logger.LogWarning(ex, "Failed to initialize DirectML provider, falling back to CPU. Error: {message}", ex.Message);
                     _useGpu = false;
                 }
             }
-            else
+
+            if (!_useGpu)
             {
                 _logger.LogInformation("Using CPU execution provider");
+                sessionOptions.EnableMemoryPattern = true;
+                sessionOptions.EnableCpuMemArena = true;
             }
 
             try
@@ -438,23 +444,21 @@ namespace MI_GUI_WinUI.Services
                 throw new InvalidOperationException("ONNX Runtime components are missing. Please reinstall the application.", ex);
             }
 
-            _tokenizer = await Task.Run(() => new InferenceSession(
-                Path.Combine(modelPath, "tokenizer.onnx"), 
-                sessionOptions));
+            // Initialize the C# tokenizer instead of using ONNX
+            _tokenizer = new CLIPTokenizer(modelPath);
 
             _textEncoder = await Task.Run(() => new InferenceSession(
                 Path.Combine(modelPath, "text_encoder.onnx"), 
                 sessionOptions));
 
             _vae = await Task.Run(() => new InferenceSession(
-                Path.Combine(modelPath, "vae.onnx"), 
+                Path.Combine(modelPath, "vae_decoder.onnx"), 
                 sessionOptions));
         }
 
         public void Dispose()
         {
             _unet?.Dispose();
-            _tokenizer?.Dispose();
             _textEncoder?.Dispose();
             _vae?.Dispose();
         }
