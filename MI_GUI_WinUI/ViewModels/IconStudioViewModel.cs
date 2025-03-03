@@ -41,11 +41,36 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private bool _isGenerating;
 
+        [ObservableProperty]
+        private int _generationProgress;
+
+        [ObservableProperty]
+        private GenerationProgressState _progressState;
+
+        [ObservableProperty]
+        private string _statusMessage = string.Empty;
+
+        private string GetStatusMessage(GenerationProgressState state, int progress) => state switch
+        {
+            GenerationProgressState.Loading => "Loading AI models...",
+            GenerationProgressState.Tokenizing => "Tokenizing prompt...",
+            GenerationProgressState.Encoding => "Processing text embeddings...",
+            GenerationProgressState.InitializingLatents => "Initializing latent space...",
+            GenerationProgressState.Diffusing => $"Running diffusion step {(progress - 20) * 100 / 60:0}%...",
+            GenerationProgressState.Decoding => "Decoding image...",
+            GenerationProgressState.Finalizing => "Applying final touches...",
+            _ => "Preparing output..."
+        };
+
         public bool IsNotGenerating => !IsGenerating;
 
         partial void OnIsGeneratingChanged(bool value)
         {
             OnPropertyChanged(nameof(IsNotGenerating));
+            if (!value)
+            {
+                GenerationProgress = 0;
+            }
         }
 
         [ObservableProperty]
@@ -90,10 +115,29 @@ namespace MI_GUI_WinUI.ViewModels
                 IsGenerating = true;
                 var settings = new IconGenerationSettings
                 {
-                    Prompt = Prompt
+                    Prompt = Prompt,
+                    ImageSize = new System.Drawing.Size(60, 60),
+                    NumInferenceSteps = 20,
+                    GuidanceScale = 7.5f,
+                    Seed = new Random().Next()
                 };
 
-                _currentImageData = await _sdService.GenerateImage(settings);
+                var progress = new Progress<int>(value => {
+                    GenerationProgress = value;
+                    ProgressState = value switch
+                    {
+                        < 5 => GenerationProgressState.Loading,
+                        < 10 => GenerationProgressState.Tokenizing,
+                        < 15 => GenerationProgressState.Encoding,
+                        < 20 => GenerationProgressState.InitializingLatents,
+                        < 80 => GenerationProgressState.Diffusing,
+                        < 90 => GenerationProgressState.Decoding,
+                        < 95 => GenerationProgressState.Finalizing,
+                        _ => GenerationProgressState.Completing
+                    };
+                    StatusMessage = GetStatusMessage(ProgressState, value);
+                });
+                _currentImageData = await _sdService.GenerateImage(settings, progress);
                 await UpdatePreviewImage(_currentImageData);
                 IsImageGenerated = true;
             }
@@ -238,6 +282,9 @@ namespace MI_GUI_WinUI.ViewModels
         {
             _currentImageData = null;
             PreviewImage = null;
+            GenerationProgress = 0;
+            StatusMessage = string.Empty;
+            ProgressState = GenerationProgressState.Loading;
         }
     }
 }
