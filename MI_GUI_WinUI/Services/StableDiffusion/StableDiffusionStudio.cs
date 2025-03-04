@@ -59,8 +59,12 @@ namespace MI_GUI_WinUI.Services.StableDiffusion
                         throw new OperationCanceledException();
                     }
 
+                    var latentModelInput = TensorHelper.Duplicate(latents.ToArray(), new[] { 2, 4, _config.Height / 8, _config.Width / 8 });
+
+                    var scaledLatents = scheduler.ScaleInput(latents.ToArray(), timesteps[t]);
+
                     // UNet step
-                    var noisePred = _unet.Predict(denseEmbeddings, latents, timesteps[t]);
+                    var noisePred = _unet.Predict(denseEmbeddings, scaledLatents, timesteps[t]);
                     LogTensorShape("Noise prediction", noisePred);
 
                     // Scheduler step with default order (4)

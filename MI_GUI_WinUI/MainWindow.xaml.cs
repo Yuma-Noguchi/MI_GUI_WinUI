@@ -16,7 +16,9 @@ namespace MI_GUI_WinUI
         public MainWindow()
         {
             this.InitializeComponent();
-            
+
+            Title = $"MotoinInput Configuration GUI";
+
             _activeWindows = new Dictionary<string, (Window, DateTime)>();
             
             // Get the navigation service from DI

@@ -175,5 +175,7 @@ namespace MI_GUI_WinUI.Services.StableDiffusion
             }
             return alphasCumprod;
         }
+
+        private 
     }
 }
