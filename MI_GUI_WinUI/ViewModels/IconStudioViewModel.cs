@@ -33,6 +33,9 @@ namespace MI_GUI_WinUI.ViewModels
         private bool _isInitializing;
 
         [ObservableProperty]
+        private bool _isPreInitialization;
+
+        [ObservableProperty]
         private string _initializationStatus = string.Empty;
 
         [ObservableProperty]
@@ -62,43 +65,6 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        private string GetStatusMessage(GenerationProgressState state, int progress) => state switch
-        {
-            GenerationProgressState.Loading => "Loading AI models...",
-            GenerationProgressState.Tokenizing => "Tokenizing prompt...",
-            GenerationProgressState.Encoding => "Processing text embeddings...",
-            GenerationProgressState.InitializingLatents => "Initializing latent space...",
-            GenerationProgressState.Diffusing => $"Running diffusion step {(progress - 20) * 100 / 60:0}%...",
-            GenerationProgressState.Decoding => "Decoding image...",
-            GenerationProgressState.Finalizing => "Applying final touches...",
-            _ => "Preparing output..."
-        };
-
-        public bool IsNotGenerating => !IsGenerating;
-        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
-        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt) && !InitializationFailed;
-
-        partial void OnIsGeneratingChanged(bool value)
-        {
-            OnPropertyChanged(nameof(IsNotGenerating));
-            OnPropertyChanged(nameof(CanGenerate));
-            if (!value)
-            {
-                GenerationProgress = 0;
-            }
-        }
-
-        partial void OnIsInitializingChanged(bool value)
-        {
-            OnPropertyChanged(nameof(IsReady));
-            OnPropertyChanged(nameof(CanGenerate));
-        }
-
-        partial void OnPromptChanged(string value)
-        {
-            OnPropertyChanged(nameof(CanGenerate));
-        }
-
         [ObservableProperty]
         private bool _isImageGenerated;
 
@@ -115,19 +81,56 @@ namespace MI_GUI_WinUI.ViewModels
             _sdService = sdService;
         }
 
+        [RelayCommand]
+        private async Task RetryInitialization()
+        {
+            _logger.LogInformation("Retrying initialization");
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+            await InitializeAsync();
+        }
+
+        public bool IsNotGenerating => !IsGenerating;
+        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
+
+        partial void OnIsGeneratingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsNotGenerating));
+            OnPropertyChanged(nameof(CanGenerate));
+            if (!value)
+            {
+                GenerationProgress = 0;
+                StatusMessage = string.Empty;
+            }
+        }
+
+        partial void OnIsInitializingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsReady));
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
+        partial void OnPromptChanged(string value)
+        {
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
         [RelayCommand(CanExecute = nameof(CanGenerate))]
         private async Task GenerateAsync()
         {
             try
             {
                 IsGenerating = true;
+                IsImageGenerated = false;
+
                 var settings = new IconGenerationSettings
                 {
                     Prompt = Prompt,
-                    ImageSize = new System.Drawing.Size(60, 60),
+                    Height = 512,
+                    Width = 512,
                     NumInferenceSteps = 20,
-                    GuidanceScale = 7.5f,
-                    Seed = new Random().Next()
+                    GuidanceScale = 7.5f
                 };
 
                 var progress = new Progress<int>(value => {
@@ -145,6 +148,7 @@ namespace MI_GUI_WinUI.ViewModels
                     };
                     StatusMessage = GetStatusMessage(ProgressState, value);
                 });
+
                 _currentImageData = await _sdService.GenerateImage(settings, progress);
                 await UpdatePreviewImage(_currentImageData);
                 IsImageGenerated = true;
@@ -162,6 +166,18 @@ namespace MI_GUI_WinUI.ViewModels
                 IsGenerating = false;
             }
         }
+
+        private string GetStatusMessage(GenerationProgressState state, int progress) => state switch
+        {
+            GenerationProgressState.Loading => "Loading AI models...",
+            GenerationProgressState.Tokenizing => "Tokenizing prompt...",
+            GenerationProgressState.Encoding => "Processing text embeddings...",
+            GenerationProgressState.InitializingLatents => "Initializing latent space...",
+            GenerationProgressState.Diffusing => $"Running diffusion step {(progress - 20) * 100 / 60:0}%...",
+            GenerationProgressState.Decoding => "Decoding image...",
+            GenerationProgressState.Finalizing => "Applying final touches...",
+            _ => "Preparing output..."
+        };
 
         [RelayCommand]
         private async Task SaveAsync()
@@ -205,16 +221,7 @@ namespace MI_GUI_WinUI.ViewModels
                             return;
                     }
                 }
-                if (PreviewImage == null)
-                {
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("No image available to save.", XamlRoot);
-                    }
-                    return;
-                }
 
-                // Save the current image
                 if (_currentImageData == null)
                 {
                     if (XamlRoot != null)
@@ -263,7 +270,7 @@ namespace MI_GUI_WinUI.ViewModels
             InitializationFailed = false;
             ErrorMessage = string.Empty;
 
-            if (_sdService.IsInitialized)
+            if (_sdService.IsInitialized || IsInitializing)
                 return;
 
             try
@@ -272,16 +279,19 @@ namespace MI_GUI_WinUI.ViewModels
                 InitializationStatus = "Starting initialization...";
 
                 InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
-                await _sdService.Initialize(UseGpu);
-                
+                await _sdService.Initialize(!UseGpu);
+
                 InitializationStatus = "Initialization complete";
+                InitializationFailed = false;
+                IsPreInitialization = false;
+
                 if (XamlRoot != null)
                 {
                     await Utils.DialogHelper.ShowMessage(
                         $"Icon Studio initialized successfully with {(UseGpu ? "GPU" : "CPU")} acceleration.", 
                         "Initialization Complete", 
                         XamlRoot);
-                }
+                }            
             }
             catch (DirectoryNotFoundException ex)
             {
@@ -319,16 +329,16 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        [RelayCommand]
-        private async Task RetryInitializationAsync()
-        {
-            await InitializeAsync();
-        }
+        
 
         public void Cleanup()
         {
             _currentImageData = null;
             PreviewImage = null;
+            GenerationProgress = 0;
+            StatusMessage = string.Empty;
+            ProgressState = GenerationProgressState.Loading;
+            InitializationStatus = string.Empty;
             GenerationProgress = 0;
             StatusMessage = string.Empty;
             ProgressState = GenerationProgressState.Loading;

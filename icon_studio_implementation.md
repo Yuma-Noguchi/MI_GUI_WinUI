@@ -1,362 +1,143 @@
-# Icon Studio Implementation Plan
+# Icon Studio Implementation Plan - Stable Diffusion Integration
 
 ## Overview
-Icon Studio will be a feature allowing users to generate custom icons for MotionInput using Stable Diffusion v1.5 with ONNX runtime. The system will support text-to-image generation with additional features for customization and refinement, following the application's established MVVM architecture and dependency injection patterns.
+This document outlines the plan to integrate Microsoft's official Stable Diffusion implementation into our Icon Studio feature. The goal is to replace our current implementation with a more robust and tested version while maintaining our icon-specific functionality.
 
-## Feature Phases
+## Current Issues
+1. Black mosaic output in generated icons
+2. Incorrect tensor handling
+3. Suboptimal diffusion process
+4. Inconsistent image quality
 
-### Core Features (Phase 1)
-```mermaid
-graph TD
-    A[Basic Setup] --> B[Model Integration]
-    B --> C[Basic UI]
-    C --> D[Basic Generation]
-    
-    subgraph "Basic Setup"
-    A1[Create AI_Models folder]
-    A2[Setup ONNX runtime]
-    A3[GPU/CPU toggle]
-    end
-    
-    subgraph "Basic UI"
-    C1[Prompt input]
-    C2[Generate button]
-    C3[Preview area]
-    C4[Save dialog]
-    end
-    
-    subgraph "Basic Generation"
-    D1[60x60px PNG output]
-    D2[Circle mask]
-    D3[Save functionality]
-    end
+## Implementation Plan
+
+### Phase 1: Core Infrastructure
+1. Helper Classes
+   - Create `StableDiffusionConfig`
+     - Model paths configuration
+     - Execution provider settings
+     - Generation parameters
+     - Session configuration
+   
+   - Port `SchedulerBase` and `LMSDiscreteScheduler`
+     - Linear multistep scheduler implementation
+     - Proper noise scheduling
+     - Timestep management
+
+   - Add `TensorHelper` utilities
+     - Tensor creation and manipulation
+     - Dimension handling
+     - Array conversions
+
+2. Dependencies
+   - Add required NuGet packages:
+     - MathNet.Numerics
+     - NumSharp
+     - SixLabors.ImageSharp
+
+### Phase 2: Core Pipeline Implementation
+1. StableDiffusionService Rewrite
+   - Follow MS pipeline architecture
+   - Maintain IStableDiffusionService interface
+   - Components:
+     - Text tokenization
+     - Text encoding
+     - UNet inference
+     - VAE decoding
+     - Image processing
+
+2. Model Integration
+   - Model loading and verification
+   - Proper tensor name handling
+   - Input/output shape validation
+   - Error handling and logging
+
+3. Generation Pipeline
+   - Proper latent noise generation
+   - Guidance scale application
+   - Scheduler integration
+   - Progress reporting
+
+### Phase 3: Icon-Specific Features
+1. Image Processing
+   - Proper VAE output handling
+   - Color channel management
+   - Size-specific adaptations
+   - Circular masking
+
+2. UI Integration
+   - Maintain current ViewModel interface
+   - Progress state reporting
+   - GPU/CPU selection
+   - Error handling and user feedback
+
+3. Icon Output
+   - Format conversion
+   - Size validation
+   - Quality checks
+   - Save functionality
+
+## Technical Details
+
+### Model Requirements
+- ONNX format models:
+  - text_encoder.onnx
+  - unet.onnx
+  - vae_decoder.onnx
+  - vocab.json
+  - merges.txt
+
+### Key Classes
+```csharp
+public class StableDiffusionConfig
+{
+    public ExecutionProvider ExecutionProviderTarget { get; set; }
+    public string TextEncoderPath { get; set; }
+    public string UnetPath { get; set; }
+    public string VaeDecoderPath { get; set; }
+    // ... additional configuration
+}
+
+public abstract class SchedulerBase
+{
+    public abstract Tensor<float> Sigmas { get; set; }
+    public abstract List<int> Timesteps { get; set; }
+    public abstract float InitNoiseSigma { get; set; }
+    // ... scheduler interface
+}
+
+public class LMSDiscreteScheduler : SchedulerBase
+{
+    // Linear multistep scheduler implementation
+}
 ```
-
-### Advanced Features (Phase 2)
-```mermaid
-graph TD
-    E[History System] --> F[Improvement Chain]
-    F --> G[Session Management]
-    
-    subgraph "History Features"
-    E1[Persistent storage]
-    E2[History deletion]
-    E3[Version navigation]
-    end
-    
-    subgraph "Improvement System"
-    F1[Prompt chaining]
-    F2[Version history]
-    F3[Previous version access]
-    end
-```
-
-## Architecture
-
-### Project Structure
-```
-MI_GUI_WinUI/
-├── AI_Models/
-│   └── StableDiffusion/
-│       ├── unet.onnx
-│       ├── tokenizer.onnx
-│       ├── text_encoder.onnx
-│       └── vae.onnx
-```
-
-### Service Layer
-1. **IStableDiffusionService**
-   ```csharp
-   public interface IStableDiffusionService
-   {
-       bool IsInitialized { get; }
-       Task Initialize(bool useGpu);
-       Task<byte[]> GenerateImage(IconGenerationSettings settings);
-   }
-   ```
-
-2. **StableDiffusionService**
-   ```csharp
-   public class StableDiffusionService : IStableDiffusionService
-   {
-       private readonly ILogger _logger;
-       private InferenceSession _unet;
-       private InferenceSession _tokenizer;
-       private InferenceSession _textEncoder;
-       private InferenceSession _vae;
-       private bool _useGpu;
-       
-       public StableDiffusionService(ILogger<StableDiffusionService> logger)
-       {
-           _logger = logger;
-       }
-
-       public bool IsInitialized { get; private set; }
-
-       public async Task Initialize(bool useGpu)
-       {
-           try
-           {
-               _useGpu = useGpu;
-               await LoadModel();
-               IsInitialized = true;
-           }
-           catch (Exception ex)
-           {
-               _logger.LogError(ex, "Failed to initialize Stable Diffusion service");
-               throw;
-           }
-       }
-
-       public async Task<byte[]> GenerateImage(IconGenerationSettings settings)
-       {
-           ValidateSettings(settings);
-           // Implementation of generation pipeline
-           // Ensure 60x60px output with circular mask
-       }
-
-       private async Task LoadModel()
-       {
-           var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AI_Models", "StableDiffusion");
-           var options = new SessionOptions();
-           if (_useGpu)
-           {
-               options.AppendExecutionProvider_CUDA();
-           }
-
-           _unet = await InferenceSession.CreateAsync(Path.Combine(modelPath, "unet.onnx"), options);
-           _tokenizer = await InferenceSession.CreateAsync(Path.Combine(modelPath, "tokenizer.onnx"), options);
-           _textEncoder = await InferenceSession.CreateAsync(Path.Combine(modelPath, "text_encoder.onnx"), options);
-           _vae = await InferenceSession.CreateAsync(Path.Combine(modelPath, "vae.onnx"), options);
-       }
-   }
-   ```
-
-### Data Models
-1. **IconGenerationSettings**
-   ```csharp
-   public class IconGenerationSettings
-   {
-       public string Prompt { get; set; } = string.Empty;
-       public Size ImageSize { get; set; } = new(60, 60); // Fixed size for initial implementation
-   }
-   ```
-
-2. **GeneratedIcon**
-   ```csharp
-   public class GeneratedIcon
-   {
-       public string Id { get; set; } = Guid.NewGuid().ToString();
-       public string Name { get; set; } = string.Empty;
-       public string Prompt { get; set; } = string.Empty;
-       public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-       public byte[] ImageData { get; set; } = Array.Empty<byte>();
-   }
-   ```
-
-### ViewModels
-
-1. **IconStudioViewModel**
-   ```csharp
-   public partial class IconStudioViewModel : ObservableObject
-   {
-       private readonly ILogger _logger;
-       private readonly INavigationService _navigationService;
-       private readonly IStableDiffusionService _sdService;
-
-       [ObservableProperty]
-       private string _prompt = string.Empty;
-
-       [ObservableProperty]
-       private bool _useGpu = true;
-
-       [ObservableProperty]
-       private ImageSource? _previewImage;
-
-       [ObservableProperty]
-       private bool _isGenerating;
-
-       [ObservableProperty]
-       private bool _isImageGenerated;
-
-       [ObservableProperty]
-       private string _iconName = string.Empty;
-
-       public IconStudioViewModel(
-           ILogger<IconStudioViewModel> logger,
-           INavigationService navigationService,
-           IStableDiffusionService sdService)
-       {
-           _logger = logger;
-           _navigationService = navigationService;
-           _sdService = sdService;
-       }
-
-       [RelayCommand]
-       private async Task GenerateAsync()
-       {
-           try
-           {
-               IsGenerating = true;
-               var settings = new IconGenerationSettings
-               {
-                   Prompt = Prompt
-               };
-
-               var imageData = await _sdService.GenerateImage(settings);
-               PreviewImage = await ConvertToImageSource(imageData);
-               IsImageGenerated = true;
-           }
-           catch (Exception ex)
-           {
-               _logger.LogError(ex, "Error during image generation");
-           }
-           finally
-           {
-               IsGenerating = false;
-           }
-       }
-
-       [RelayCommand]
-       private async Task SaveAsync()
-       {
-           try
-           {
-               if (string.IsNullOrWhiteSpace(IconName))
-               {
-                   // Show error message
-                   return;
-               }
-
-               // Save as PNG with circular mask
-               // Implementation
-           }
-           catch (Exception ex)
-           {
-               _logger.LogError(ex, "Error saving icon");
-           }
-       }
-
-       public override async Task InitializeAsync()
-       {
-           try
-           {
-               if (!_sdService.IsInitialized)
-               {
-                   await _sdService.Initialize(UseGpu);
-               }
-           }
-           catch (Exception ex)
-           {
-               _logger.LogError(ex, "Failed to initialize Icon Studio");
-           }
-       }
-   }
-   ```
-
-### UI Implementation
-
-1. **IconStudioPage.xaml**
-   ```xaml
-   <Grid>
-       <Grid.ColumnDefinitions>
-           <ColumnDefinition Width="320"/>
-           <ColumnDefinition Width="*"/>
-       </Grid.ColumnDefinitions>
-
-       <!-- Left Panel -->
-       <StackPanel Grid.Column="0" Margin="16">
-           <!-- GPU/CPU Selection -->
-           <ToggleSwitch Header="Use GPU"
-                       IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"/>
-           
-           <!-- Prompt Input -->
-           <TextBox Header="Prompt"
-                    Text="{x:Bind ViewModel.Prompt, Mode=TwoWay}"
-                    AcceptsReturn="True"
-                    TextWrapping="Wrap"
-                    Height="100"/>
-           
-           <!-- Generate Button -->
-           <Button Content="Generate"
-                   Command="{x:Bind ViewModel.GenerateCommand}"
-                   HorizontalAlignment="Stretch"
-                   Margin="0,16,0,0"/>
-                   
-           <!-- Save Section -->
-           <TextBox Header="Icon Name"
-                    Text="{x:Bind ViewModel.IconName, Mode=TwoWay}"
-                    Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}"/>
-           <Button Content="Save Icon"
-                   Command="{x:Bind ViewModel.SaveCommand}"
-                   Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}"/>
-       </StackPanel>
-
-       <!-- Right Panel -->
-       <Grid Grid.Column="1">
-           <!-- Preview with circular mask -->
-           <Image Source="{x:Bind ViewModel.PreviewImage, Mode=OneWay}"
-                  Width="60" Height="60"/>
-           <ProgressRing IsActive="{x:Bind ViewModel.IsGenerating, Mode=OneWay}"
-                        Width="40" Height="40"/>
-       </Grid>
-   </Grid>
-   ```
-
-## Implementation Timeline
-
-### Phase 1: Core Features (Week 1-2)
-1. **Infrastructure Setup**
-   - Create AI_Models folder structure
-   - Setup ONNX runtime integration
-   - Implement StableDiffusionService with GPU/CPU support
-
-2. **Basic Functionality**
-   - Implement image generation (60x60px)
-   - Add circular masking
-   - Setup PNG export
-
-3. **UI Implementation**
-   - Build basic interface
-   - Add GPU/CPU toggle
-   - Implement generation and save functionality
-
-### Phase 2: Advanced Features (Week 3-4)
-1. **History System**
-   - Implement chat history
-   - Add version tracking
-   - Setup persistent storage
-
-2. **Improvement Chain**
-   - Add improvement prompts
-   - Implement version navigation
-   - Add history management
 
 ## Testing Strategy
-1. **Core Features**
-   - Test GPU/CPU switching
-   - Validate image dimensions and format
-   - Test circular masking
-   - Verify save functionality
+1. Unit Tests
+   - Individual component testing
+   - Tensor operations validation
+   - Scheduler behavior verification
 
-2. **Advanced Features**
-   - Test history persistence
-   - Validate improvement chain
-   - Test version navigation
+2. Integration Tests
+   - Full pipeline testing
+   - Model loading verification
+   - Image generation validation
 
-## Future Enhancements
-1. **History Management**
-   - Persistent storage of generation history
-   - History deletion functionality
-   - Version navigation interface
+3. UI Tests
+   - Progress reporting
+   - Error handling
+   - GPU/CPU switching
 
-2. **Advanced Generation**
-   - Multiple generation styles
-   - Size customization
-   - Batch processing
+## Migration Steps
+1. Create new classes in parallel
+2. Test new implementation independently
+3. Switch services in DI container
+4. Remove old implementation
+5. Verify icon generation
 
-Notes:
-- Initial implementation focuses on 60x60px circular icons
-- PNG format is required for output
-- Advanced features like history and improvements will be implemented in Phase 2
-- GPU/CPU selection is available from the start
+## Success Criteria
+1. Generated icons are clear and accurate
+2. Performance is maintained or improved
+3. Proper error handling and feedback
+4. Consistent quality across different prompts
+5. Successful circular icon generation

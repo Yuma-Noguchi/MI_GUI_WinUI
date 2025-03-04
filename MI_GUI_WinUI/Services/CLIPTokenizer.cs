@@ -1,172 +1,174 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Text;
+using Newtonsoft.Json;
 
 namespace MI_GUI_WinUI.Services
 {
     public class CLIPTokenizer
     {
-        private Dictionary<string, int> _vocab;
-        private Dictionary<string, string> _merges;
-        private List<string> _mergesList; // Added to store merges in order
-        private readonly Regex _patSpaces;
-        private readonly Regex _patToken;
-        private readonly int _padTokenId = 49407; // [PAD] token ID in CLIP
-        private readonly int _maxLength = 77;
+        private readonly Dictionary<string, int> _vocab;
+        private readonly Dictionary<int, string> _vocabReverse;
+        private readonly Dictionary<string, string> _merges;
+        private const string DefaultVocabFile = "vocab.json";
+        private const string DefaultMergesFile = "merges.txt";
+        private const int UnkToken = 49407;  // CLIP's unknown token ID
+        private readonly Regex _pattern = new(@"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+");
 
         public CLIPTokenizer(string modelPath)
         {
-            var vocabPath = Path.Combine(modelPath, "vocab.json");
-            var mergesPath = Path.Combine(modelPath, "merges.txt");
+            if (string.IsNullOrEmpty(modelPath))
+                throw new ArgumentException("Model path cannot be empty", nameof(modelPath));
 
-            if (!File.Exists(vocabPath) || !File.Exists(mergesPath))
-                throw new FileNotFoundException("CLIP tokenizer files not found");
+            var vocabPath = Path.Combine(modelPath, DefaultVocabFile);
+            var mergesPath = Path.Combine(modelPath, DefaultMergesFile);
 
-            // Load vocabulary
-            using var vocabStream = File.OpenRead(vocabPath);
-            _vocab = JsonSerializer.Deserialize<Dictionary<string, int>>(vocabStream) ??
-                throw new InvalidOperationException("Failed to load vocabulary");
+            if (!File.Exists(vocabPath))
+                throw new FileNotFoundException("Vocabulary file not found", vocabPath);
+            if (!File.Exists(mergesPath))
+                throw new FileNotFoundException("Merges file not found", mergesPath);
 
-            // Load BPE merges
-            var mergeLines = File.ReadAllLines(mergesPath).Skip(1).ToArray();
-            _merges = new Dictionary<string, string>();
-            _mergesList = new List<string>();
-
-            foreach (var line in mergeLines)
+            try
             {
-                var parts = line.Split(' ');
-                if (parts.Length == 2)
-                {
-                    var merge = parts[0] + " " + parts[1];
-                    _merges[merge] = parts[0] + parts[1];
-                    _mergesList.Add(merge);
-                }
-            }
+                // Load vocabulary
+                var vocabJson = File.ReadAllText(vocabPath);
+                _vocab = JsonConvert.DeserializeObject<Dictionary<string, int>>(vocabJson)
+                    ?? throw new InvalidOperationException("Failed to parse vocabulary file");
 
-            // Initialize regex patterns
-            _patSpaces = new Regex(@"\s+");
-            _patToken = new Regex(@"<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+", RegexOptions.Compiled);
+                _vocabReverse = _vocab.ToDictionary(x => x.Value, x => x.Key);
+
+                // Load merges
+                var mergeLines = File.ReadAllLines(mergesPath).Skip(1); // Skip header
+                _merges = mergeLines.ToDictionary(
+                    x => x,
+                    x => x,
+                    StringComparer.Ordinal);
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException("Failed to parse tokenizer files", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to initialize tokenizer", ex);
+            }
         }
 
-        public long[] Tokenize(string text)
+        public long[] Tokenize(string text, int maxLength)
         {
-            var result = new List<long>();
+            if (string.IsNullOrEmpty(text))
+                throw new ArgumentException("Text cannot be empty", nameof(text));
+            if (maxLength <= 0)
+                throw new ArgumentException("Max length must be positive", nameof(maxLength));
 
-            // Add start token
-            result.Add(_vocab["<|startoftext|>"]);
-
-            // Normalize whitespace
-            text = _patSpaces.Replace(text, " ").Trim();
-
-            // Extract tokens
-            var matches = _patToken.Matches(text);
-            foreach (Match match in matches)
+            try
             {
-                var token = match.Value.ToLowerInvariant();
-                var bpeToken = BPEEncode(token);
+                var tokens = new List<long>();
+                var matches = _pattern.Matches(text.ToLowerInvariant());
 
-                foreach (var bpe in bpeToken.Split(' '))
+                foreach (Match match in matches)
                 {
-                    if (_vocab.TryGetValue(bpe, out var id))
-                    {
-                        result.Add(id);
-                    }
-                }
+                    var token = TokenizePiece(match.Value);
+                    tokens.AddRange(token);
 
-                // Check if we're approaching the limit
-                if (result.Count >= _maxLength - 1)
-                    break;
-            }
-
-            // Add end token
-            result.Add(_vocab["<|endoftext|>"]);
-
-            // Pad to max length
-            while (result.Count < _maxLength)
-            {
-                result.Add(_padTokenId);
-            }
-
-            // Truncate if too long
-            if (result.Count > _maxLength)
-            {
-                result = result.Take(_maxLength - 1).ToList();
-                result.Add(_vocab["<|endoftext|>"]);
-            }
-
-            return result.ToArray();
-        }
-
-        private string BPEEncode(string token)
-        {
-            if (string.IsNullOrEmpty(token))
-                return "";
-
-            // Convert to bytes for UTF-8 handling
-            var bytes = Encoding.UTF8.GetBytes(token);
-
-            // Convert bytes to string tokens
-            var word = string.Join(" ", bytes.Select(b => b.ToString()));
-
-            // Iteratively merge BPE pairs
-            var pairs = GetPairs(word);
-
-            if (!pairs.Any())
-                return word;
-
-            while (true)
-            {
-                var bigram = pairs.OrderBy(p => {
-                    if (_merges.TryGetValue(p, out _))
-                        return _mergesList.IndexOf(p);
-                    return int.MaxValue;
-                }).FirstOrDefault();
-
-                if (string.IsNullOrEmpty(bigram) || !_merges.ContainsKey(bigram))
-                    break;
-
-                var parts = bigram.Split(' ');
-                var newWord = "";
-                var i = 0;
-
-                while (i < word.Length)
-                {
-                    var j = word.IndexOf(bigram, i);
-                    if (j == -1)
-                    {
-                        newWord += word.Substring(i);
+                    if (tokens.Count >= maxLength)
                         break;
-                    }
-                    newWord += word.Substring(i, j - i);
-                    newWord += _merges[bigram];
-                    i = j + bigram.Length;
                 }
 
-                word = newWord;
-                if (word.IndexOf(' ') == -1)
-                    break;
+                // Pad or truncate to maxLength
+                if (tokens.Count < maxLength)
+                {
+                    tokens.AddRange(Enumerable.Repeat((long)UnkToken, maxLength - tokens.Count));
+                }
+                else if (tokens.Count > maxLength)
+                {
+                    tokens = tokens.Take(maxLength).ToList();
+                }
 
-                pairs = GetPairs(word);
+                return tokens.ToArray();
             }
-
-            return word;
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to tokenize text: {text}", ex);
+            }
         }
 
-        private List<string> GetPairs(string word)
+        private List<long> TokenizePiece(string text)
         {
-            var pairs = new List<string>();
-            var tokens = word.Split(' ');
+            if (string.IsNullOrEmpty(text))
+                return new List<long>();
 
-            for (int i = 0; i < tokens.Length - 1; i++)
+            try
             {
-                pairs.Add($"{tokens[i]} {tokens[i + 1]}");
+                var words = Tokenize(text);
+                var tokens = new List<long>();
+
+                foreach (var word in words)
+                {
+                    if (_vocab.TryGetValue(word, out int token))
+                    {
+                        tokens.Add(token);
+                    }
+                    else
+                    {
+                        // Handle unknown tokens by splitting into characters
+                        foreach (var ch in word)
+                        {
+                            var charToken = _vocab.GetValueOrDefault(ch.ToString(), UnkToken);
+                            tokens.Add(charToken);
+                        }
+                    }
+                }
+
+                return tokens;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to tokenize piece: {text}", ex);
+            }
+        }
+
+        private List<string> Tokenize(string text)
+        {
+            var words = new List<string>();
+            var buffer = new StringBuilder();
+
+            foreach (var ch in text)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    if (buffer.Length > 0)
+                    {
+                        words.Add(buffer.ToString());
+                        buffer.Clear();
+                    }
+                    words.Add(" ");
+                }
+                else
+                {
+                    buffer.Append(ch);
+                }
             }
 
-            return pairs;
+            if (buffer.Length > 0)
+                words.Add(buffer.ToString());
+
+            return words;
+        }
+
+        private bool TryGetMergeRank(string piece1, string piece2, out int rank)
+        {
+            var key = $"{piece1} {piece2}";
+            if (_merges.TryGetValue(key, out var rankStr))
+            {
+                rank = _merges.Keys.ToList().IndexOf(key);
+                return true;
+            }
+            rank = -1;
+            return false;
         }
     }
 }

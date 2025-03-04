@@ -1,496 +1,266 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
-using MI_GUI_WinUI.Models;
+﻿﻿using Microsoft.Extensions.Logging;
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
+using MI_GUI_WinUI.Models;
+using MI_GUI_WinUI.Services.StableDiffusion;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace MI_GUI_WinUI.Services
 {
     public class StableDiffusionService : IStableDiffusionService, IDisposable
     {
         private readonly ILogger<StableDiffusionService> _logger;
-        private InferenceSession? _unet;
-        private CLIPTokenizer? _tokenizer;
-        private InferenceSession? _textEncoder;
-        private InferenceSession? _vae;
-        private bool _useGpu;
-        private readonly Random _random = new();
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly string _baseDirectory;
+        private const string MODEL_FOLDER = "AI_Models/StableDiffusion";
+        private readonly object _initLock = new();
 
-        public bool IsInitialized { get; private set; }
+        private StableDiffusionStudio? _studio;
+        private StableDiffusionConfig? _config;
 
-        public StableDiffusionService(ILogger<StableDiffusionService> logger)
+        public StableDiffusionService(ILoggerFactory loggerFactory)
         {
-            _logger = logger;
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _logger = loggerFactory.CreateLogger<StableDiffusionService>();
+            
+            _baseDirectory = Path.GetFullPath(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, MODEL_FOLDER));
+            _logger.LogInformation("Base directory set to: {path}", _baseDirectory);
         }
+
+        public bool IsInitialized => _studio != null && _config != null;
 
         public async Task Initialize(bool useGpu)
         {
+            // Ensure we're not already initialized
+            if (IsInitialized)
+            {
+                _logger.LogInformation("Service already initialized");
+                return;
+            }
+
+            // Use lock to prevent multiple simultaneous initialization attempts
+            lock (_initLock)
+            {
+                if (IsInitialized)
+                    return;
+            }
+
             try
             {
-                _useGpu = useGpu;
-                await LoadModel();
-                IsInitialized = true;
-                _logger.LogInformation("StableDiffusion service initialized successfully with GPU: {useGpu}", useGpu);
+                _logger.LogInformation("Starting initialization with GPU: {useGpu}", useGpu);
+                var modelPath = Path.Combine(_baseDirectory);
+
+                // Validate model directory exists
+                if (!Directory.Exists(modelPath))
+                {
+                    _logger.LogError("Model directory not found: {path}", modelPath);
+                    throw new DirectoryNotFoundException($"Model directory not found: {modelPath}");
+                }
+
+                // Create configuration
+                _config = new StableDiffusionConfig
+                {
+                    ModelBasePath = modelPath,
+                    Height = 512,
+                    Width = 512,
+                    NumInferenceSteps = 20,
+                    GuidanceScale = 7.5f,
+                    ExecutionProvider = !useGpu ? ExecutionProvider.CPU : ExecutionProvider.DirectML
+                };
+
+                // Initialize model paths
+                _config.InitializePaths();
+                _config.ValidateModelFiles();
+
+                // Create studio in async task to avoid blocking
+                await Task.Run(() => 
+                {
+                    lock (_initLock)
+                    {
+                        if (!IsInitialized)
+                        {
+                            _studio = new StableDiffusionStudio(_config, _loggerFactory);
+                        }
+                    }
+                });
+
+                _logger.LogInformation("Initialization completed successfully");
+            }
+            catch (FileNotFoundException ex)
+            {
+                _logger.LogError(ex, "Required model file not found: {file}", ex.FileName);
+                CleanupAfterFailure();
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize StableDiffusion service");
+                _logger.LogError(ex, "Failed to initialize Stable Diffusion service");
+                CleanupAfterFailure();
                 throw;
+            }
+        }
+
+        private void CleanupAfterFailure()
+        {
+            lock (_initLock)
+            {
+                _studio?.Dispose();
+                _studio = null;
+                _config = null;
             }
         }
 
         public async Task<byte[]> GenerateImage(IconGenerationSettings settings, IProgress<int>? progress = null)
         {
-            if (!IsInitialized)
-                throw new InvalidOperationException("StableDiffusion service is not initialized");
+            if (!IsInitialized || _studio == null)
+                throw new InvalidOperationException("Service not initialized. Call Initialize first.");
+
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            void ReportProgress(int value)
+            {
+                progress?.Report(value);
+            }
 
             try
             {
-                // 1. Tokenize input prompt
-                var inputTokens = TokenizeText(settings.Prompt);
-                progress?.Report(5);
+                ReportProgress(0);
 
-                // 2. Encode text
-                var textEmbeddings = await EncodeText(inputTokens);
-                progress?.Report(10);
+                // Update configuration if needed
+                if (settings.Width > 0) _config.Width = settings.Width;
+                if (settings.Height > 0) _config.Height = settings.Height;
+                if (settings.NumInferenceSteps > 0) _config.NumInferenceSteps = settings.NumInferenceSteps;
+                if (settings.GuidanceScale > 0) _config.GuidanceScale = settings.GuidanceScale;
 
-                // 3. Generate latent noise with seed
-                var latents = GenerateInitialNoise(seed: settings.Seed);
-                progress?.Report(15);
+                // Start generation
+                ReportProgress(10);
 
-                // 4. Run UNet inference with guidance scale
-                var finalLatents = await RunDiffusion(latents, textEmbeddings, 
-                    settings.NumInferenceSteps, settings.GuidanceScale, progress);
-
-                // 5. Decode latents to image using VAE
-                progress?.Report(85);
-                var imageData = await DecodeLatents(finalLatents);
-
-                // 6. Apply circular mask and resize
-                progress?.Report(95);
-                var result = ApplyCircularMask(imageData, settings.ImageSize);
-                progress?.Report(100);
-                
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating image with prompt: {prompt}", settings.Prompt);
-                throw;
-            }
-        }
-
-        private long[] TokenizeText(string text)
-        {
-            if (_tokenizer == null)
-                throw new InvalidOperationException("Tokenizer not initialized");
-
-            try
-            {
-                var tokens = _tokenizer.Tokenize(text);
-                _logger.LogDebug("Text tokenized successfully: {text}", text);
-                return tokens;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during text tokenization");
-                throw;
-            }
-        }
-
-        private async Task<float[]> EncodeText(long[] tokens)
-        {
-            if (_textEncoder == null)
-                throw new InvalidOperationException("Text encoder not initialized");
-
-            try
-            {
-                // Create input tensor for text encoder
-                var inputTensor = new NamedOnnxValue[]
+                // Map progress to 20-90 range
+                var progressTracker = new Progress<double>(value =>
                 {
-            NamedOnnxValue.CreateFromTensor("input_ids", new DenseTensor<long>(tokens, new[] { 1, tokens.Length }))
+                    var mappedProgress = 20 + (int)(value * 70);
+                    ReportProgress(mappedProgress);
+                });
+
+                var image = await _studio.GenerateImageAsync(settings.Prompt, progressTracker, settings.CancellationToken);
+
+                ReportProgress(90);
+
+                using var memStream = new MemoryStream();
+                await image.SaveAsPngAsync(memStream);
+
+                ReportProgress(100);
+                return memStream.ToArray();
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Generation cancelled");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate image");
+                throw;
+            }
+        }
+
+        public async Task<(bool success, string path)> GenerateIconAsync(string prompt, IProgress<GenerationProgress> progress, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(prompt))
+                    throw new ArgumentException("Prompt cannot be empty", nameof(prompt));
+
+                var settings = new IconGenerationSettings
+                {
+                    Prompt = prompt,
+                    Width = 512,
+                    Height = 512,
+                    NumInferenceSteps = 20,
+                    GuidanceScale = 7.5f,
+                    CancellationToken = cancellationToken
                 };
 
-                // Run text encoder
-                using var output = await Task.Run(() => _textEncoder.Run(inputTensor));
+                ReportProgress(0.0f, GenerationProgressState.Loading, progress);
 
-                // Debug log available output names (helpful for debugging)
-                _logger.LogDebug("Text encoder output names: {names}", string.Join(", ", output.Select(x => x.Name)));
-
-                // Directly try to get "text_embeddings" output
-                NamedOnnxValue embeddingOutput = null;
-                try
+                // Generate image
+                var imageData = await GenerateImage(settings, new Progress<int>(value =>
                 {
-                    embeddingOutput = output.First(x => x.Name == "text_embeddings");
-                }
-                catch (InvalidOperationException)
-                {
-                    // Log a warning if "text_embeddings" is not found, fallback to first output
-                    _logger.LogWarning("Output 'text_embeddings' not found. Using fallback output.");
-                    embeddingOutput = output.First();
-                    _logger.LogDebug("Using fallback output tensor with name: {name}", embeddingOutput.Name); // Optional: Log fallback name
-                }
-
-                // Get embeddings as float array
-                var lastHiddenState = embeddingOutput.AsEnumerable<float>().ToArray();
-                _logger.LogDebug("Text encoded successfully, shape: {length}", lastHiddenState.Length);
-
-                return lastHiddenState;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during text encoding: {message}", ex.Message);
-                throw;
-            }
-        }
-
-        private float[] GenerateInitialNoise(
-            int batchSize = 1, int height = 64, int width = 64, int channels = 4, long seed = -1)
-        {
-            var latentSize = batchSize * channels * height * width;
-            var latents = new float[latentSize];
-            var random = seed < 0 ? _random : new Random((int)seed);
-
-            for (int i = 0; i < latentSize; i++)
-            {
-                latents[i] = (float)(random.NextDouble() * 2 - 1); // Random values between -1 and 1
-            }
-            return latents;
-        }
-
-        private async Task<float[]> RunDiffusion(
-            float[] initialLatents, float[] textEmbeddings, int numInferenceSteps, float guidanceScale,
-            IProgress<int>? progress = null)
-        {
-            if (_unet == null)
-                throw new InvalidOperationException("UNet not initialized");
-
-            try
-            {
-                var latents = initialLatents;
-                _logger.LogInformation("Starting diffusion with {steps} steps, guidance scale: {scale}", 
-                    numInferenceSteps, guidanceScale);
-                var timesteps = GenerateTimesteps(numInferenceSteps);
-
-                for (int i = 0; i < timesteps.Length; i++)
-                {
-                    var t = timesteps[i];
-                    
-                    // Prepare input tensors for UNet
-                    var inputTensors = new List<NamedOnnxValue>
+                    var p = value / 100.0f;
+                    var state = value switch
                     {
-                        NamedOnnxValue.CreateFromTensor("latent", 
-                            new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 })),
-                        NamedOnnxValue.CreateFromTensor("timestep", 
-                            new DenseTensor<long>(new[] { t }, new[] { 1 })),
-                        NamedOnnxValue.CreateFromTensor("text_embed", 
-                            new DenseTensor<float>(textEmbeddings, new[] { 1, 77, 768 }))
+                        < 5 => GenerationProgressState.Loading,
+                        < 10 => GenerationProgressState.Tokenizing,
+                        < 15 => GenerationProgressState.Encoding,
+                        < 20 => GenerationProgressState.InitializingLatents,
+                        < 80 => GenerationProgressState.Diffusing,
+                        < 90 => GenerationProgressState.Decoding,
+                        < 95 => GenerationProgressState.Finalizing,
+                        _ => GenerationProgressState.Completing
                     };
+                    ReportProgress(p, state, progress);
+                }));
 
-                    // Prepare unconditional input (empty embedding)
-                    var uncondEmbedding = new float[textEmbeddings.Length];
-                    var uncondInput = new List<NamedOnnxValue>
-                    {
-                        NamedOnnxValue.CreateFromTensor("latent", 
-                            new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 })),
-                        NamedOnnxValue.CreateFromTensor("timestep", 
-                            new DenseTensor<long>(new[] { t }, new[] { 1 })),
-                        NamedOnnxValue.CreateFromTensor("text_embed", 
-                            new DenseTensor<float>(uncondEmbedding, new[] { 1, 77, 768 }))
-                    };
+                // Save image
+                var outputPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "MotionInput",
+                    "data", 
+                    "assets",
+                    "generated_icons",
+                    $"icon_{DateTime.Now:yyyyMMdd_HHmmss}.png"
+                );
 
-                    // Get both conditional and unconditional predictions
-                    using var uncondOutput = await Task.Run(() => _unet.Run(uncondInput));
-                    using var condOutput = await Task.Run(() => _unet.Run(inputTensors));
-
-                    var uncondPred = uncondOutput.First(x => x.Name == "noise_pred")
-                        .AsEnumerable<float>()
-                        .ToArray();
-                    var condPred = condOutput.First(x => x.Name == "noise_pred")
-                        .AsEnumerable<float>()
-                        .ToArray();
-
-                    // Apply classifier-free guidance
-                    var noisePred = new float[uncondPred.Length];
-                    for (int j = 0; j < noisePred.Length; j++)
-                    {
-                        noisePred[j] = uncondPred[j] + guidanceScale * (condPred[j] - uncondPred[j]);
-                    }
-
-                    // Update latents using scheduler step
-                    latents = SchedulerStep(latents, noisePred, t);
-
-                    _logger.LogDebug("Completed diffusion step {i} of {total}", i + 1, timesteps.Length);
-                    
-                    // Report progress from 20% to 80%
-                    var progressValue = 20 + (60 * (i + 1) / timesteps.Length);
-                    progress?.Report(progressValue);
+                var directory = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
                 }
 
-                return latents;
+                await File.WriteAllBytesAsync(outputPath, imageData, cancellationToken);
+
+                ReportProgress(1.0f, GenerationProgressState.Completed, progress);
+                return (true, outputPath);
+            }
+            catch (OperationCanceledException)
+            {
+                ReportProgress(0f, GenerationProgressState.Cancelled, progress);
+                return (false, string.Empty);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during diffusion process");
-                throw;
+                _logger.LogError(ex, "Failed to generate and save icon");
+                ReportProgress(0f, GenerationProgressState.Failed, progress);
+                return (false, string.Empty);
             }
         }
 
-        private long[] GenerateTimesteps(int numInferenceSteps)
+        private void ReportProgress(float value, GenerationProgressState state, IProgress<GenerationProgress> progress)
         {
-            // Generate timesteps for DDIM scheduler
-            var timesteps = new long[numInferenceSteps];
-            var step = 1000 / numInferenceSteps;
-            for (int i = 0; i < numInferenceSteps; i++)
-            {
-                timesteps[i] = 1000 - (i * step);
-            }
-            return timesteps;
-        }
-
-        private float[] SchedulerStep(float[] latents, float[] noisePred, long timestep)
-        {
-            // DDIM scheduler parameters
-            float beta1 = 0.00085f;
-            float beta2 = 0.012f;
-            float betaSchedule = beta1 + (beta2 - beta1) * (timestep / 1000.0f);
-            
-            // Calculate alpha values
-            float alpha = 1.0f - betaSchedule;
-            float alphaProd = (float)Math.Pow(alpha, timestep);
-            float alphaProdPrev = timestep > 0 ? (float)Math.Pow(alpha, timestep - 1) : 1.0f;
-            
-            // Calculate coefficients
-            float sigma = (float)Math.Sqrt((1 - alphaProdPrev) / (1 - alphaProd) * betaSchedule);
-            float c1 = (float)Math.Sqrt(1 / alpha);
-            float c2 = (float)Math.Sqrt(1 - alpha) * sigma;
-            
-            var result = new float[latents.Length];
-            for (int i = 0; i < latents.Length; i++)
-            {
-                // Predict x0
-                float predX0 = (latents[i] - c2 * noisePred[i]) / c1;
-                
-                // Update latent
-                result[i] = c1 * predX0 + c2 * noisePred[i];
-            }
-
-            return result;
-        }
-
-        private async Task<byte[]> DecodeLatents(float[] latents)
-        {
-            if (_vae == null)
-                throw new InvalidOperationException("VAE not initialized");
-
-            try
-            {
-                // Scale latents for VAE input
-                for (int i = 0; i < latents.Length; i++)
-                {
-                    latents[i] /= 0.18215f;
-                }
-
-                // Create input tensor for VAE
-                var inputTensor = new List<NamedOnnxValue>
-                {
-                    NamedOnnxValue.CreateFromTensor("latent",
-                        new DenseTensor<float>(latents, new[] { 1, 4, 64, 64 }))
-                };
-
-                // Run VAE decoder
-                using var output = await Task.Run(() => _vae.Run(inputTensor));
-
-                // Get the decoded image tensor
-                var imageArray = output.First(x => x.Name == "sample")
-                    .AsEnumerable<float>()
-                    .ToArray();
-
-                // Convert to image format (0-255 range)
-                var rgbImage = new byte[256 * 256 * 3];
-                int pixelIndex = 0; // Index for rgbImage (0 to 196607)
-                for (int y = 0; y < 256; y++) // Iterate over image height (rows)
-                {
-                    for (int x = 0; x < 256; x++) // Iterate over image width (columns)
-                    {
-                        // Calculate index in imageArray for the current pixel (x, y) and channel
-                        int arrayIndexBase = (y * 256 + x) * 4; // Base index for 4 channels
-
-                        // Assuming channels are ordered like R, G, B, A (or similar - check VAE output docs if available)
-                        // Extract R, G, B channels from imageArray (take first 3 channels, ignore 4th if needed)
-                        float rFloat = imageArray[arrayIndexBase + 0];
-                        float gFloat = imageArray[arrayIndexBase + 1];
-                        float bFloat = imageArray[arrayIndexBase + 2];
-                        // float aFloat = imageArray[arrayIndexBase + 3]; // If you want to use alpha or inspect it
-
-                        // Convert to byte and clamp for R channel
-                        rgbImage[pixelIndex++] = (byte)Math.Clamp((rFloat + 1) * 127.5f, 0, 255); // R
-                        rgbImage[pixelIndex++] = (byte)Math.Clamp((gFloat + 1) * 127.5f, 0, 255); // G
-                        rgbImage[pixelIndex++] = (byte)Math.Clamp((bFloat + 1) * 127.5f, 0, 255); // B
-                    }
-                }
-
-                // Create bitmap from raw bytes
-                using var bitmap = new Bitmap(256, 256, PixelFormat.Format24bppRgb);
-                var bitmapData = bitmap.LockBits(
-                    new Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                    ImageLockMode.WriteOnly,
-                    PixelFormat.Format24bppRgb);
-
-                try
-                {
-                    System.Runtime.InteropServices.Marshal.Copy(rgbImage, 0, bitmapData.Scan0, rgbImage.Length);
-                }
-                finally
-                {
-                    bitmap.UnlockBits(bitmapData);
-                }
-
-                // Convert to PNG
-                using var stream = new MemoryStream();
-                bitmap.Save(stream, ImageFormat.Png);
-                return stream.ToArray();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error decoding latents");
-                throw;
-            }
-        }
-
-        private byte[] CreatePlaceholderImage(Size size)
-        {
-            using var bitmap = new Bitmap(size.Width, size.Height);
-            using var graphics = Graphics.FromImage(bitmap);
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-            // Create circular mask
-            using var path = new GraphicsPath();
-            path.AddEllipse(0, 0, size.Width, size.Height);
-            graphics.SetClip(path);
-
-            // Fill with a gradient
-            using var brush = new LinearGradientBrush(
-                new Point(0, 0),
-                new Point(size.Width, size.Height),
-                Color.LightBlue,
-                Color.DarkBlue);
-            graphics.FillEllipse(brush, 0, 0, size.Width, size.Height);
-
-            // Convert to bytes
-            using var stream = new MemoryStream();
-            bitmap.Save(stream, ImageFormat.Png);
-            return stream.ToArray();
-        }
-
-        private byte[] ApplyCircularMask(byte[] imageData, Size size)
-        {
-            using var inputStream = new MemoryStream(imageData);
-            using var inputBitmap = new Bitmap(inputStream);
-            using var outputBitmap = new Bitmap(size.Width, size.Height);
-            using var graphics = Graphics.FromImage(outputBitmap);
-
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-
-            // Create and set circular clipping path
-            using var path = new GraphicsPath();
-            path.AddEllipse(0, 0, size.Width, size.Height);
-            graphics.SetClip(path);
-
-            // Draw the image
-            graphics.DrawImage(inputBitmap, 0, 0, size.Width, size.Height);
-
-            // Convert to PNG
-            using var stream = new MemoryStream();
-            outputBitmap.Save(stream, ImageFormat.Png);
-            return stream.ToArray();
-        }
-
-        private async Task LoadModel()
-        {
-            var modelPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "AI_Models", "StableDiffusion");
-            _logger.LogInformation("Looking for AI_Models in base directory: {baseDir}", modelPath);
-
-            if (!Directory.Exists(modelPath))
-            {
-                throw new DirectoryNotFoundException(
-                    $"Could not find AI_Models directory in any of the following locations:{Environment.NewLine}{modelPath}");
-            }
-
-            _logger.LogInformation("Using model path: {modelPath}", modelPath);
-
-            var requiredFiles = new[] { "text_encoder.onnx", "unet.onnx", "vae_decoder.onnx", "vocab.json", "merges.txt" };
-            foreach (var file in requiredFiles)
-            {
-                var filePath = Path.Combine(modelPath, file);
-                if (!File.Exists(filePath))
-                {
-                    throw new FileNotFoundException($"Required model file not found: {file}", filePath);
-                }
-                _logger.LogInformation("Found required model file: {file}", file);
-            }
-
-            _logger.LogInformation("Configuring inference session options...");
-            var sessionOptions = new SessionOptions();
-            if (_useGpu)
-            {
-                try
-                {
-                    _logger.LogInformation("Attempting to initialize DirectML provider...");
-                    sessionOptions.AppendExecutionProvider_DML(0);
-                    _logger.LogInformation("Successfully initialized DirectML (GPU) execution provider");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to initialize DirectML provider, falling back to CPU. Error: {message}", ex.Message);
-                    _useGpu = false;
-                }
-            }
-
-            if (!_useGpu)
-            {
-                _logger.LogInformation("Using CPU execution provider");
-                sessionOptions.EnableMemoryPattern = true;
-                sessionOptions.EnableCpuMemArena = true;
-            }
-
-            try
-            {
-                _unet = await Task.Run(() => new InferenceSession(
-                    Path.Combine(modelPath, "unet.onnx"), 
-                    sessionOptions));
-            }
-            catch (DllNotFoundException ex)
-            {
-                _logger.LogError(ex, "ONNX Runtime DLL not found. Please ensure Microsoft.ML.OnnxRuntime DLLs are present");
-                throw new InvalidOperationException("ONNX Runtime components are missing. Please reinstall the application.", ex);
-            }
-
-            // Initialize the C# tokenizer instead of using ONNX
-            _tokenizer = new CLIPTokenizer(modelPath);
-
-            _textEncoder = await Task.Run(() => new InferenceSession(
-                Path.Combine(modelPath, "text_encoder.onnx"), 
-                sessionOptions));
-
-            _vae = await Task.Run(() => new InferenceSession(
-                Path.Combine(modelPath, "vae_decoder.onnx"), 
-                sessionOptions));
+            progress?.Report(new GenerationProgress { Progress = value, State = state });
         }
 
         public void Dispose()
         {
-            _unet?.Dispose();
-            _textEncoder?.Dispose();
-            _vae?.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                lock (_initLock)
+                {
+                    _studio?.Dispose();
+                    _studio = null;
+                    _config = null;
+                }
+            }
         }
     }
 }
