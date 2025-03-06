@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup>
 <OutputType>WinExe</OutputType>
 <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
@@ -6,7 +6,7 @@
 <RootNamespace>MI_GUI_WinUI</RootNamespace>
 <ApplicationManifest>app.manifest</ApplicationManifest>
 <Platform>x64</Platform>
-<Platforms>x86;x64;ARM64</Platforms>
+<Platforms>x86;x64;</Platforms>
 <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
 <PublishProfile>win-$(Platform).pubxml</PublishProfile>
@@ -15,7 +15,42 @@
 <Nullable>enable</Nullable>
 </PropertyGroup>
 
-<ItemGroup>
+	<PropertyGroup Label="Globals">
+		<Microsoft_AI_DirectML_SkipIncludeDir>True</Microsoft_AI_DirectML_SkipIncludeDir>
+		<Microsoft_AI_DirectML_SkipLink>True</Microsoft_AI_DirectML_SkipLink>
+		<Microsoft_AI_DirectML_SkipDebugLayerCopy>True</Microsoft_AI_DirectML_SkipDebugLayerCopy>
+		<Microsoft_AI_DirectML_SkipLibraryCopy>False</Microsoft_AI_DirectML_SkipLibraryCopy>
+		<Configurations>Debug;Release</Configurations>
+		<OnnxModelSubdir>fp16</OnnxModelSubdir>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\StableDiffusion.ML.OnnxRuntime\StableDiffusion.ML.OnnxRuntime.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="$(SolutionDir)\x64\$(Configuration)\DirectXAdapterSelector.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<None Update="Onnx\$(OnnxModelSubdir)\safety_checker\model.onnx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Onnx\$(OnnxModelSubdir)\text_encoder\model.onnx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Onnx\$(OnnxModelSubdir)\unet\model.onnx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Onnx\$(OnnxModelSubdir)\vae_decoder\model.onnx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Onnx\$(OnnxModelSubdir)\cliptokenizer.onnx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+
+	<ItemGroup>
 <None Remove="Assets\actionstudio-logo.svg" />
 <None Remove="Assets\iconstudio-logo.svg" />
 <None Remove="Assets\profileeditor-logo.svg" />
@@ -35,9 +70,14 @@
 <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
 <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
 <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
+<PackageReference Include="Microsoft.ML" Version="4.0.2" />
+<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.20.1" />
+<PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.13.0" />
+<PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.20.2" />
 <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
 <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250205002" />
 <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+<PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
 </ItemGroup>
 
 <ItemGroup>
