@@ -17,7 +17,7 @@ namespace MI_GUI_WinUI.ViewModels
     {
         private readonly ILogger<IconStudioViewModel> _logger;
         private readonly INavigationService _navigationService;
-        private readonly StableDiffusionService _service;
+        private readonly StableDiffusionService _sdService;
         private bool _executingInference;
 
         [ObservableProperty]
@@ -72,11 +72,11 @@ namespace MI_GUI_WinUI.ViewModels
         private string _statusMessage = string.Empty;
 
         public IconStudioViewModel(
-            StableDiffusionService service,
+            StableDiffusionService sdService,
             ILogger<IconStudioViewModel> logger,
             INavigationService navigationService)
         {
-            _service = service;
+            _sdService = sdService;
             _logger = logger;
             _navigationService = navigationService;
         }
@@ -94,9 +94,9 @@ namespace MI_GUI_WinUI.ViewModels
                 StatusString = "Generating...";
                 IsGenerating = true;
 
-                var imagePaths = await _service.GenerateImages(InputDescription, NumberOfImages);
+                var imagePaths = await _sdService.GenerateImages(InputDescription, NumberOfImages);
 
-                StatusString = $"{_service.NumInferenceSteps} iterations ({_service.IterationsPerSecond:F1} it/sec); {_service.LastTimeMilliseconds / 1000.0:F1} sec total";
+                StatusString = $"{_sdService.NumInferenceSteps} iterations ({_sdService.IterationsPerSecond:F1} it/sec); {_sdService.LastTimeMilliseconds / 1000.0:F1} sec total";
                 await LoadImagesAsync(imagePaths);
                 IsImageGenerated = true;
             }
