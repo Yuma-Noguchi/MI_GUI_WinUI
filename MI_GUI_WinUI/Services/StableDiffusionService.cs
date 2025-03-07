@@ -9,13 +9,20 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Media;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
 
 namespace MI_GUI_WinUI.Services
 {
-    public partial class StableDiffusionService : ObservableObject
+    public partial class StableDiffusionService : ObservableObject, IDisposable
     {
-        private readonly StableDiffusionConfig _config;
-        private readonly UNet _unet;
+        private StableDiffusionConfig _config;
+        private UNet _unet;
+        private readonly ILogger<StableDiffusionService> _logger;
+        private readonly object _initLock = new();
+        private readonly DispatcherQueue _dispatcherQueue;
+
+        public bool IsInitialized => _unet != null && _config != null;
 
         [ObservableProperty]
         private double _percentage;
@@ -28,8 +35,9 @@ namespace MI_GUI_WinUI.Services
 
         public long NumInferenceSteps => _config.NumInferenceSteps;
 
-        public StableDiffusionService()
+        public StableDiffusionService(ILogger<StableDiffusionService> logger)
         {
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
             var modelsPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "Onnx", "fp16");
 
             _config = new StableDiffusionConfig
@@ -46,7 +54,51 @@ namespace MI_GUI_WinUI.Services
                 ImageOutputPath = "NONE",
             };
 
-            _unet = new UNet(_config);
+            _logger = logger;
+        }
+
+        public async Task Initialize(bool useGpu)
+        {
+            // Ensure we're not already initialized
+            if (IsInitialized)
+            {
+                _logger.LogInformation("Service already initialized");
+                return;
+            }
+
+            // Use lock to prevent multiple simultaneous initialization attempts
+            lock (_initLock)
+            {
+                if (IsInitialized)
+                    return;
+            }
+
+            try
+            {
+                _logger.LogInformation("Starting initialization with GPU: {useGpu}", useGpu);
+                _unet = new UNet(_config);
+            }
+            catch (FileNotFoundException ex)
+            {
+                _logger.LogError(ex, "Required model file not found: {file}", ex.FileName);
+                CleanupAfterFailure();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize Stable Diffusion service");
+                CleanupAfterFailure();
+                throw;
+            }
+        }
+
+        private void CleanupAfterFailure()
+        {
+            lock (_initLock)
+            {
+                _unet = null;
+                _config = null;
+            }
         }
 
         public ObservableCollection<ImageSource> GenerateFakeData(string description, int numberOfImages)
@@ -64,7 +116,7 @@ namespace MI_GUI_WinUI.Services
 
         public async Task<string[]> GenerateImages(string description, int numberOfImages, Action<int>? stepCallback = null)
         {
-            Percentage = 0;
+            _dispatcherQueue.TryEnqueue(() => Percentage = 0);
             
             if (numberOfImages == 0)
             {
@@ -88,16 +140,18 @@ namespace MI_GUI_WinUI.Services
                     var output = _unet.Inference(
                         description, 
                         config, 
-                        (stepIndex) => { 
-                            Percentage = ((double)((stepIndex + 1) + (i - 1) * config.NumInferenceSteps) / (double)totalSteps) * 100.0;
+                        (stepIndex) => 
+                        { 
+                            var percentage = ((double)((stepIndex + 1) + (i - 1) * config.NumInferenceSteps) / (double)totalSteps) * 100.0;
+                            _dispatcherQueue.TryEnqueue(() => Percentage = percentage);
                         }
                     );
 
-                    IterationsPerSecond = output.IterationsPerSecond;
+                    _dispatcherQueue.TryEnqueue(() => IterationsPerSecond = output.IterationsPerSecond);
 
                     if (output.Image == null)
                     {
-                        Console.WriteLine($"There was an error generating image {i}.");
+                        _logger.LogWarning("Error generating image {i}", i);
                     }
                 }
 
@@ -107,12 +161,31 @@ namespace MI_GUI_WinUI.Services
                                         .ToArray();
 
                 timer.Stop();
-                LastTimeMilliseconds = timer.ElapsedMilliseconds;
+                _dispatcherQueue.TryEnqueue(() => LastTimeMilliseconds = timer.ElapsedMilliseconds);
 
                 return imagePaths;
             });
 
             return result;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                lock (_initLock)
+                {
+                    _unet?.Dispose();
+                    _unet = null;
+                    _config = null;
+                }
+            }
         }
     }
 }

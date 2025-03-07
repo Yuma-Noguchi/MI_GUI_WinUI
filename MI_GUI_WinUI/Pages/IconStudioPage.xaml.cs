@@ -26,12 +26,12 @@ namespace MI_GUI_WinUI.Pages
                 PulseStoryboard.Begin();
             }
 
-            //// Ensure we have valid ViewModel and XamlRoot
-            //if (ViewModel != null)
-            //{
-            //    ViewModel.XamlRoot = this.XamlRoot;
-            //    await ViewModel.InitializeAsync();
-            //}
+            // Ensure we have valid ViewModel and XamlRoot
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = this.XamlRoot;
+                await ViewModel.InitializeAsync();
+            }
         }
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)

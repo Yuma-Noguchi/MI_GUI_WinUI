@@ -7,9 +7,10 @@ using SixLabors.ImageSharp.Advanced;
 
 namespace StableDiffusion.ML.OnnxRuntime
 {
-    public class SafetyChecker
+    public class SafetyChecker : IDisposable
     {
         private InferenceSession _session;
+        private bool _disposedValue;
 
         public SafetyChecker(StableDiffusionConfig config)
         {
@@ -119,6 +120,24 @@ namespace StableDiffusion.ML.OnnxRuntime
 
             return input;
 
+        }
+
+        public virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    _session?.Dispose();
+                }
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

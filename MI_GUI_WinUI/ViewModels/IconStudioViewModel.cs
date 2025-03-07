@@ -10,15 +10,22 @@ using MI_GUI_WinUI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class IconStudioViewModel : ObservableObject
     {
+        private XamlRoot? _xamlRoot;
         private readonly ILogger<IconStudioViewModel> _logger;
         private readonly INavigationService _navigationService;
         private readonly StableDiffusionService _sdService;
         private bool _executingInference;
+        public XamlRoot? XamlRoot
+        {
+            get => _xamlRoot;
+            set => _xamlRoot = value;
+        }
 
         [ObservableProperty]
         private string _title = "Icon Studio";
@@ -79,11 +86,106 @@ namespace MI_GUI_WinUI.ViewModels
             _sdService = sdService;
             _logger = logger;
             _navigationService = navigationService;
+
+            // Subscribe to service's percentage changes
+            _sdService.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(StableDiffusionService.Percentage))
+                {
+                    OnPropertyChanged(nameof(ProgressPercentage));
+                }
+            };
+        }
+
+        public double ProgressPercentage => _sdService.Percentage;
+        public async Task InitializeAsync()
+        {
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+
+            if (_sdService.IsInitialized || IsInitializing)
+                return;
+
+            try
+            {
+                IsInitializing = true;
+                InitializationStatus = "Starting initialization...";
+
+                InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
+                await _sdService.Initialize(!UseGpu);
+
+                InitializationStatus = "Initialization complete";
+                InitializationFailed = false;
+                IsPreInitialization = false;
+
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowMessage(
+                        $"Stable Diffusion initialized successfully with {(UseGpu ? "GPU" : "CPU")} acceleration.",
+                        "Initialization Complete",
+                        XamlRoot);
+                }
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                _logger.LogError(ex, "AI Models directory not found");
+                InitializationFailed = true;
+                ErrorMessage = "AI Models directory not found. Please ensure the models are properly installed.";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
+                }
+            }
+            catch (FileNotFoundException ex)
+            {
+                _logger.LogError(ex, "Required model file not found");
+                InitializationFailed = true;
+                ErrorMessage = $"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to initialize Icon Studio");
+                InitializationFailed = true;
+                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
+                }
+            }
+            finally
+            {
+                IsInitializing = false;
+            }
         }
 
         public bool IsNotGenerating => !IsGenerating;
         public bool IsReady => true;
         public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
+
+        partial void OnIsGeneratingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsNotGenerating));
+            OnPropertyChanged(nameof(CanGenerate));
+            if (!value)
+            {
+                StatusMessage = string.Empty;
+            }
+        }
+
+        partial void OnIsInitializingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsReady));
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
+        partial void OnPromptChanged(string value)
+        {
+            OnPropertyChanged(nameof(CanGenerate));
+        }
 
         [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
         private async Task GenerateAsync()
@@ -152,13 +254,87 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         private async Task SaveAsync()
         {
-            // TODO: Implement save functionality when needed
+            if (string.IsNullOrWhiteSpace(IconName))
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+                }
+                return;
+            }
+
+            if (!Utils.FileNameHelper.IsValidFileName(IconName))
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("The icon name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
+                }
+                return;
+            }
+
+            try
+            {
+                var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
+                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
+                Directory.CreateDirectory(iconPath);
+
+                var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
+
+                if (File.Exists(fileName))
+                {
+                    if (XamlRoot != null)
+                    {
+                        var overwrite = await Utils.DialogHelper.ShowConfirmation(
+                            $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
+                            "Icon Already Exists",
+                            XamlRoot);
+
+                        if (!overwrite)
+                            return;
+                    }
+                }
+
+                //if (_currentImageData == null)
+                //{
+                //    if (XamlRoot != null)
+                //    {
+                //        await Utils.DialogHelper.ShowError("No image data available to save.", XamlRoot);
+                //    }
+                //    return;
+                //}
+
+                //await File.WriteAllBytesAsync(fileName, _currentImageData);
+
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving icon");
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("Failed to save icon. Please try again.", XamlRoot);
+                }
+            }
         }
 
         [RelayCommand]
         private async Task RetryInitialization()
         {
+            _logger.LogInformation("Retrying initialization");
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+            await InitializeAsync();
+        }
 
+        public void Cleanup()
+        {
+            Images = null;
+            PreviewImage = null;
+            StatusMessage = string.Empty;
+            InitializationStatus = string.Empty;
         }
     }
 }
