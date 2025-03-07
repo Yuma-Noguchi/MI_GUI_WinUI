@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -8,7 +8,6 @@ using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using StableDiffusionGeneration.Model;
 
 namespace MI_GUI_WinUI;
 

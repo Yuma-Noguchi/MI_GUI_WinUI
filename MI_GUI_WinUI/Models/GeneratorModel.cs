@@ -12,7 +12,7 @@ using System.Diagnostics;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
-namespace StableDiffusionGeneration.Model
+namespace MI_GUI_WinUI.Models
 {
     public class GeneratorModel: ModelBase
     {

@@ -2,13 +2,13 @@ using MI_GUI_WinUI.Common;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Dispatching;
-using StableDiffusionGeneration.Model;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
 using Windows.Storage;
+using MI_GUI_WinUI.Models;
 
 namespace MI_GUI_WinUI.ViewModels
 {
