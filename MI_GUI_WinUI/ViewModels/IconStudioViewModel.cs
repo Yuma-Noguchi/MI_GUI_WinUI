@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
+using System.Linq;
 
 namespace MI_GUI_WinUI.ViewModels
 {
@@ -21,6 +22,7 @@ namespace MI_GUI_WinUI.ViewModels
         private readonly INavigationService _navigationService;
         private readonly StableDiffusionService _sdService;
         private bool _executingInference;
+        private string[] _currentImagePaths = Array.Empty<string>();
 
         public XamlRoot? XamlRoot
         {
@@ -38,7 +40,7 @@ namespace MI_GUI_WinUI.ViewModels
         private bool _isPreInitialization = true;
 
         [ObservableProperty]
-        private string _initializationStatus = string.Empty;
+        private string _initializationStatus = "Starting initialization...";
 
         [ObservableProperty]
         private bool _initializationFailed;
@@ -79,7 +81,7 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        public double ProgressPercentage => _sdService.Percentage;
+        public double Progress => _sdService.Percentage;
 
         public IconStudioViewModel(
             StableDiffusionService sdService,
@@ -95,23 +97,25 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 if (e.PropertyName == nameof(StableDiffusionService.Percentage))
                 {
-                    OnPropertyChanged(nameof(ProgressPercentage));
+                    OnPropertyChanged(nameof(Progress));
                 }
             };
         }
 
         public async Task InitializeAsync()
         {
-            InitializationFailed = false;
-            ErrorMessage = string.Empty;
-
-            if (_sdService.IsInitialized || IsInitializing)
+            if (_sdService.IsInitialized)
+            {
+                IsPreInitialization = false;
                 return;
+            }
 
             try
             {
                 IsInitializing = true;
-                InitializationStatus = "Starting initialization...";
+                IsPreInitialization = true;
+                InitializationFailed = false;
+                ErrorMessage = string.Empty;
 
                 InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
                 await _sdService.Initialize(!UseGpu);
@@ -150,9 +154,9 @@ namespace MI_GUI_WinUI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Stable Diffusion");
+                _logger.LogError(ex, "Failed to initialize Icon Studio");
                 InitializationFailed = true;
-                ErrorMessage = $"Failed to initialize Stable Diffusion with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
+                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
                 if (XamlRoot != null)
                 {
                     await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
@@ -198,10 +202,10 @@ namespace MI_GUI_WinUI.ViewModels
                 StatusString = "Generating...";
                 IsGenerating = true;
 
-                var imagePaths = await _sdService.GenerateImages(InputDescription, NumberOfImages);
+                _currentImagePaths = await _sdService.GenerateImages(InputDescription, NumberOfImages);
 
                 StatusString = $"{_sdService.NumInferenceSteps} iterations ({_sdService.IterationsPerSecond:F1} it/sec); {_sdService.LastTimeMilliseconds / 1000.0:F1} sec total";
-                await LoadImagesAsync(imagePaths);
+                await LoadImagesAsync(_currentImagePaths);
                 IsImageGenerated = true;
             }
             catch (Exception ex)
@@ -274,6 +278,15 @@ namespace MI_GUI_WinUI.ViewModels
                 return;
             }
 
+            if (_currentImagePaths == null || !_currentImagePaths.Any())
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
+                }
+                return;
+            }
+
             try
             {
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
@@ -282,30 +295,11 @@ namespace MI_GUI_WinUI.ViewModels
 
                 var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
 
-                if (File.Exists(fileName))
-                {
-                    if (XamlRoot != null)
-                    {
-                        var overwrite = await Utils.DialogHelper.ShowConfirmation(
-                            $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
-                            "Icon Already Exists",
-                            XamlRoot);
+                // Create directory if it doesn't exist
+                Directory.CreateDirectory(Path.GetDirectoryName(fileName));
 
-                        if (!overwrite)
-                            return;
-                    }
-                }
-
-                //if (_currentImageData == null)
-                //{
-                //    if (XamlRoot != null)
-                //    {
-                //        await Utils.DialogHelper.ShowError("No image data available to save.", XamlRoot);
-                //    }
-                //    return;
-                //}
-
-                //await File.WriteAllBytesAsync(fileName, _currentImageData);
+                // Save the first generated image
+                await Utils.ImageHelper.SaveImageAsync(_currentImagePaths.First(), fileName);
 
                 if (XamlRoot != null)
                 {
@@ -337,6 +331,7 @@ namespace MI_GUI_WinUI.ViewModels
             PreviewImage = null;
             StatusMessage = string.Empty;
             InitializationStatus = string.Empty;
+            _currentImagePaths = Array.Empty<string>();
         }
     }
 }

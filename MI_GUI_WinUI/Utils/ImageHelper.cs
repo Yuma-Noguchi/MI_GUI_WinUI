@@ -1,15 +1,22 @@
 using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.IO;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
+using Windows.Storage;
 using Windows.Storage.Streams;
 
 namespace MI_GUI_WinUI.Utils
 {
     public static class ImageHelper
     {
+        public static async Task SaveImageAsync(string sourcePath, string destinationPath)
+        {
+            var sourceFile = await StorageFile.GetFileFromPathAsync(sourcePath);
+            var destinationFolder = await StorageFolder.GetFolderFromPathAsync(Path.GetDirectoryName(destinationPath));
+            await sourceFile.CopyAsync(destinationFolder, Path.GetFileName(destinationPath), NameCollisionOption.ReplaceExisting);
+        }
+
         public static async Task<SoftwareBitmapSource?> ByteArrayToImageSource(byte[] imageData)
         {
             try
