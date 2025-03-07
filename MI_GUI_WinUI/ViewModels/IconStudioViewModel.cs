@@ -21,6 +21,7 @@ namespace MI_GUI_WinUI.ViewModels
         private readonly INavigationService _navigationService;
         private readonly StableDiffusionService _sdService;
         private bool _executingInference;
+
         public XamlRoot? XamlRoot
         {
             get => _xamlRoot;
@@ -34,7 +35,7 @@ namespace MI_GUI_WinUI.ViewModels
         private bool _isInitializing;
 
         [ObservableProperty]
-        private bool _isPreInitialization;
+        private bool _isPreInitialization = true;
 
         [ObservableProperty]
         private string _initializationStatus = string.Empty;
@@ -78,6 +79,8 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
+        public double ProgressPercentage => _sdService.Percentage;
+
         public IconStudioViewModel(
             StableDiffusionService sdService,
             ILogger<IconStudioViewModel> logger,
@@ -97,7 +100,6 @@ namespace MI_GUI_WinUI.ViewModels
             };
         }
 
-        public double ProgressPercentage => _sdService.Percentage;
         public async Task InitializeAsync()
         {
             InitializationFailed = false;
@@ -148,9 +150,9 @@ namespace MI_GUI_WinUI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Icon Studio");
+                _logger.LogError(ex, "Failed to initialize Stable Diffusion");
                 InitializationFailed = true;
-                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
+                ErrorMessage = $"Failed to initialize Stable Diffusion with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
                 if (XamlRoot != null)
                 {
                     await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
@@ -163,7 +165,7 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         public bool IsNotGenerating => !IsGenerating;
-        public bool IsReady => true;
+        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
         public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
 
         partial void OnIsGeneratingChanged(bool value)
@@ -219,14 +221,14 @@ namespace MI_GUI_WinUI.ViewModels
         private async Task LoadImagesAsync(IEnumerable<string> imagePaths)
         {
             var imageSources = new ObservableCollection<ImageSource>();
-
+            
             foreach (string imagePath in imagePaths)
             {
                 try
                 {
                     var bitmap = new BitmapImage();
                     var uri = new Uri(imagePath);
-
+                    
                     if (uri.Scheme == "file")
                     {
                         var file = await StorageFile.GetFileFromPathAsync(imagePath);
@@ -239,7 +241,7 @@ namespace MI_GUI_WinUI.ViewModels
                     {
                         bitmap.UriSource = uri;
                     }
-
+                    
                     imageSources.Add(bitmap);
                 }
                 catch (Exception ex)

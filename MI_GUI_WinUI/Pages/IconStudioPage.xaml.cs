@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using MI_GUI_WinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 
 namespace MI_GUI_WinUI.Pages
 {
@@ -21,15 +22,22 @@ namespace MI_GUI_WinUI.Pages
 
         private async void IconStudioPage_Loaded(object sender, RoutedEventArgs e)
         {
+            // Start animations
             if (PulseStoryboard != null)
             {
                 PulseStoryboard.Begin();
             }
 
-            // Ensure we have valid ViewModel and XamlRoot
+            // Ensure we have valid ViewModel
             if (ViewModel != null)
             {
+                // Set XamlRoot for dialogs
                 ViewModel.XamlRoot = this.XamlRoot;
+                
+                // Let the page render first
+                //await Task.Yield();
+
+                // Begin initialization
                 await ViewModel.InitializeAsync();
             }
         }
@@ -41,8 +49,7 @@ namespace MI_GUI_WinUI.Pages
                 PulseStoryboard.Stop();
             }
 
-            //ViewModel?.Cleanup();
-
+            ViewModel?.Cleanup();
         }
     }
 }
