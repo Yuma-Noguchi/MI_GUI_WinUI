@@ -73,7 +73,7 @@ namespace MI_GUI_WinUI.ViewModels
         private int _numberOfImages = 1;
 
         [ObservableProperty]
-        private string _inputDescription = "landscape, painting, rolling hills, windmill, clouds";
+        private string _inputDescription = "";
 
         [ObservableProperty]
         private ICollection<ImageSource> _images = new ObservableCollection<ImageSource>();
@@ -295,6 +295,21 @@ namespace MI_GUI_WinUI.ViewModels
 
                 var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
 
+                // Check if file exists
+                if (File.Exists(fileName))
+                {
+                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
+                        $"An icon named '{sanitizedName}.png' already exists.\nDo you want to replace it?",
+                        "Replace Existing Icon?",
+                        XamlRoot);
+
+                    // If user chooses not to replace, return to page
+                    if (!overwrite)
+                    {
+                        return;
+                    }
+                }
+
                 // Create directory if it doesn't exist
                 Directory.CreateDirectory(Path.GetDirectoryName(fileName));
 
@@ -325,6 +340,31 @@ namespace MI_GUI_WinUI.ViewModels
             await InitializeAsync();
         }
 
+        private void CleanupTempDirectories()
+        {
+            try
+            {
+                var appPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+                var tempDirs = Directory.GetDirectories(appPath, "Images-*");
+                
+                foreach (var dir in tempDirs)
+                {
+                    try
+                    {
+                        Directory.Delete(dir, true);  // true = recursive delete
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Failed to delete temp directory: {dir}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up temp directories");
+            }
+        }
+
         public void Cleanup()
         {
             Images = null;
@@ -332,6 +372,7 @@ namespace MI_GUI_WinUI.ViewModels
             StatusMessage = string.Empty;
             InitializationStatus = string.Empty;
             _currentImagePaths = Array.Empty<string>();
+            CleanupTempDirectories();
         }
     }
 }
