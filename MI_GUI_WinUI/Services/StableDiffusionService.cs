@@ -11,6 +11,7 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
+using Microsoft.ML.OnnxRuntime;
 
 namespace MI_GUI_WinUI.Services
 {
@@ -21,8 +22,10 @@ namespace MI_GUI_WinUI.Services
         private readonly ILogger<StableDiffusionService> _logger;
         private readonly object _initLock = new();
         private readonly DispatcherQueue _dispatcherQueue;
+        private bool _usingCpuFallback;
 
         public bool IsInitialized => _unet != null && _config != null;
+        public bool UsingCpuFallback => _usingCpuFallback;
 
         [ObservableProperty]
         private double _percentage;
@@ -75,10 +78,34 @@ namespace MI_GUI_WinUI.Services
 
             try
             {
-                _logger.LogInformation("Starting initialization with GPU: {useGpu}", useGpu);
-                await Task.Run(() => {
-                    _unet = new UNet(_config);
-                });
+                _config.ExecutionProviderTarget = useGpu 
+                    ? StableDiffusionConfig.ExecutionProvider.DirectML
+                    : StableDiffusionConfig.ExecutionProvider.Cpu;
+
+                _logger.LogInformation("Starting initialization with execution provider: {provider}", _config.ExecutionProviderTarget);
+                
+                try
+                {
+                    await Task.Run(() => {
+                        _unet = new UNet(_config);
+                    });
+                    _usingCpuFallback = !useGpu;
+                }
+                catch (Exception ex) when (useGpu && 
+                    (ex.Message.Contains("DirectML") || 
+                     ex.Message.Contains("GPU") || 
+                     ex.Message.Contains("DML") ||
+                     ex.GetType().Name.Contains("Dml")))
+                {
+                    _logger.LogWarning(ex, "DirectML initialization failed, falling back to CPU");
+                    
+                    // Fall back to CPU
+                    _config.ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.Cpu;
+                    await Task.Run(() => {
+                        _unet = new UNet(_config);
+                    });
+                    _usingCpuFallback = true;
+                }
             }
             catch (FileNotFoundException ex)
             {

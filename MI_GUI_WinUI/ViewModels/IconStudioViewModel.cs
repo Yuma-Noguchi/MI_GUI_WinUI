@@ -73,7 +73,7 @@ namespace MI_GUI_WinUI.ViewModels
         private int _numberOfImages = 1;
 
         [ObservableProperty]
-        private string _inputDescription = "";
+        private string _inputDescription = "landscape, painting, rolling hills, windmill, clouds";
 
         [ObservableProperty]
         private ICollection<ImageSource> _images = new ObservableCollection<ImageSource>();
@@ -118,7 +118,7 @@ namespace MI_GUI_WinUI.ViewModels
                 ErrorMessage = string.Empty;
 
                 InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
-                await _sdService.Initialize(!UseGpu);
+                await _sdService.Initialize(UseGpu);
 
                 InitializationStatus = "Initialization complete";
                 InitializationFailed = false;
@@ -126,10 +126,22 @@ namespace MI_GUI_WinUI.ViewModels
 
                 if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowMessage(
-                        $"Stable Diffusion initialized successfully with {(UseGpu ? "GPU" : "CPU")} acceleration.",
-                        "Initialization Complete",
-                        XamlRoot);
+                    // Check if we fell back to CPU
+                    if (UseGpu && _sdService.UsingCpuFallback)
+                    {
+                        await Utils.DialogHelper.ShowMessage(
+                            "GPU acceleration was not available or failed to initialize.\n\n" +
+                            "The application will run using CPU instead, which may be significantly slower.",
+                            "Using CPU Mode",
+                            XamlRoot);
+                    }
+                    else
+                    {
+                        await Utils.DialogHelper.ShowMessage(
+                            $"Stable Diffusion initialized successfully with {(_sdService.UsingCpuFallback ? "CPU" : "GPU")} acceleration.",
+                            "Initialization Complete",
+                            XamlRoot);
+                    }
                 }
             }
             catch (DirectoryNotFoundException ex)
@@ -201,6 +213,12 @@ namespace MI_GUI_WinUI.ViewModels
                 _executingInference = true;
                 StatusString = "Generating...";
                 IsGenerating = true;
+
+                // If we're using CPU, warn the user about slower performance
+                if (_sdService.UsingCpuFallback)
+                {
+                    StatusMessage = "Running on CPU - generation may take longer";
+                }
 
                 _currentImagePaths = await _sdService.GenerateImages(InputDescription, NumberOfImages);
 
@@ -351,7 +369,7 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     try
                     {
-                        Directory.Delete(dir, true);  // true = recursive delete
+                        Directory.Delete(dir, true);  // recursive delete
                     }
                     catch (Exception ex)
                     {
