@@ -1,10 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MI_GUI_WinUI.Common
 {
-    public abstract class ModelBase : INotifyPropertyChanged
+    public abstract class ModelBase : ObservableObject, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 

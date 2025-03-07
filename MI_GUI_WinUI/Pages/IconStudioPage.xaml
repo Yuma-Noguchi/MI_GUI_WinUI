@@ -46,87 +46,197 @@
             <Setter Property="Margin" Value="10" />
         </Style>
     </Page.Resources>
-    <Grid Margin="0,0,0,-16">
+
+    <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="40" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*" />
-            <ColumnDefinition Width="77*"/>
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Image prompt:"
-               Grid.Row="0" Grid.Column="0"
-               Grid.ColumnSpan="2"
-               Style="{StaticResource HeaderTextBlockStyle}" />
+        <controls:PageHeader Grid.Row="0" Title="{x:Bind ViewModel.Title, Mode=OneWay}"/>
 
-        <TextBox Grid.Column="1"
-             VerticalAlignment="Center"
-             Width="391"
-             HorizontalAlignment="Left"
-             Text="{Binding InputDescription}"
-             Style="{StaticResource InputTextBoxStyle}" Margin="119,0,0,0" />
+        <!-- Main content -->
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-        <TextBlock Text="Number of images to generate:"
-               Grid.Row="2" Grid.Column="0"
-               Grid.ColumnSpan="2"
-               Style="{StaticResource HeaderTextBlockStyle}" Margin="10,6,10,7" />
+            <!-- Settings Panel -->
+            <StackPanel Grid.Column="0" Spacing="12">
+                <!-- Initialization Status/Error -->
+                <Grid>
+                    <Border Visibility="{x:Bind ViewModel.IsInitializing, Mode=OneWay}"
+                            Background="{ThemeResource SystemFillColorNeutralBackground}"
+                            BorderBrush="{ThemeResource SystemFillColorCautionBackground}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{x:Bind ViewModel.InitializationStatus, Mode=OneWay}"
+                                     Style="{StaticResource BodyTextBlockStyle}"
+                                     TextWrapping="Wrap"
+                                     Foreground="{ThemeResource SystemAccentColorLight1}"/>
+                            <ProgressBar IsIndeterminate="True" Height="2"/>
+                        </StackPanel>
+                    </Border>
 
-        <TextBox Grid.Row="2" Grid.Column="1"
-             Width="35"
-             HorizontalAlignment="Left"
-             VerticalAlignment="Center"
-             Text="{Binding NumberOfImages}"
-             Style="{StaticResource InputTextBoxStyle}" Margin="252,0,0,0" />
+                    <Border Visibility="{x:Bind ViewModel.InitializationFailed, Mode=OneWay}"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="⚠️ Initialization Failed"
+                                         Style="{StaticResource SubtitleTextBlockStyle}"
+                                         Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                <TextBlock Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                                         Style="{StaticResource BodyTextBlockStyle}"
+                                         Foreground="{ThemeResource TextFillColorSecondary}"
+                                         TextWrapping="Wrap"/>
+                            </StackPanel>
 
-        <StackPanel Grid.Row="4" Grid.ColumnSpan="2">
-            <StackPanel Orientation="Horizontal">
-                <Button Content="Generate"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Center"
-                Command="{Binding GenerateCommand}"
-                Style="{StaticResource ActionButtonStyle}" />
-                <TextBlock Text="{Binding StatusString}" 
-                           Margin="0"
-                           VerticalAlignment="Center"
-                           Style="{StaticResource HeaderTextBlockStyle}" 
-                           Foreground="Gray"/>
+                            <Button Content="Try Again"
+                                    Command="{x:Bind ViewModel.RetryInitializationCommand}"
+                                    Style="{ThemeResource AccentButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- GPU/CPU Selection -->
+                <StackPanel>
+                    <ToggleSwitch Header="Use GPU"
+                                IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
+                                IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
+                    <TextBlock Text="GPU acceleration requires DirectML support"
+                             Style="{StaticResource CaptionTextBlockStyle}"
+                             Foreground="{ThemeResource TextFillColorSecondary}"/>
+                </StackPanel>
+
+                <!-- Prompt Input -->
+                <TextBox Header="Prompt"
+                        Text="{Binding InputDescription, Mode=TwoWay}"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        Height="100"
+                        PlaceholderText="Enter a description of the icon you want to generate..."
+                        IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
+
+                <!-- Generate Button -->
+                <Button Content="Generate Icon"
+                        Command="{Binding GenerateCommand}"
+                        HorizontalAlignment="Stretch"
+                        Style="{ThemeResource AccentButtonStyle}"/>
+
+                <!-- Generation Progress -->
+                <Grid Visibility="{x:Bind ViewModel.IsGenerating, Mode=OneWay}">
+                    <Grid.Resources>
+                        <Storyboard x:Key="PulseStoryboard" x:Name="PulseStoryboard" RepeatBehavior="Forever">
+                            <DoubleAnimation
+                                Storyboard.TargetName="ProgressText"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1.0" To="0.8" Duration="0:0:1"
+                                AutoReverse="True"/>
+                            <DoubleAnimation
+                                Storyboard.TargetName="StatusText"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1.0" To="0.7" Duration="0:0:1.5"
+                                AutoReverse="True"/>
+                            <DoubleAnimation
+                                Storyboard.TargetName="ProgressBar"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1.0" To="0.85" Duration="0:0:1"
+                                AutoReverse="True">
+                                <DoubleAnimation.EasingFunction>
+                                    <CircleEase EasingMode="EaseInOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation
+                                Storyboard.TargetName="LoadingRing"
+                                Storyboard.TargetProperty="Opacity"
+                                From="0.9" To="0.6" Duration="0:0:2"
+                                AutoReverse="True">
+                                <DoubleAnimation.EasingFunction>
+                                    <CircleEase EasingMode="EaseInOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                        </Storyboard>
+                    </Grid.Resources>
+                    <ProgressBar x:Name="ProgressBar"
+                                Value="{Binding ProgressPercentage}"
+                                IsIndeterminate="False"
+                                Maximum="100"
+                                Height="6"
+                                Margin="0,0,0,8"
+                                Foreground="Blue"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                CornerRadius="3"/>
+                    <StackPanel HorizontalAlignment="Center" Margin="0,12,0,8">
+                        <Grid>
+                            <!-- Shadow text -->
+                            <TextBlock Text="{Binding StatusString}" 
+                                     HorizontalAlignment="Center"
+                                     Style="{StaticResource BodyStrongTextBlockStyle}"
+                                     Margin="1,1,0,0"/>
+                            <!-- Main text -->
+                            <TextBlock x:Name="ProgressText"
+                                    Text="{Binding StatusString}" 
+                                     HorizontalAlignment="Center"
+                                     Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        </Grid>
+                        <TextBlock x:Name="StatusText"
+                                 Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                                 HorizontalAlignment="Center"
+                                 Style="{StaticResource CaptionTextBlockStyle}"
+                                 FontWeight="SemiBold"
+                                 Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <ProgressRing x:Name="LoadingRing"
+                                IsActive="{x:Bind ViewModel.IsGenerating, Mode=OneWay}"
+                                Width="50" Height="50"
+                                HorizontalAlignment="Center"
+                                Margin="0,60,0,0"/>
+                </Grid>
+
+                <!-- Save Section -->
+                <StackPanel Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}">
+                    <TextBox Header="Icon Name"
+                            Text="{x:Bind ViewModel.IconName, Mode=TwoWay}"
+                            PlaceholderText="Enter a name for your icon..."
+                            Margin="0,12,0,0"/>
+                    <Button Content="Save Icon"
+                            Command="{x:Bind ViewModel.SaveCommand}"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,12,0,0"/>
+                </StackPanel>
             </StackPanel>
-            <ProgressBar x:Name="progressBar"
-                         Height="19"
-                         Width="520"
-                         HorizontalAlignment="Left"
-                         Margin="10,5,10,10"
-                         Value="{Binding ProgressPercentage}"/>
-        </StackPanel>
 
-        <ListBox Grid.Row="5" Grid.ColumnSpan="2"
-             VerticalAlignment="Center"
-             Margin="10,0,20,0"
-             MinWidth="530"
-             Height="350"
-             ItemsSource="{Binding Images}"
-             Style="{StaticResource ImageListBoxStyle}">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Image Source="{Binding }"
-                       Width="330" Height="330"
-                       Stretch="UniformToFill"
-                       Margin="5"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+            <!-- Preview Panel -->
+            <Grid Grid.Column="1">
+                <ListBox
+                     VerticalAlignment="Center"
+                     Margin="10,0,20,0"
+                     MinWidth="530"
+                     Height="350"
+                     ItemsSource="{Binding Images}"
+                     Style="{StaticResource ImageListBoxStyle}">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Image Source="{Binding }"
+                               Width="330" Height="330"
+                               Stretch="UniformToFill"
+                               Margin="5"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Grid>
     </Grid>
-
 </Page>

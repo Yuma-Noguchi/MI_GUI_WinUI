@@ -9,16 +9,70 @@ using System.IO;
 using System.Threading.Tasks;
 using Windows.Storage;
 using MI_GUI_WinUI.Models;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using MI_GUI_WinUI.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public class IconStudioViewModel : ModelBase
+    public partial class IconStudioViewModel : ModelBase
     {
+        private readonly ILogger<IconStudioViewModel> _logger;
+        private readonly INavigationService _navigationService;
+
         private bool _executingInference = false;
         private DispatcherQueue dispatcherQueue;
 
-        public IconStudioViewModel(GeneratorModel model)
+        [ObservableProperty]
+        private string _title = "Icon Studio";
+
+        [ObservableProperty]
+        private bool _isInitializing;
+
+        [ObservableProperty]
+        private bool _isPreInitialization;
+
+        [ObservableProperty]
+        private string _initializationStatus = string.Empty;
+
+        [ObservableProperty]
+        private bool _initializationFailed;
+
+        [ObservableProperty]
+        private string _errorMessage = string.Empty;
+
+        [ObservableProperty]
+        private string _prompt = string.Empty;
+
+        [ObservableProperty]
+        private bool _useGpu = true;
+
+        [ObservableProperty]
+        private SoftwareBitmapSource? _previewImage;
+
+        [ObservableProperty]
+        private bool _isGenerating;
+
+        [ObservableProperty]
+        private string _statusMessage = string.Empty;
+
+        [ObservableProperty]
+        private bool _isImageGenerated;
+
+        [ObservableProperty]
+        private string _iconName = string.Empty;
+
+
+        public IconStudioViewModel(GeneratorModel model, 
+            ILogger<IconStudioViewModel> logger,
+            INavigationService navigationService)
         {
+
+            _logger = logger;
+            _navigationService = navigationService;
+
             _model = model;
             _inputDescription = "landscape, painting, rolling hills, windmill, clouds";
             _numberOfImages = 1;
@@ -28,7 +82,22 @@ namespace MI_GUI_WinUI.ViewModels
             dispatcherQueue = DispatcherQueue.GetForCurrentThread();
             _model.PropertyChanged += _model_PropertyChanged;
             StatusString = "Idle";
+
         }
+
+        [RelayCommand]
+        private async Task RetryInitialization()
+        {
+            _logger.LogInformation("Retrying initialization");
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+            //await InitializeAsync();
+        }
+
+        public bool IsNotGenerating => !IsGenerating;
+        public bool IsReady = true;
+            //=> _sdService.IsInitialized && !IsInitializing;
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
 
         private void _model_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -162,6 +231,75 @@ namespace MI_GUI_WinUI.ViewModels
         {
             get => _statusString;
             set => SetProperty(ref _statusString, value);
+        }
+
+        [RelayCommand]
+        private async Task SaveAsync()
+        {
+            //if (string.IsNullOrWhiteSpace(IconName))
+            //{
+            //    if (XamlRoot != null)
+            //    {
+            //        await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+            //    }
+            //    return;
+            //}
+
+            //if (!Utils.FileNameHelper.IsValidFileName(IconName))
+            //{
+            //    if (XamlRoot != null)
+            //    {
+            //        await Utils.DialogHelper.ShowError("The icon name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
+            //    }
+            //    return;
+            //}
+
+            //try
+            //{
+            //    var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
+            //    var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
+            //    Directory.CreateDirectory(iconPath);
+
+            //    var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
+
+            //    if (File.Exists(fileName))
+            //    {
+            //        if (XamlRoot != null)
+            //        {
+            //            var overwrite = await Utils.DialogHelper.ShowConfirmation(
+            //                $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
+            //                "Icon Already Exists",
+            //                XamlRoot);
+
+            //            if (!overwrite)
+            //                return;
+            //        }
+            //    }
+
+            //    if (_currentImageData == null)
+            //    {
+            //        if (XamlRoot != null)
+            //        {
+            //            await Utils.DialogHelper.ShowError("No image data available to save.", XamlRoot);
+            //        }
+            //        return;
+            //    }
+
+            //    await File.WriteAllBytesAsync(fileName, _currentImageData);
+
+            //    if (XamlRoot != null)
+            //    {
+            //        await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    _logger.LogError(ex, "Error saving icon");
+            //    if (XamlRoot != null)
+            //    {
+            //        await Utils.DialogHelper.ShowError("Failed to save icon. Please try again.", XamlRoot);
+            //    }
+            //}
         }
     }
 }
