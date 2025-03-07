@@ -21,10 +21,10 @@ namespace MI_GUI_WinUI.Pages
 
         private async void IconStudioPage_Loaded(object sender, RoutedEventArgs e)
         {
-            //if (PulseStoryboard != null)
-            //{
-            //    PulseStoryboard.Begin();
-            //}
+            if (PulseStoryboard != null)
+            {
+                PulseStoryboard.Begin();
+            }
 
             //// Ensure we have valid ViewModel and XamlRoot
             //if (ViewModel != null)
@@ -36,10 +36,10 @@ namespace MI_GUI_WinUI.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            //if (PulseStoryboard != null)
-            //{
-            //    PulseStoryboard.Stop();
-            //}
+            if (PulseStoryboard != null)
+            {
+                PulseStoryboard.Stop();
+            }
 
             //ViewModel?.Cleanup();
 
