@@ -76,7 +76,9 @@ namespace MI_GUI_WinUI.Services
             try
             {
                 _logger.LogInformation("Starting initialization with GPU: {useGpu}", useGpu);
-                _unet = new UNet(_config);
+                await Task.Run(() => {
+                    _unet = new UNet(_config);
+                });
             }
             catch (FileNotFoundException ex)
             {
