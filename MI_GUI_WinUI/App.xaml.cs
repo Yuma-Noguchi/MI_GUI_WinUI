@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using StableDiffusionGeneration.Model;
 
 namespace MI_GUI_WinUI;
 
@@ -74,6 +75,9 @@ public partial class App : Application
 
         // Register controls
         services.AddTransient<Controls.PageHeader>();
+
+        // Register models
+        services.AddTransient<GeneratorModel>();
 
         // Build and configure services
         _serviceProvider = services.BuildServiceProvider();

@@ -361,3 +361,7 @@ MotionInput/
 *.lot
 *.out
 *.bcf
+
+MI_GUI_WinUI/Onnx/
+
+StableDiffusion-main/

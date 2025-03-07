@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- TEMPORARY: we don't want to copy these from the microsoft.ai.directml package since we need a newer DLL for now -->
+  <PropertyGroup Label="Globals">
+    <Microsoft_AI_DirectML_SkipIncludeDir>True</Microsoft_AI_DirectML_SkipIncludeDir>
+    <Microsoft_AI_DirectML_SkipLink>True</Microsoft_AI_DirectML_SkipLink>
+    <Microsoft_AI_DirectML_SkipDebugLayerCopy>True</Microsoft_AI_DirectML_SkipDebugLayerCopy>
+    <Microsoft_AI_DirectML_SkipLibraryCopy>True</Microsoft_AI_DirectML_SkipLibraryCopy>
+    <Configurations>Debug;Release</Configurations>
+    <Platforms>x86;x64;</Platforms>
+  </PropertyGroup>
+
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<PackageOutputPath>C:\code\localnuget</PackageOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MathNet.Numerics" Version="5.0.0" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.20.1" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.13.0" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.20.2" />
+		<PackageReference Include="NumSharp" Version="0.30.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
+		<PackageReference Include="Microsoft.ML" Version="4.0.2" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Compile Update="EulerAncestralDiscreteScheduler.cs">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Compile>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="DirectML.dll">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	  <None Update="onnxruntime.dll">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+	<PropertyGroup>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	</PropertyGroup>
+</Project>
