@@ -6,9 +6,10 @@ using System;
 
 namespace StableDiffusion.ML.OnnxRuntime
 {
-    public class VaeDecoder
+    public class VaeDecoder : IDisposable
     {
         private InferenceSession _session;
+        private bool _disposedValue;
 
         public VaeDecoder(StableDiffusionConfig config)
         {
@@ -58,6 +59,23 @@ namespace StableDiffusion.ML.OnnxRuntime
             Console.WriteLine($"Image saved to: {imagePath}");
 
             return result;
+        }
+        public virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    _session?.Dispose();
+                }
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

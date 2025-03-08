@@ -9,104 +9,103 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 
-namespace MI_GUI_WinUI;
-
-/// <summary>
-/// Provides application-specific behavior to supplement the default Application class.
-/// </summary>
-public partial class App : Application
+namespace MI_GUI_WinUI
 {
-    private readonly WindowManager _windowManager;
-    private bool _isClosing;
-    private readonly IServiceProvider _serviceProvider;
-
-    public static new App Current => (App)Application.Current;
-    public IServiceProvider Services => _serviceProvider;
-
     /// <summary>
-    /// Initializes the singleton application object. This is the first line of authored code
-    /// executed, and as such is the logical equivalent of main() or WinMain().
+    /// Provides application-specific behavior to supplement the default Application class.
     /// </summary>
-    public App()
+    public partial class App : Application
     {
-        this.InitializeComponent();
-        _windowManager = new WindowManager();
+        private readonly WindowManager _windowManager;
+        private bool _isClosing;
+        private readonly IServiceProvider _serviceProvider;
 
-        // Configure services
-        var services = new ServiceCollection();
+        public static new App Current => (App)Application.Current;
+        public IServiceProvider Services => _serviceProvider;
 
-        // Register logging
-        services.AddSingleton<LoggingService>();
-        services.AddLogging(builder =>
+        /// <summary>
+        /// Initializes the singleton application object. This is the first line of authored code
+        /// executed, and as such is the logical equivalent of main() or WinMain().
+        /// </summary>
+        public App()
         {
-            builder.ClearProviders();
-            builder.SetMinimumLevel(LogLevel.Debug);
-            builder.Services.AddSingleton<ILoggerProvider>(sp =>
-                new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
-        });
+            this.InitializeComponent();
+            _windowManager = new WindowManager();
 
-        // Register window management first as other services might depend on it
-        services.AddSingleton<WindowManager>(_windowManager);
+            // Configure services
+            var services = new ServiceCollection();
 
-        // Register navigation
-        services.AddSingleton<INavigationService, NavigationService>();
+            // Register logging
+            services.AddSingleton<LoggingService>();
+            services.AddLogging(builder =>
+            {
+                builder.ClearProviders();
+                builder.SetMinimumLevel(LogLevel.Debug);
+                builder.Services.AddSingleton<ILoggerProvider>(sp =>
+                    new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
+            });
 
-        // Register services
-        services.AddSingleton<ProfileService>();
+            // Register window management first as other services might depend on it
+            services.AddSingleton<WindowManager>(_windowManager);
 
-        // Register view models
-        services.AddSingleton<MainWindowViewModel>();
-        services.AddSingleton<SelectProfilesViewModel>();
-        services.AddSingleton<ActionStudioViewModel>();
-        services.AddSingleton<IconStudioViewModel>();
-        services.AddSingleton<ProfileEditorViewModel>();
+            // Register navigation
+            services.AddSingleton<INavigationService, NavigationService>();
 
-        // Register converters
-        services.AddSingleton<StringToBoolConverter>();
-        services.AddSingleton<BoolToVisibilityInverseConverter>();
+            // Register services
+            services.AddSingleton<ProfileService>();
+            services.AddTransient<StableDiffusionService>();
 
-        // Register pages
-        services.AddTransient<HomePage>();
-        services.AddTransient<SelectProfilesPage>();
-        services.AddTransient<ActionStudioPage>();
-        services.AddTransient<IconStudioPage>();
-        services.AddTransient<ProfileEditorPage>();
+            // Register view models
+            services.AddSingleton<MainWindowViewModel>();
+            services.AddSingleton<SelectProfilesViewModel>();
+            services.AddSingleton<ActionStudioViewModel>();
+            services.AddSingleton<IconStudioViewModel>();
+            services.AddSingleton<ProfileEditorViewModel>();
 
-        // Register controls
-        services.AddTransient<Controls.PageHeader>();
+            // Register converters
+            services.AddSingleton<StringToBoolConverter>();
+            services.AddSingleton<BoolToVisibilityInverseConverter>();
 
-        // Register models
-        services.AddTransient<GeneratorModel>();
+            // Register pages
+            services.AddTransient<HomePage>();
+            services.AddTransient<SelectProfilesPage>();
+            services.AddTransient<ActionStudioPage>();
+            services.AddTransient<IconStudioPage>();
+            services.AddTransient<ProfileEditorPage>();
 
-        // Build and configure services
-        _serviceProvider = services.BuildServiceProvider();
-        Ioc.Default.ConfigureServices(_serviceProvider);
+            // Register controls
+            services.AddTransient<Controls.PageHeader>();
 
-        this.UnhandledException += App_UnhandledException;
-    }
+            // Build and configure services
+            _serviceProvider = services.BuildServiceProvider();
+            Ioc.Default.ConfigureServices(_serviceProvider);
 
-    /// <summary>
-    /// Invoked when the application is launched.
-    /// </summary>
-    /// <param name="args">Details about the launch request and process.</param>
-    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
-    {
-        // Ensure we have a window created when the app launches
-        if (_windowManager.MainWindow == null && !_isClosing)
-        {
-            _windowManager.InitializeMainWindow();
+            UnhandledException += App_UnhandledException;
         }
-    }
 
-    private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
-    {
-        // Log the exception
-        e.Handled = true;
-    }
+        /// <summary>
+        /// Invoked when the application is launched.
+        /// </summary>
+        /// <param name="args">Details about the launch request and process.</param>
+        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        {
+            // Ensure we have a window created when the app launches
+            if (_windowManager.MainWindow == null && !_isClosing)
+            {
+                _windowManager.InitializeMainWindow();
+            }
+        }
 
-    public new void Exit()
-    {
-        _isClosing = true;
-        base.Exit();
+        private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            // Log the exception
+            e.Handled = true;
+        }
+
+        public new void Exit()
+        {
+            _isClosing = true;
+            base.Exit();
+        }
     }
 }

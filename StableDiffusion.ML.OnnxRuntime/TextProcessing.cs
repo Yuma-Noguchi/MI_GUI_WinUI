@@ -3,10 +3,11 @@ using Microsoft.ML.OnnxRuntime;
 
 namespace StableDiffusion.ML.OnnxRuntime
 {
-    public class TextProcessing
+    public class TextProcessing : IDisposable
     {
         private InferenceSession _tokenizeSession;
         private InferenceSession _encodeSession;
+        private bool _disposedValue;
 
         public TextProcessing(StableDiffusionConfig config)
         {
@@ -115,5 +116,23 @@ namespace StableDiffusion.ML.OnnxRuntime
             }
         }
 
+        public virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    _tokenizeSession?.Dispose();
+                    _encodeSession?.Dispose();
+                }
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

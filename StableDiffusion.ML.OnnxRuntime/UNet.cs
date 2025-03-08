@@ -4,10 +4,11 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using System.Diagnostics;
 using System;
+using System.Text;
 
 namespace StableDiffusion.ML.OnnxRuntime
 {
-    public class UNet
+    public class UNet : IDisposable
     {
         private InferenceSession _session;
         private TextProcessing _textProcessing;
@@ -15,6 +16,7 @@ namespace StableDiffusion.ML.OnnxRuntime
         private LMSDiscreteScheduler _scheduler;
         private SafetyChecker _safetyChecker;
         private float[] _timesteps;
+        private bool _disposedValue;
 
         public UNet(StableDiffusionConfig config)
         {
@@ -189,5 +191,25 @@ namespace StableDiffusion.ML.OnnxRuntime
 
         }
 
+        public virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    _session?.Dispose();
+                    _textProcessing?.Dispose();
+                    _decoder?.Dispose();
+                    _safetyChecker?.Dispose();
+                }
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }
