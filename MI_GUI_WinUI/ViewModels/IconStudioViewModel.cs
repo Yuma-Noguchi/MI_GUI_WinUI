@@ -73,7 +73,7 @@ namespace MI_GUI_WinUI.ViewModels
         private int _numberOfImages = 1;
 
         [ObservableProperty]
-        private string _inputDescription = "landscape, painting, rolling hills, windmill, clouds";
+        private string _inputDescription = "";
 
         [ObservableProperty]
         private ICollection<ImageSource> _images = new ObservableCollection<ImageSource>();
@@ -205,6 +205,15 @@ namespace MI_GUI_WinUI.ViewModels
             OnPropertyChanged(nameof(CanGenerate));
         }
 
+        //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
+        private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
+        //private string helperPrompt = "";
+
+        private string BuildFinalPrompt(string prompt)
+        {
+            return helperPrompt.Replace("{}", prompt);
+        }
+
         [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
         private async Task GenerateAsync()
         {
@@ -220,7 +229,9 @@ namespace MI_GUI_WinUI.ViewModels
                     StatusMessage = "Running on CPU - generation may take longer";
                 }
 
-                _currentImagePaths = await _sdService.GenerateImages(InputDescription, NumberOfImages);
+                var prompt = BuildFinalPrompt(InputDescription);
+
+                _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
 
                 StatusString = $"{_sdService.NumInferenceSteps} iterations ({_sdService.IterationsPerSecond:F1} it/sec); {_sdService.LastTimeMilliseconds / 1000.0:F1} sec total";
                 await LoadImagesAsync(_currentImagePaths);
