@@ -165,7 +165,7 @@
                         </Storyboard>
                     </Grid.Resources>
                     <ProgressBar x:Name="ProgressBar"
-                                Value="{Binding ProgressPercentage}"
+                                Value="{Binding Viewmodel.ProgressPercentage}"
                                 IsIndeterminate="False"
                                 Maximum="100"
                                 Height="6"

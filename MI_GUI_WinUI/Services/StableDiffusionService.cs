@@ -45,8 +45,8 @@ namespace MI_GUI_WinUI.Services
 
             _config = new StableDiffusionConfig
             {
-                NumInferenceSteps = 50,
-                GuidanceScale = 7.5,
+                NumInferenceSteps = 75,
+                GuidanceScale = 9.5,
                 ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.DirectML,
                 DeviceId = 1,
                 TokenizerOnnxPath = $@"{modelsPath}\cliptokenizer.onnx",

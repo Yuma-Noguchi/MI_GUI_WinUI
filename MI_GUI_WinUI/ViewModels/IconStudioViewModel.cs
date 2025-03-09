@@ -81,7 +81,7 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        public double Progress => _sdService.Percentage;
+        public double ProgressPercentage => _sdService.Percentage;
 
         public IconStudioViewModel(
             StableDiffusionService sdService,
@@ -97,7 +97,7 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 if (e.PropertyName == nameof(StableDiffusionService.Percentage))
                 {
-                    OnPropertyChanged(nameof(Progress));
+                    OnPropertyChanged(nameof(ProgressPercentage));
                 }
             };
         }
@@ -206,8 +206,9 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
-        private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
-        //private string helperPrompt = "";
+        //private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
+        //private string helperPrompt = "single clean vector icon representing {}, modern material design, minimal UI/UX style, perfect pixel grid alignment, scalable vector graphics, professional app icon quality, crisp edges";
+        private string helperPrompt = "{}";
 
         private string BuildFinalPrompt(string prompt)
         {
