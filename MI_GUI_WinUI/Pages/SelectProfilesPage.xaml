@@ -15,8 +15,8 @@
         <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
     </Page.Resources>
 
-    <Grid Margin="36,40">
-        <Grid x:Name="MainContent">
+    <Grid>
+        <Grid x:Name="MainContent" Margin="36,40">
             <!-- Blur effect when popup is open -->
             <Grid.Resources>
                 <ThemeShadow x:Name="SharedShadow"/>
@@ -25,10 +25,9 @@
                 <ThemeShadow/>
             </Grid.Shadow>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Error Bar -->
+                <RowDefinition Height="*"/>    <!-- Content -->
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
@@ -63,9 +62,8 @@
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"
-                                         MaximumRowsOrColumns="3"
-                                         HorizontalAlignment="Center"
-                                         Margin="12"/>
+                                     HorizontalAlignment="Center"
+                                     Width="{Binding ActualWidth}"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -77,11 +75,13 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     CommandParameter="{Binding}">
-                                    <Border Margin="16"
+                                    <Border Margin="8"
                                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderThickness="1"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                         CornerRadius="8"
+                                        MinWidth="240"
+                                        MaxWidth="320"
                                         Translation="0,0,8">
                                         <Border.Shadow>
                                             <ThemeShadow />
@@ -91,7 +91,7 @@
                                         </Grid>
                                     </Border>
                                 </Button>
-                                <Grid Margin="20,10">
+                                <Grid Margin="20,10" Height="60">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -139,18 +139,21 @@
                         CornerRadius="8"
                         Padding="24">
 
-                    <Border Margin="0,0,0,16"
+                        <Border Margin="0,0,0,16"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderThickness="1"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         CornerRadius="8"
-                        MaxWidth="800"
+                        MaxWidth="640"
+                        MaxHeight="480"
                         Translation="0,0,8">
                         <Border.Shadow>
                             <ThemeShadow />
                         </Border.Shadow>
-                        <Grid MaxWidth="800">
-                            <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"/>
+                        <Grid MaxWidth="640" MaxHeight="480">
+                            <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
 

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -110,28 +110,34 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
 
         private static Canvas CloneCanvas(Canvas original)
         {
+            // For popup view, scale up to full game resolution
+            double popupScaleFactor = GAME_HEIGHT / TARGET_HEIGHT;
+
             Canvas clone = new Canvas
             {
-                Width = original.Width,
-                Height = original.Height,
+                Width = GAME_WIDTH,
+                Height = GAME_HEIGHT,
                 Background = original.Background,
-                HorizontalAlignment = original.HorizontalAlignment
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             };
 
             foreach (UIElement child in original.Children)
             {
                 if (child is Image originalImage)
                 {
+                    // Scale up the image for the popup view
                     Image clonedImage = new Image
                     {
                         Source = originalImage.Source,
-                        Width = originalImage.Width,
-                        Height = originalImage.Height,
+                        Width = originalImage.Width * popupScaleFactor,
+                        Height = originalImage.Height * popupScaleFactor,
                         Stretch = originalImage.Stretch
                     };
 
-                    Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage));
-                    Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage));
+                    // Scale up the position for the popup view
+                    Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage) * popupScaleFactor);
+                    Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage) * popupScaleFactor);
 
                     clone.Children.Add(clonedImage);
                 }
@@ -144,9 +150,10 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
     public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
 
     private readonly ProfileService _profileService;
-    private const double GAME_HEIGHT = 360.0; // Original game window height
-    private const double TARGET_HEIGHT = 180.0; // Preview canvas height
-    private const double ASPECT_RATIO = 16.0 / 9.0;
+    private const double GAME_HEIGHT = 480.0; // Original game window height
+    private const double GAME_WIDTH = 640.0;  // Original game window width
+    private const double TARGET_HEIGHT = 240.0; // Preview canvas height
+    private const double TARGET_WIDTH = (TARGET_HEIGHT * GAME_WIDTH) / GAME_HEIGHT;
     private const double SCALE_FACTOR = TARGET_HEIGHT / GAME_HEIGHT;
 
     private string profilesFolderPath = "MotionInput\\data\\profiles";
@@ -309,10 +316,11 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
         {
             Canvas preview = new Canvas
             {
-                Width = TARGET_HEIGHT * ASPECT_RATIO,
+                Width = TARGET_WIDTH,
                 Height = TARGET_HEIGHT,
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGray),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
                 DataContext = new { ProfileName = profile.Name }
             };
 
@@ -361,11 +369,12 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
             var randomAccessStream = memoryStream.AsRandomAccessStream();
             await bitmap.SetSourceAsync(randomAccessStream);
 
+            double scaledSize = element.Radius * 2 * SCALE_FACTOR; // Diameter is 2 * radius
             return new Image
             {
                 Source = bitmap,
-                            Width = element.Radius * SCALE_FACTOR,
-                            Height = element.Radius * SCALE_FACTOR,
+                Width = scaledSize,
+                Height = scaledSize,
                 Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
             };
         }
