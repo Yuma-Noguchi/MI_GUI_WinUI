@@ -72,8 +72,9 @@
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"
-                                         MaximumRowsOrColumns="4"
-                                         HorizontalAlignment="Center"/>
+                                         MaximumRowsOrColumns="3"
+                                         HorizontalAlignment="Center"
+                                         Margin="12"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -85,10 +86,18 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     CommandParameter="{Binding}">
-                                    <Border Margin="10"
+                                    <Border Margin="16"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="4">
-                                        <ContentPresenter Content="{Binding Canvas}"/>
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        CornerRadius="8"
+                                        Translation="0,0,8">
+                                        <Border.Shadow>
+                                            <ThemeShadow />
+                                        </Border.Shadow>
+                                        <Grid>
+                                            <ContentPresenter Content="{Binding Canvas}"/>
+                                        </Grid>
                                     </Border>
                                 </Button>
                                 <Grid Margin="20,10">
@@ -140,9 +149,18 @@
                         Padding="24">
 
                     <Border Margin="0,0,0,16"
-                            BorderThickness="1"
-                            CornerRadius="4">
-                        <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"/>
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderThickness="1"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        CornerRadius="8"
+                        MaxWidth="800"
+                        Translation="0,0,8">
+                        <Border.Shadow>
+                            <ThemeShadow />
+                        </Border.Shadow>
+                        <Grid MaxWidth="800">
+                            <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"/>
+                        </Grid>
                     </Border>
 
                     <TextBlock Text="{Binding SelectedProfilePreview.ProfileName}"

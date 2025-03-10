@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -144,6 +144,10 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
     public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
 
     private readonly ProfileService _profileService;
+    private const double GAME_HEIGHT = 360.0; // Original game window height
+    private const double TARGET_HEIGHT = 180.0; // Preview canvas height
+    private const double ASPECT_RATIO = 16.0 / 9.0;
+    private const double SCALE_FACTOR = TARGET_HEIGHT / GAME_HEIGHT;
 
     private string profilesFolderPath = "MotionInput\\data\\profiles";
 
@@ -305,10 +309,10 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
         {
             Canvas preview = new Canvas
             {
-                Width = 640,
-                Height = 480,
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGray),
-                HorizontalAlignment = HorizontalAlignment.Center,
+                Width = TARGET_HEIGHT * ASPECT_RATIO,
+                Height = TARGET_HEIGHT,
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 DataContext = new { ProfileName = profile.Name }
             };
 
@@ -323,8 +327,9 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
                         
                         if (image != null)
                         {
-                            Canvas.SetLeft(image, guiElement.Position[0] - guiElement.Radius);
-                            Canvas.SetTop(image, guiElement.Position[1] - guiElement.Radius);
+                            // Scale positions and offset by scaled radius
+                            Canvas.SetLeft(image, guiElement.Position[0] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
+                            Canvas.SetTop(image, guiElement.Position[1] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                             preview.Children.Add(image);
                         }
                     }
@@ -359,8 +364,8 @@ public partial class SelectProfilesViewModel : ObservableObject, INotifyProperty
             return new Image
             {
                 Source = bitmap,
-                Width = element.Radius,
-                Height = element.Radius,
+                            Width = element.Radius * SCALE_FACTOR,
+                            Height = element.Radius * SCALE_FACTOR,
                 Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
             };
         }
