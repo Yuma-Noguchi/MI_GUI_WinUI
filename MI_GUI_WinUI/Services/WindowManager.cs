@@ -6,6 +6,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Windows.Graphics;
 using Windows.Storage;
+using System.IO;
 
 namespace MI_GUI_WinUI.Services;
 

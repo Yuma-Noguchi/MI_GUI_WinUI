@@ -35,25 +35,16 @@
                 <controls:PageHeader Grid.Row="0" Title="Select Profiles"/>
             </Grid>
 
-            <AutoSuggestBox
-                Grid.Row="1"
-                Margin="0,24"
-                Width="300"
-                HorizontalAlignment="Left"
-                PlaceholderText="Search Profiles"
-                Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                QueryIcon="Find"/>
-
             <!-- Error Message -->
             <InfoBar
-                Grid.Row="2"
+                Grid.Row="1"
                 IsOpen="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}"
                 Message="{Binding ErrorMessage}"
                 Severity="Error"
                 Title="Error"/>
 
             <!-- Loading State -->
-            <Grid Grid.Row="3"
+            <Grid Grid.Row="2"
                    Visibility="{Binding IsLoading}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressRing IsActive="True" Width="50" Height="50"/>
@@ -64,7 +55,7 @@
             </Grid>
 
             <!-- Profile Grid -->
-            <ScrollViewer Grid.Row="3"
+            <ScrollViewer Grid.Row="2"
                          HorizontalScrollBarVisibility="Disabled"
                          VerticalScrollBarVisibility="Auto"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityInverseConverter}}">

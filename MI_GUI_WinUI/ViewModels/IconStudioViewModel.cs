@@ -206,8 +206,8 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
-        private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
-        //private string helperPrompt = "";
+        //private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
+        private string helperPrompt = "{}";
 
         private string BuildFinalPrompt(string prompt)
         {
