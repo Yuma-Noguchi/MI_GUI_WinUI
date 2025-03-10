@@ -43,11 +43,39 @@ namespace MI_GUI_WinUI.Pages
             {
                 ClearCanvas();
             }
+            else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+            {
+                foreach (ButtonPositionInfo buttonInfo in e.NewItems)
+                {
+                    AddButtonToCanvas(buttonInfo);
+                }
+            }
         }
 
         private void ClearCanvas()
         {
             EditorCanvas.Children.Clear();
+        }
+
+        private void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
+        {
+            var image = new ResizableImage
+            {
+                Source = new BitmapImage(new Uri(buttonInfo.Button.IconPath)),
+                Width = buttonInfo.Size.Width,
+                Height = buttonInfo.Size.Height,
+                Tag = buttonInfo.Button.Name,
+                ManipulationMode = ManipulationModes.All
+            };
+
+            Canvas.SetLeft(image, buttonInfo.Position.X);
+            Canvas.SetTop(image, buttonInfo.Position.Y);
+
+            EditorCanvas.Children.Add(image);
+
+            // Add manipulation events
+            image.ManipulationStarted += Image_ManipulationStarted;
+            image.ManipulationDelta += Image_ManipulationDelta;
         }
 
         private void Image_DragStarting(UIElement sender, DragStartingEventArgs e)

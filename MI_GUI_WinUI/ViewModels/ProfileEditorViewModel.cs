@@ -136,11 +136,15 @@ namespace MI_GUI_WinUI.ViewModels
 
         private ButtonPositionInfo ConvertFromGuiElement(GuiElement element)
         {
-            var button = FindSourceButton(element.File)?.Clone() ?? new EditorButton
+            // Try to find existing button first
+            var sourceButton = FindSourceButton(element.File);
+            
+            // If found, use its paths, otherwise construct paths from the JSON data
+            var button = sourceButton?.Clone() ?? new EditorButton
             {
                 Name = element.File,
-                IconPath = element.Skin,
-                TriggeredIconPath = element.TriggeredSkin
+                IconPath = ConvertToMsAppxPath(element.Skin),
+                TriggeredIconPath = ConvertToMsAppxPath(element.TriggeredSkin)
             };
 
             return new ButtonPositionInfo
@@ -149,6 +153,16 @@ namespace MI_GUI_WinUI.ViewModels
                 Position = new Point(element.Position[0], element.Position[1]),
                 Size = new Size(element.Radius * 2, element.Radius * 2)
             };
+        }
+
+        private string ConvertToMsAppxPath(string relativePath)
+        {
+            if (relativePath.StartsWith("ms-appx:///"))
+                return relativePath;
+
+            // Remove any leading slashes and combine with base path
+            relativePath = relativePath.TrimStart('/');
+            return $"ms-appx:///{relativePath}";
         }
 
         [RelayCommand]
