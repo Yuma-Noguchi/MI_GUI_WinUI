@@ -16,7 +16,7 @@ namespace MI_GUI_WinUI.ViewModels
     public partial class ProfileEditorViewModel : ObservableObject
     {
         private readonly string _baseAppPath;
-        private readonly string PROFILES_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "MotionInput", "Profiles");
+        private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
 
         [ObservableProperty]
         private string profileName = string.Empty;

@@ -53,7 +53,9 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <controls:PageHeader Grid.Row="0" Title="{x:Bind ViewModel.Title, Mode=OneWay}"/>
+        <controls:PageHeader Grid.Row="0" 
+                          Title="{x:Bind ViewModel.Title, Mode=OneWay}"
+                          HomeButtonEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
 
         <!-- Main content -->
         <Grid Grid.Row="1" Margin="20">
@@ -136,6 +138,7 @@
                 <!-- Generate Button -->
                 <Button Content="Generate Icon"
                         Command="{Binding GenerateCommand}"
+                        IsEnabled="{x:Bind ViewModel.CanGenerate, Mode=OneWay}"
                         HorizontalAlignment="Stretch"
                         Height="40"
                         Style="{ThemeResource AccentButtonStyle}"/>
@@ -246,8 +249,8 @@
                                  Opacity="0.7"
                                  Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay, Converter={StaticResource BoolToVisibilityInverseConverter}}"/>
                         <Image Source="{Binding Images[0]}"
-                               Width="300" Height="300"
-                               Stretch="Uniform"
+                               Width="450" Height="450"
+                               Stretch="UniformToFill"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}"/>

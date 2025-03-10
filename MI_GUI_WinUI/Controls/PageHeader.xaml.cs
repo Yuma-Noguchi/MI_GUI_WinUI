@@ -13,10 +13,19 @@ namespace MI_GUI_WinUI.Controls
         public static readonly DependencyProperty TitleProperty =
             DependencyProperty.Register(nameof(Title), typeof(string), typeof(PageHeader), new PropertyMetadata(string.Empty));
 
+        public static readonly DependencyProperty HomeButtonEnabledProperty =
+            DependencyProperty.Register(nameof(HomeButtonEnabled), typeof(bool), typeof(PageHeader), new PropertyMetadata(true));
+
         public string Title
         {
             get => (string)GetValue(TitleProperty);
             set => SetValue(TitleProperty, value);
+        }
+
+        public bool HomeButtonEnabled
+        {
+            get => (bool)GetValue(HomeButtonEnabledProperty);
+            set => SetValue(HomeButtonEnabledProperty, value);
         }
 
         public PageHeader()
