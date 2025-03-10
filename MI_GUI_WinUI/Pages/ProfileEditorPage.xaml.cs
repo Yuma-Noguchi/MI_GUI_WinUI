@@ -30,6 +30,8 @@ namespace MI_GUI_WinUI.Pages
         private ResizableImage? activeImage;
         private Point originalPosition;
         private Canvas? EditorCanvasElement => FindName("EditorCanvas") as Canvas;
+        private string? _lastDroppedPath;
+        private bool _isAddingFromDrop;
         
         public ProfileEditorPage()
         {
@@ -58,7 +60,7 @@ namespace MI_GUI_WinUI.Pages
             {
                 ClearCanvas();
             }
-            else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+            else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null && !_isAddingFromDrop)
             {
                 foreach (ButtonPositionInfo buttonInfo in e.NewItems)
                 {
@@ -72,6 +74,21 @@ namespace MI_GUI_WinUI.Pages
             if (EditorCanvasElement != null)
             {
                 EditorCanvasElement.Children.Clear();
+            }
+        }
+
+        private async Task AddButtonToCanvasWithAnimation(ResizableImage image)
+        {
+            var scaleTransform = new ScaleTransform();
+            image.RenderTransform = scaleTransform;
+
+            var storyboard = CreateDropAnimation(scaleTransform);
+            storyboard.Begin();
+
+            if (_lastDroppedPath != null)
+            {
+                await SwitchToTriggeredState(image, _lastDroppedPath);
+                _lastDroppedPath = null;
             }
         }
 
@@ -138,68 +155,45 @@ namespace MI_GUI_WinUI.Pages
         {
             try
             {
-                if (e.DataView.Contains(StandardDataFormats.Text))
+                if (!e.DataView.Contains(StandardDataFormats.Text)) return;
+
+                string buttonType = await e.DataView.GetTextAsync();
+                string imagePath = "";
+                
+                if (e.DataView.Properties.TryGetValue("ImagePath", out object path))
                 {
-                    string buttonType = await e.DataView.GetTextAsync();
-                    string imagePath = "";
-                    
-                    if (e.DataView.Properties.TryGetValue("ImagePath", out object path))
-                    {
-                        imagePath = path.ToString();
-                    }
-
-                    if (string.IsNullOrEmpty(imagePath))
-                        return;
-
-                    Point dropPosition = e.GetPosition((UIElement)sender);
-
-                    // Find the source button from DefaultButtons or CustomButtons
-                    var sourceButton = FindSourceButton(buttonType);
-                    if (sourceButton == null) return;
-
-                    // Create new resizable image
-                    var image = new ResizableImage
-                    {
-                        Source = new BitmapImage(new Uri(imagePath)),
-                        Width = DROPPED_IMAGE_SIZE,
-                        Height = DROPPED_IMAGE_SIZE,
-                        Tag = buttonType,
-                        ManipulationMode = ManipulationModes.All
-                    };
-
-                    // Center on drop position
-                    Canvas.SetLeft(image, dropPosition.X - DROPPED_IMAGE_SIZE / 2);
-                    Canvas.SetTop(image, dropPosition.Y - DROPPED_IMAGE_SIZE / 2);
-
-                    if (sender is Canvas canvas)
-                    {
-                        // Add to canvas immediately
-                        canvas.Children.Add(image);
-
-                        // Setup transform and animation
-                        var scaleTransform = new ScaleTransform();
-                        image.RenderTransform = scaleTransform;
-
-                        var storyboard = CreateDropAnimation(scaleTransform);
-                        storyboard.Begin();
-
-                        // Handle triggered state
-                        await SwitchToTriggeredState(image, imagePath);
-
-                        // Add to view model
-                        var buttonInfo = new ButtonPositionInfo
-                        {
-                            Button = sourceButton.Clone(),
-                            Position = dropPosition,
-                            Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
-                        };
-                        ViewModel.AddButtonToCanvasCommand.Execute(buttonInfo);
-
-                        // Add manipulation events for repositioning
-                        image.ManipulationStarted += Image_ManipulationStarted;
-                        image.ManipulationDelta += Image_ManipulationDelta;
-                    }
+                    imagePath = path.ToString();
                 }
+
+                if (string.IsNullOrEmpty(imagePath)) return;
+
+                Point dropPosition = e.GetPosition((UIElement)sender);
+                _lastDroppedPath = imagePath;
+
+                // Find the source button from DefaultButtons or CustomButtons
+                var sourceButton = FindSourceButton(buttonType);
+                if (sourceButton == null) return;
+
+                var buttonInfo = new ButtonPositionInfo
+                {
+                    Button = sourceButton.Clone(),
+                    Position = new Point(dropPosition.X - DROPPED_IMAGE_SIZE / 2, dropPosition.Y - DROPPED_IMAGE_SIZE / 2),
+                    Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
+                };
+
+                // Add the button to canvas first
+                AddButtonToCanvas(buttonInfo);
+
+                // Get the last added image and apply animation
+                if (EditorCanvasElement?.Children.LastOrDefault() is ResizableImage lastImage)
+                {
+                    await AddButtonToCanvasWithAnimation(lastImage);
+                }
+
+                // Now add to the ViewModel's collection (which won't trigger another visual update due to _isAddingFromDrop)
+                _isAddingFromDrop = true;
+                ViewModel.AddButtonToCanvasCommand.Execute(buttonInfo);
+                _isAddingFromDrop = false;
             }
             catch (Exception ex)
             {
