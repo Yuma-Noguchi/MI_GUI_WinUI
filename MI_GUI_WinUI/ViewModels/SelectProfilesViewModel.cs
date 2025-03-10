@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -338,6 +338,7 @@ namespace MI_GUI_WinUI.ViewModels
                     DataContext = new { ProfileName = profile.Name }
                 };
 
+                // Add GUI elements to preview
                 if (profile.GuiElements != null)
                 {
                     foreach (GuiElement guiElement in profile.GuiElements)
@@ -353,7 +354,6 @@ namespace MI_GUI_WinUI.ViewModels
                                 Canvas.SetLeft(image, guiElement.Position[0] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 Canvas.SetTop(image, guiElement.Position[1] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 preview.Children.Add(image);
-                            }
                         }
                         catch (Exception ex)
                         {

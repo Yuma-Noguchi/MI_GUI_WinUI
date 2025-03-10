@@ -1,4 +1,6 @@
 using Microsoft.UI;
+using System.Collections.Generic;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -39,11 +41,21 @@ namespace MI_GUI_WinUI.Pages
             ViewModel = App.Current.Services.GetRequiredService<ProfileEditorViewModel>();
             DataContext = ViewModel;
 
-            // Subscribe to collection changes in CanvasButtons
+            // Subscribe to collection changes and set XamlRoot
             ViewModel.CanvasButtons.CollectionChanged += CanvasButtons_CollectionChanged;
+            ViewModel.CanvasPoses.CollectionChanged += CanvasPoses_CollectionChanged;
             
             // Set XamlRoot when page is loaded
             Loaded += ProfileEditorPage_Loaded;
+
+            // Set up collection changed handler for loading profiles
+            ViewModel.PropertyChanged += (sender, e) =>
+            {
+                if (e.PropertyName == nameof(ProfileEditorViewModel.ProfileName))
+                {
+                    ClearCanvas();
+                }
+            };
 
             // Ensure clean state for new profile creation
             ViewModel.NewProfile();
@@ -93,6 +105,21 @@ namespace MI_GUI_WinUI.Pages
                 foreach (ButtonPositionInfo buttonInfo in e.NewItems)
                 {
                     AddButtonToCanvas(buttonInfo);
+                }
+            }
+        }
+
+        private void CanvasPoses_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                ClearCanvas();
+            }
+            else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null && !_isAddingFromDrop)
+            {
+                foreach (PosePositionInfo poseInfo in e.NewItems)
+                {
+                    AddPoseToCanvas(poseInfo);
                 }
             }
         }
@@ -148,8 +175,29 @@ namespace MI_GUI_WinUI.Pages
                 e.Data.SetText(sourceImage.Tag?.ToString() ?? "");
                 e.Data.Properties.Title = "Xbox Button";
                 e.Data.Properties.Add("ImagePath", sourcePath);
+                e.Data.Properties.Add("Type", "Button");
                 e.AllowedOperations = DataPackageOperation.Copy;
             }
+        }
+
+        private void Pose_DragStarting(UIElement sender, DragStartingEventArgs e)
+        {
+            if (sender is Image sourceImage)
+            {
+                string sourcePath = ((BitmapImage)sourceImage.Source).UriSource.ToString();
+                string poseFile = sourceImage.Tag?.ToString() ?? "";
+
+                e.Data.SetText(poseFile);
+                e.Data.Properties.Title = "Pose Element";
+                e.Data.Properties.Add("ImagePath", sourcePath);
+                e.Data.Properties.Add("Type", "Pose");
+                e.AllowedOperations = DataPackageOperation.Copy;
+            }
+        }
+
+        private void Pose_DropCompleted(UIElement sender, DropCompletedEventArgs e)
+        {
+            // Clean up if needed after drag operation
         }
 
         private void Image_DropCompleted(UIElement sender, DropCompletedEventArgs e)
@@ -165,7 +213,7 @@ namespace MI_GUI_WinUI.Pages
                 
                 if (e.DragUIOverride != null)
                 {
-                    e.DragUIOverride.Caption = "Drop to place button";
+                    e.DragUIOverride.Caption = "Drop to place element";
                     e.DragUIOverride.IsCaptionVisible = true;
                     e.DragUIOverride.IsGlyphVisible = false;
                     e.DragUIOverride.IsContentVisible = true;
@@ -179,7 +227,13 @@ namespace MI_GUI_WinUI.Pages
             {
                 if (!e.DataView.Contains(StandardDataFormats.Text)) return;
 
-                string buttonType = await e.DataView.GetTextAsync();
+                string elementType = "Button";
+                if (e.DataView.Properties.TryGetValue("Type", out object type))
+                {
+                    elementType = type.ToString();
+                }
+
+                string elementId = await e.DataView.GetTextAsync();
                 string imagePath = "";
                 
                 if (e.DataView.Properties.TryGetValue("ImagePath", out object path))
@@ -196,38 +250,109 @@ namespace MI_GUI_WinUI.Pages
                 dropPosition.X = Math.Max(DROPPED_IMAGE_SIZE/2, Math.Min(dropPosition.X, 640 - DROPPED_IMAGE_SIZE/2));
                 dropPosition.Y = Math.Max(DROPPED_IMAGE_SIZE/2, Math.Min(dropPosition.Y, 480 - DROPPED_IMAGE_SIZE/2));
 
-                // Find the source button from DefaultButtons or CustomButtons
-                var sourceButton = FindSourceButton(buttonType);
-                if (sourceButton == null) return;
-
-                var buttonInfo = new ButtonPositionInfo
+                if (elementType == "Button")
                 {
-                    Button = sourceButton.Clone(),
-                    Position = new Point(
-                        Math.Round(dropPosition.X - DROPPED_IMAGE_SIZE / 2), // Round to nearest pixel
-                        Math.Round(dropPosition.Y - DROPPED_IMAGE_SIZE / 2)
-                    ),
-                    Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
-                };
-
-                // Add the button to canvas first
-                AddButtonToCanvas(buttonInfo);
-
-                // Get the last added image and apply animation
-                if (EditorCanvasElement?.Children.LastOrDefault() is ResizableImage lastImage)
-                {
-                    AddButtonToCanvasWithAnimation(lastImage);
+                    HandleButtonDrop(elementId, imagePath, dropPosition);
                 }
-
-                // Now add to the ViewModel's collection (which won't trigger another visual update due to _isAddingFromDrop)
-                _isAddingFromDrop = true;
-                ViewModel.AddButtonToCanvasCommand.Execute(buttonInfo);
-                _isAddingFromDrop = false;
+                else if (elementType == "Pose")
+                {
+                    HandlePoseDrop(elementId, imagePath, dropPosition);
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Drop error: {ex.Message}");
             }
+        }
+
+        private void HandleButtonDrop(string buttonType, string imagePath, Point dropPosition)
+        {
+            var sourceButton = FindSourceButton(buttonType);
+            if (sourceButton == null) return;
+
+            var buttonInfo = new ButtonPositionInfo
+            {
+                Button = sourceButton.Clone(),
+                Position = new Point(
+                    Math.Round(dropPosition.X - DROPPED_IMAGE_SIZE / 2),
+                    Math.Round(dropPosition.Y - DROPPED_IMAGE_SIZE / 2)
+                ),
+                Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
+            };
+
+            AddButtonToCanvas(buttonInfo);
+
+            if (EditorCanvasElement?.Children.LastOrDefault() is ResizableImage lastImage)
+            {
+                AddButtonToCanvasWithAnimation(lastImage);
+            }
+
+            _isAddingFromDrop = true;
+            ViewModel.AddButtonToCanvasCommand.Execute(buttonInfo);
+            _isAddingFromDrop = false;
+        }
+
+        private void HandlePoseDrop(string poseFile, string imagePath, Point dropPosition)
+        {
+            var sourcePose = ViewModel.DefaultPoses.FirstOrDefault(p => p.File.Equals(poseFile));
+            if (sourcePose.File == null) return;
+
+            var poseInfo = new PosePositionInfo
+            {
+                Pose = new PoseGuiElement
+                {
+                    File = sourcePose.File,
+                    LeftSkin = sourcePose.LeftSkin,
+                    RightSkin = sourcePose.RightSkin,
+                    Sensitivity = sourcePose.Sensitivity,
+                    Deadzone = sourcePose.Deadzone,
+                    Linear = sourcePose.Linear,
+                    Flag = sourcePose.Flag,
+                    Landmark = sourcePose.Landmark,
+                    Position = new List<int> { (int)dropPosition.X, (int)dropPosition.Y },
+                    Radius = sourcePose.Radius,
+                    Skin = sourcePose.Skin,
+                    Action = sourcePose.Action
+                },
+                Position = new Point(
+                    Math.Round(dropPosition.X - DROPPED_IMAGE_SIZE / 2),
+                    Math.Round(dropPosition.Y - DROPPED_IMAGE_SIZE / 2)
+                ),
+                Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
+            };
+
+            AddPoseToCanvas(poseInfo);
+
+            if (EditorCanvasElement?.Children.LastOrDefault() is ResizableImage lastImage)
+            {
+                AddButtonToCanvasWithAnimation(lastImage);
+            }
+
+            _isAddingFromDrop = true;
+            ViewModel.AddPoseToCanvasCommand.Execute(poseInfo);
+            _isAddingFromDrop = false;
+        }
+
+        private void AddPoseToCanvas(PosePositionInfo poseInfo)
+        {
+            if (EditorCanvasElement == null) return;
+
+            var image = new ResizableImage
+            {
+                Source = new BitmapImage(new Uri(poseInfo.Pose.Skin)),
+                Width = poseInfo.Size.Width,
+                Height = poseInfo.Size.Height,
+                Tag = poseInfo.Pose.File,
+                ManipulationMode = ManipulationModes.All
+            };
+
+            Canvas.SetLeft(image, poseInfo.Position.X);
+            Canvas.SetTop(image, poseInfo.Position.Y);
+
+            EditorCanvasElement.Children.Add(image);
+
+            image.ManipulationStarted += Image_ManipulationStarted;
+            image.ManipulationDelta += Image_ManipulationDelta;
         }
 
         private void Image_ManipulationStarted(object sender, ManipulationStartedRoutedEventArgs e)
@@ -263,9 +388,9 @@ namespace MI_GUI_WinUI.Pages
             Canvas.SetTop(activeImage, newPosition.Y);
 
             // Update model
-            if (activeImage.Tag is string buttonType)
+            if (activeImage.Tag is string elementType)
             {
-                var sourceButton = FindSourceButton(buttonType);
+                var sourceButton = FindSourceButton(elementType);
                 if (sourceButton != null)
                 {
                     var buttonInfo = new ButtonPositionInfo
@@ -275,6 +400,34 @@ namespace MI_GUI_WinUI.Pages
                         Size = new Size(activeImage.ActualWidth, activeImage.ActualHeight)
                     };
                     ViewModel.UpdateButtonPosition(buttonInfo);
+                }
+                else
+                {
+                    var sourcePose = ViewModel.DefaultPoses.FirstOrDefault(p => p.File.Equals(elementType));
+                    if (sourcePose.File != null)
+                    {
+                        var poseInfo = new PosePositionInfo
+                        {
+                            Pose = new PoseGuiElement
+                            {
+                                File = sourcePose.File,
+                                LeftSkin = sourcePose.LeftSkin,
+                                RightSkin = sourcePose.RightSkin,
+                                Sensitivity = sourcePose.Sensitivity,
+                                Deadzone = sourcePose.Deadzone,
+                                Linear = sourcePose.Linear,
+                                Flag = sourcePose.Flag,
+                                Landmark = sourcePose.Landmark,
+                                Position = new List<int> { (int)newPosition.X, (int)newPosition.Y },
+                                Radius = sourcePose.Radius,
+                                Skin = sourcePose.Skin,
+                                Action = sourcePose.Action
+                            },
+                            Position = newPosition,
+                            Size = new Size(activeImage.ActualWidth, activeImage.ActualHeight)
+                        };
+                        ViewModel.UpdatePosePosition(poseInfo);
+                    }
                 }
             }
         }

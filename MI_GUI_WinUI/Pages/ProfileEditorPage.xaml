@@ -105,6 +105,34 @@
                                 </ItemsRepeater.ItemTemplate>
                             </ItemsRepeater>
                         </StackPanel>
+
+                        <!-- Poses -->
+                        <StackPanel>
+                            <TextBlock
+                                Text="Poses"
+                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Margin="0,0,0,8"/>
+                            <ItemsRepeater ItemsSource="{x:Bind ViewModel.DefaultPoses}">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout
+                                        MinItemWidth="70"
+                                        MinItemHeight="70"
+                                        MinRowSpacing="8"
+                                        MinColumnSpacing="8"/>
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Image
+                                            Source="{Binding Skin}"
+                                            Width="60" Height="60"
+                                            Tag="{Binding File}"
+                                            CanDrag="True"
+                                            DragStarting="Pose_DragStarting"
+                                            DropCompleted="Pose_DropCompleted"/>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

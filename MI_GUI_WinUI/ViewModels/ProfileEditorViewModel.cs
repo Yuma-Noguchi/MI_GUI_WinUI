@@ -28,6 +28,54 @@ namespace MI_GUI_WinUI.ViewModels
             _baseAppPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
             InitializeDefaultButtons();
             LoadCustomButtons();
+            InitializeDefaultPoses();
+        }
+
+        private void InitializeDefaultPoses()
+        {
+            var defaultPoses = new[]
+            {
+                new PoseGuiElement 
+                {
+                    File = "head_tilt_joystick.py",
+                    LeftSkin = ConvertToMsAppxPath("racing/left_arrow.png"),
+                    RightSkin = ConvertToMsAppxPath("racing/right_arrow.png"),
+                    Sensitivity = 0.75,
+                    Deadzone = 1,
+                    Linear = false
+                },
+                new PoseGuiElement
+                {
+                    File = "hit_trigger.py",
+                    Landmark = "right_wrist",
+                    Skin = ConvertToMsAppxPath("racing/forward.png"),
+                    Radius = 60,
+                    Action = new ActionConfig
+                    {
+                        ClassName = "ds4_gamepad",
+                        MethodName = "right_trigger",
+                        Arguments = new List<string> { "0.75" }
+                    }
+                },
+                new PoseGuiElement
+                {
+                    File = "hit_trigger.py",
+                    Landmark = "left_wrist",
+                    Skin = ConvertToMsAppxPath("racing/backward.png"),
+                    Radius = 60,
+                    Action = new ActionConfig
+                    {
+                        ClassName = "ds4_gamepad",
+                        MethodName = "left_trigger",
+                        Arguments = new List<string> { "1.0" }
+                    }
+                }
+            };
+
+            foreach (var pose in defaultPoses)
+            {
+                DefaultPoses.Add(pose);
+            }
         }
 
         public XamlRoot? XamlRoot
@@ -45,10 +93,13 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
         public ObservableCollection<ButtonPositionInfo> CanvasButtons { get; } = new();
+        public ObservableCollection<PoseGuiElement> DefaultPoses { get; } = new();
+        public ObservableCollection<PosePositionInfo> CanvasPoses { get; } = new();
 
         private void PrepareForEdit()
         {
             CanvasButtons.Clear();
+            CanvasPoses.Clear();
             ValidationMessage = string.Empty;
         }
 
@@ -61,12 +112,11 @@ namespace MI_GUI_WinUI.ViewModels
                 // Set profile name
                 ProfileName = profile.Name;
 
-                // Load GUI elements if they exist
+                // Load GUI elements
                 if (profile.GuiElements != null)
                 {
                     _logger?.LogInformation($"Loading {profile.GuiElements.Count} GUI elements for profile {profile.Name}");
                     
-                    // Add each element to canvas via AddButtonToCanvas command
                     foreach (var element in profile.GuiElements)
                     {
                         try
@@ -83,15 +133,30 @@ namespace MI_GUI_WinUI.ViewModels
                             _logger?.LogError(elementEx, $"Error loading GUI element: {element.File}");
                         }
                     }
+                }
 
-                    _logger?.LogInformation($"Successfully loaded profile {profile.Name} with {CanvasButtons.Count} elements");
-                    ValidationMessage = "Profile loaded successfully";
-                }
-                else
+                // Load poses
+                if (profile.Poses != null)
                 {
-                    _logger?.LogWarning($"Profile {profile.Name} has no GUI elements");
-                    ValidationMessage = "Profile has no GUI elements";
+                    _logger?.LogInformation($"Loading {profile.Poses.Count} poses for profile {profile.Name}");
+
+                    foreach (var pose in profile.Poses)
+                    {
+                        try
+                        {
+                            var poseInfo = ConvertFromPoseElement(pose);
+                            CanvasPoses.Add(poseInfo);
+                            _logger?.LogInformation($"Added pose: {pose.File} at position {pose.Position?[0]}, {pose.Position?[1]}");
+                        }
+                        catch (Exception poseEx)
+                        {
+                            _logger?.LogError(poseEx, $"Error loading pose: {pose.File}");
+                        }
+                    }
                 }
+
+                _logger?.LogInformation($"Successfully loaded profile {profile.Name} with {CanvasButtons.Count} GUI elements and {CanvasPoses.Count} poses");
+                ValidationMessage = "Profile loaded successfully";
             }
             catch (Exception ex)
             {
@@ -169,6 +234,7 @@ namespace MI_GUI_WinUI.ViewModels
                 ProfileName = string.Empty;
                 ValidationMessage = string.Empty;
                 CanvasButtons.Clear();
+                CanvasPoses.Clear();
             }
             catch (Exception ex)
             {
@@ -181,6 +247,7 @@ namespace MI_GUI_WinUI.ViewModels
         public void ClearCanvas()
         {
             CanvasButtons.Clear();
+            CanvasPoses.Clear();
             ValidationMessage = string.Empty;
         }
 
@@ -298,7 +365,7 @@ namespace MI_GUI_WinUI.ViewModels
                     Name = sanitizedName,
                     GlobalConfig = new Dictionary<string, string>(),
                     GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
-                    Poses = new List<PoseConfig>(),
+                    Poses = CanvasPoses.Select(p => p.Pose).ToList(),
                     SpeechCommands = new Dictionary<string, SpeechCommand>()
                 };
 
@@ -355,6 +422,12 @@ namespace MI_GUI_WinUI.ViewModels
                     CanvasButtons.Add(ConvertFromGuiElement(element));
                 }
 
+                foreach (var pose in profile.Poses)
+                {
+                    var poseInfo = ConvertFromPoseElement(pose);
+                    CanvasPoses.Add(poseInfo);
+                }
+
                 ValidationMessage = "Profile loaded successfully";
             }
             catch (Exception ex)
@@ -367,6 +440,36 @@ namespace MI_GUI_WinUI.ViewModels
         {
             return DefaultButtons.FirstOrDefault(b => b.Name == buttonName) ??
                    CustomButtons.FirstOrDefault(b => b.Name == buttonName);
+        }
+
+        [RelayCommand]
+        public void AddPoseToCanvas(PosePositionInfo poseInfo)
+        {
+            CanvasPoses.Add(poseInfo);
+        }
+
+        public void UpdatePosePosition(PosePositionInfo poseInfo)
+        {
+            var existingPose = CanvasPoses.FirstOrDefault(p => p.Pose.File == poseInfo.Pose.File);
+            if (existingPose != null)
+            {
+                var index = CanvasPoses.IndexOf(existingPose);
+                CanvasPoses[index] = poseInfo.Clone();
+            }
+        }
+
+        private PosePositionInfo ConvertFromPoseElement(PoseGuiElement pose)
+        {
+            double radius = pose.Radius;
+            double x = pose.Position?[0] ?? 0;
+            double y = pose.Position?[1] ?? 0;
+
+            return new PosePositionInfo
+            {
+                Pose = pose,
+                Position = new Point(x - radius, y - radius),
+                Size = new Size(radius * 2, radius * 2)
+            };
         }
     }
 }
