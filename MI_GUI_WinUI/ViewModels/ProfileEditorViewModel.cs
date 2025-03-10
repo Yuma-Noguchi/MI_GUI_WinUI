@@ -43,6 +43,44 @@ namespace MI_GUI_WinUI.ViewModels
             LoadCustomButtons();
         }
 
+        private void PrepareForEdit()
+        {
+            CanvasButtons.Clear();
+            ValidationMessage = string.Empty;
+        }
+
+        public async Task LoadExistingProfile(Profile profile)
+        {
+            try
+            {
+                PrepareForEdit();
+                
+                // Set profile name
+                ProfileName = profile.Name;
+
+                // Load GUI elements if they exist
+                if (profile.GuiElements != null)
+                {
+                    // Add each element to canvas via AddButtonToCanvas command
+                    foreach (var element in profile.GuiElements)
+                    {
+                        var buttonInfo = ConvertFromGuiElement(element);
+                        CanvasButtons.Add(buttonInfo);
+                    }
+
+                    ValidationMessage = "Profile loaded successfully";
+                }
+                else
+                {
+                    ValidationMessage = "Profile has no GUI elements";
+                }
+            }
+            catch (Exception ex)
+            {
+                ValidationMessage = $"Error loading profile: {ex.Message}";
+            }
+        }
+
         private void InitializeDefaultButtons()
         {
             var defaultButtons = new[]

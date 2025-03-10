@@ -54,6 +54,22 @@ namespace MI_GUI_WinUI.Pages
             }
         }
 
+        protected override async void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = XamlRoot;
+
+                // Load profile if one was passed during navigation
+                if (e.Parameter is Profile profile)
+                {
+                    await ViewModel.LoadExistingProfile(profile);
+                }
+            }
+        }
+
         private void CanvasButtons_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == NotifyCollectionChangedAction.Reset)
