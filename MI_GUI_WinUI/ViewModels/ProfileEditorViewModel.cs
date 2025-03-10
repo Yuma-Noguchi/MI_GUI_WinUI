@@ -11,14 +11,24 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Microsoft.UI.Xaml;
+using Microsoft.Extensions.Logging;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ProfileEditorViewModel : ObservableObject
     {
+        private readonly ILogger<ProfileEditorViewModel> _logger;
         private readonly string _baseAppPath;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
         private XamlRoot? _xamlRoot;
+
+        public ProfileEditorViewModel(ILogger<ProfileEditorViewModel> logger)
+        {
+            _logger = logger;
+            _baseAppPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+            InitializeDefaultButtons();
+            LoadCustomButtons();
+        }
 
         public XamlRoot? XamlRoot
         {
@@ -36,12 +46,6 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
         public ObservableCollection<ButtonPositionInfo> CanvasButtons { get; } = new();
 
-        public ProfileEditorViewModel()
-        {
-            _baseAppPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
-            InitializeDefaultButtons();
-            LoadCustomButtons();
-        }
 
         private void PrepareForEdit()
         {
@@ -61,23 +65,40 @@ namespace MI_GUI_WinUI.ViewModels
                 // Load GUI elements if they exist
                 if (profile.GuiElements != null)
                 {
+                    _logger?.LogInformation($"Loading {profile.GuiElements.Count} GUI elements for profile {profile.Name}");
+                    
                     // Add each element to canvas via AddButtonToCanvas command
                     foreach (var element in profile.GuiElements)
                     {
-                        var buttonInfo = ConvertFromGuiElement(element);
-                        CanvasButtons.Add(buttonInfo);
+                        try
+                        {
+                            var buttonInfo = ConvertFromGuiElement(element);
+                            if (buttonInfo != null)
+                            {
+                                CanvasButtons.Add(buttonInfo);
+                                _logger?.LogInformation($"Added GUI element: {element.File} at position {element.Position[0]}, {element.Position[1]}");
+                            }
+                        }
+                        catch (Exception elementEx)
+                        {
+                            _logger?.LogError(elementEx, $"Error loading GUI element: {element.File}");
+                        }
                     }
 
+                    _logger?.LogInformation($"Successfully loaded profile {profile.Name} with {CanvasButtons.Count} elements");
                     ValidationMessage = "Profile loaded successfully";
                 }
                 else
                 {
+                    _logger?.LogWarning($"Profile {profile.Name} has no GUI elements");
                     ValidationMessage = "Profile has no GUI elements";
                 }
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, $"Error loading profile: {profile.Name}");
                 ValidationMessage = $"Error loading profile: {ex.Message}";
+                throw;
             }
         }
 
@@ -145,9 +166,18 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         public void NewProfile()
         {
-            ProfileName = string.Empty;
-            ValidationMessage = string.Empty;
-            CanvasButtons.Clear();
+            try
+            {
+                _logger?.LogInformation("Creating new profile");
+                ProfileName = string.Empty;
+                ValidationMessage = string.Empty;
+                CanvasButtons.Clear();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error creating new profile");
+                ValidationMessage = "Error creating new profile";
+            }
         }
 
         [RelayCommand]
@@ -190,7 +220,9 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 Name = element.File,
                 IconPath = ConvertToMsAppxPath(element.Skin),
-                TriggeredIconPath = ConvertToMsAppxPath(element.TriggeredSkin)
+                // can be null if element.TriggeredSkin is null
+                TriggeredIconPath = element.TriggeredSkin == null ? null : ConvertToMsAppxPath(element.TriggeredSkin)
+                //TriggeredIconPath = ConvertToMsAppxPath(element.TriggeredSkin)
             };
 
             return new ButtonPositionInfo

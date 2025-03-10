@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -403,6 +403,8 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
+                _logger.LogInformation($"Starting edit of profile: {profileName}");
+
                 if (string.IsNullOrWhiteSpace(profileName))
                 {
                     ErrorMessage = "Profile name is empty";
@@ -412,11 +414,17 @@ namespace MI_GUI_WinUI.ViewModels
                 var profile = GetProfileByName(profileName);
                 if (profile == null)
                 {
+                    _logger.LogWarning($"Profile not found: {profileName}");
                     ErrorMessage = $"Profile '{profileName}' not found";
                     return;
                 }
 
-                _navigationService.Navigate<ProfileEditorPage, ProfileEditorViewModel>(profile);
+                // Ensure we have all profile data
+                _logger.LogInformation($"Found profile with {profile?.GuiElements?.Count ?? 0} GUI elements");
+
+                // Navigate to editor with the profile
+                _navigationService.Navigate<ProfileEditorPage>(profile);
+                _logger.LogInformation($"Navigated to editor for profile: {profileName}");
             }
             catch (Exception ex)
             {

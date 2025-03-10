@@ -36,7 +36,7 @@ namespace MI_GUI_WinUI.Pages
         public ProfileEditorPage()
         {
             this.InitializeComponent();
-            ViewModel = App.Current.Services.GetService<ProfileEditorViewModel>();
+            ViewModel = App.Current.Services.GetRequiredService<ProfileEditorViewModel>();
             DataContext = ViewModel;
 
             // Subscribe to collection changes in CanvasButtons
@@ -44,6 +44,9 @@ namespace MI_GUI_WinUI.Pages
             
             // Set XamlRoot when page is loaded
             Loaded += ProfileEditorPage_Loaded;
+
+            // Ensure clean state for new profile creation
+            ViewModel.NewProfile();
         }
 
         private void ProfileEditorPage_Loaded(object sender, RoutedEventArgs e)
@@ -65,7 +68,16 @@ namespace MI_GUI_WinUI.Pages
                 // Load profile if one was passed during navigation
                 if (e.Parameter is Profile profile)
                 {
-                    await ViewModel.LoadExistingProfile(profile);
+                    try
+                    {
+                        await ViewModel.LoadExistingProfile(profile);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error loading profile: {ex.Message}");
+                        // Fall back to new profile if loading fails
+                        ViewModel.NewProfile();
+                    }
                 }
             }
         }
