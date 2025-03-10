@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Microsoft.UI.Xaml;
 
 namespace MI_GUI_WinUI.ViewModels
 {
@@ -17,6 +18,13 @@ namespace MI_GUI_WinUI.ViewModels
     {
         private readonly string _baseAppPath;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
+        private XamlRoot? _xamlRoot;
+
+        public XamlRoot? XamlRoot
+        {
+            get => _xamlRoot;
+            set => _xamlRoot = value;
+        }
 
         [ObservableProperty]
         private string profileName = string.Empty;
@@ -173,32 +181,71 @@ namespace MI_GUI_WinUI.ViewModels
                 if (string.IsNullOrWhiteSpace(ProfileName))
                 {
                     ValidationMessage = "Please enter a profile name";
+                    if (XamlRoot != null)
+                    {
+                        await Utils.DialogHelper.ShowError("Please enter a name for the profile.", XamlRoot);
+                    }
                     return;
                 }
 
-                var profile = new Profile
+                if (!Utils.FileNameHelper.IsValidFileName(ProfileName))
                 {
-                    Name = ProfileName,
-                    GlobalConfig = new Dictionary<string, string>(),
-                    GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
-                    Poses = new List<PoseConfig>(),
-                    SpeechCommands = new Dictionary<string, SpeechCommand>()
-                };
+                    ValidationMessage = "The profile name contains invalid characters";
+                    if (XamlRoot != null)
+                    {
+                        await Utils.DialogHelper.ShowError("The profile name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
+                    }
+                    return;
+                }
 
                 if (!Directory.Exists(PROFILES_DIR))
                 {
                     Directory.CreateDirectory(PROFILES_DIR);
                 }
 
-                var filePath = Path.Combine(PROFILES_DIR, $"{ProfileName}.json");
+                var sanitizedName = Utils.FileNameHelper.SanitizeFileName(ProfileName);
+                var filePath = Path.Combine(PROFILES_DIR, $"{sanitizedName}.json");
+
+                // Check if file exists
+                if (File.Exists(filePath) && XamlRoot != null)
+                {
+                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
+                        $"A profile named '{sanitizedName}.json' already exists.\nDo you want to replace it?",
+                        "Replace Existing Profile?",
+                        XamlRoot);
+
+                    if (!overwrite)
+                    {
+                        return;
+                    }
+                }
+
+                var profile = new Profile
+                {
+                    Name = sanitizedName,
+                    GlobalConfig = new Dictionary<string, string>(),
+                    GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
+                    Poses = new List<PoseConfig>(),
+                    SpeechCommands = new Dictionary<string, SpeechCommand>()
+                };
+
                 var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
                 await File.WriteAllTextAsync(filePath, json);
 
                 ValidationMessage = "Profile saved successfully";
+                
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowMessage($"Profile saved as {sanitizedName}.json", "Success", XamlRoot);
+                }
             }
             catch (Exception ex)
             {
                 ValidationMessage = $"Error saving profile: {ex.Message}";
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("Failed to save profile. Please try again.", XamlRoot);
+                }
             }
         }
 

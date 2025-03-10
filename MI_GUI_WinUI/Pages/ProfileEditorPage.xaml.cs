@@ -1,9 +1,12 @@
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Navigation;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using System;
@@ -20,12 +23,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MI_GUI_WinUI.Pages
 {
-    public sealed partial class ProfileEditorPage : Page
+    public sealed partial class ProfileEditorPage : Microsoft.UI.Xaml.Controls.Page
     {
         private const float DROPPED_IMAGE_SIZE = 80;
         private readonly ProfileEditorViewModel ViewModel;
         private ResizableImage? activeImage;
         private Point originalPosition;
+        private Canvas? EditorCanvasElement => FindName("EditorCanvas") as Canvas;
         
         public ProfileEditorPage()
         {
@@ -35,6 +39,17 @@ namespace MI_GUI_WinUI.Pages
 
             // Subscribe to collection changes in CanvasButtons
             ViewModel.CanvasButtons.CollectionChanged += CanvasButtons_CollectionChanged;
+            
+            // Set XamlRoot when page is loaded
+            Loaded += ProfileEditorPage_Loaded;
+        }
+
+        private void ProfileEditorPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = XamlRoot;
+            }
         }
 
         private void CanvasButtons_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -54,11 +69,16 @@ namespace MI_GUI_WinUI.Pages
 
         private void ClearCanvas()
         {
-            EditorCanvas.Children.Clear();
+            if (EditorCanvasElement != null)
+            {
+                EditorCanvasElement.Children.Clear();
+            }
         }
 
         private void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
         {
+            if (EditorCanvasElement == null) return;
+
             var image = new ResizableImage
             {
                 Source = new BitmapImage(new Uri(buttonInfo.Button.IconPath)),
@@ -71,7 +91,7 @@ namespace MI_GUI_WinUI.Pages
             Canvas.SetLeft(image, buttonInfo.Position.X);
             Canvas.SetTop(image, buttonInfo.Position.Y);
 
-            EditorCanvas.Children.Add(image);
+            EditorCanvasElement.Children.Add(image);
 
             // Add manipulation events
             image.ManipulationStarted += Image_ManipulationStarted;

@@ -107,21 +107,6 @@
                     </Border>
                 </Grid>
 
-                <!-- GPU/CPU Selection -->
-                <StackPanel Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                          BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                          BorderThickness="1"
-                          CornerRadius="4"
-                          Padding="12,8">
-                    <ToggleSwitch Header="Use GPU Acceleration"
-                                IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
-                                IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
-                    <TextBlock Text="GPU acceleration requires DirectML support"
-                             Style="{StaticResource CaptionTextBlockStyle}"
-                             Foreground="{ThemeResource TextFillColorSecondary}"
-                             Margin="12,0,0,8"/>
-                </StackPanel>
-
                 <!-- Prompt Input -->
                 <TextBox Header="Prompt"
                         Text="{Binding InputDescription, Mode=TwoWay}"
