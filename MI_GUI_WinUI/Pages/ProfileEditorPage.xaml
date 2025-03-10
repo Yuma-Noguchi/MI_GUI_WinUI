@@ -125,7 +125,8 @@
                         BorderBrush="{ThemeResource SystemListLowColor}"
                         BorderThickness="2"
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
-                        CornerRadius="8">
+                        CornerRadius="8"
+                       >
                         <Grid>
                             <TextBlock
                                 Text="Drop Buttons Here"
@@ -139,7 +140,9 @@
                                 Background="Transparent"
                                 AllowDrop="True"
                                 DragOver="EditorCanvas_DragOver"
-                                Drop="EditorCanvas_Drop"/>
+                                Drop="EditorCanvas_Drop"
+                                Height="480"
+                                Width="640"/>
                         </Grid>
                     </Border>
                 </Border>

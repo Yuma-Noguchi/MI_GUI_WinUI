@@ -46,7 +46,6 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
         public ObservableCollection<ButtonPositionInfo> CanvasButtons { get; } = new();
 
-
         private void PrepareForEdit()
         {
             CanvasButtons.Clear();
@@ -123,13 +122,11 @@ namespace MI_GUI_WinUI.ViewModels
                 string basePath = Path.Combine("MotionInput", "data", "assets", "gamepad");
                 string baseResourcePath = $"ms-appx:///{basePath}";
                 string normalImagePath = $"{baseResourcePath}/{button.BasePath}.png";
-                string triggeredImagePath = $"{baseResourcePath}/{button.BasePath}_triggered.png";
 
                 DefaultButtons.Add(new EditorButton
                 {
                     Name = button.Name,
-                    IconPath = normalImagePath, // Store just the filename in File property
-                    TriggeredIconPath = triggeredImagePath,
+                    IconPath = normalImagePath,
                     Category = "Default",
                     Action = null,
                     IsDefault = true
@@ -205,7 +202,6 @@ namespace MI_GUI_WinUI.ViewModels
                 Position = new List<int> { (int)buttonInfo.Position.X, (int)buttonInfo.Position.Y },
                 Radius = (int)(buttonInfo.Size.Width / 2),
                 Skin = buttonInfo.Button.IconPath,
-                TriggeredSkin = buttonInfo.Button.GetTriggeredIconPath(),
                 Action = CreateDefaultActionConfig(buttonInfo.Button)
             };
         }
@@ -219,10 +215,7 @@ namespace MI_GUI_WinUI.ViewModels
             var button = sourceButton?.Clone() ?? new EditorButton
             {
                 Name = element.File,
-                IconPath = ConvertToMsAppxPath(element.Skin),
-                // can be null if element.TriggeredSkin is null
-                TriggeredIconPath = element.TriggeredSkin == null ? null : ConvertToMsAppxPath(element.TriggeredSkin)
-                //TriggeredIconPath = ConvertToMsAppxPath(element.TriggeredSkin)
+                IconPath = ConvertToMsAppxPath(element.Skin)
             };
 
             return new ButtonPositionInfo
@@ -240,7 +233,7 @@ namespace MI_GUI_WinUI.ViewModels
 
             // Remove any leading slashes and combine with base path
             relativePath = relativePath.TrimStart('/');
-            return $"ms-appx:///{relativePath}";
+            return $"ms-appx:///MotionInput/data/assets/{relativePath}";
         }
 
         [RelayCommand]
@@ -365,6 +358,5 @@ namespace MI_GUI_WinUI.ViewModels
             return DefaultButtons.FirstOrDefault(b => b.Name == buttonName) ??
                    CustomButtons.FirstOrDefault(b => b.Name == buttonName);
         }
-
     }
 }

@@ -30,7 +30,6 @@ namespace MI_GUI_WinUI.Pages
         private ResizableImage? activeImage;
         private Point originalPosition;
         private Canvas? EditorCanvasElement => FindName("EditorCanvas") as Canvas;
-        private string? _lastDroppedPath;
         private bool _isAddingFromDrop;
         
         public ProfileEditorPage()
@@ -105,19 +104,13 @@ namespace MI_GUI_WinUI.Pages
             }
         }
 
-        private async Task AddButtonToCanvasWithAnimation(ResizableImage image)
+        private void AddButtonToCanvasWithAnimation(ResizableImage image)
         {
             var scaleTransform = new ScaleTransform();
             image.RenderTransform = scaleTransform;
 
             var storyboard = CreateDropAnimation(scaleTransform);
             storyboard.Begin();
-
-            if (_lastDroppedPath != null)
-            {
-                await SwitchToTriggeredState(image, _lastDroppedPath);
-                _lastDroppedPath = null;
-            }
         }
 
         private void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
@@ -196,7 +189,6 @@ namespace MI_GUI_WinUI.Pages
                 if (string.IsNullOrEmpty(imagePath)) return;
 
                 Point dropPosition = e.GetPosition((UIElement)sender);
-                _lastDroppedPath = imagePath;
 
                 // Find the source button from DefaultButtons or CustomButtons
                 var sourceButton = FindSourceButton(buttonType);
@@ -215,7 +207,7 @@ namespace MI_GUI_WinUI.Pages
                 // Get the last added image and apply animation
                 if (EditorCanvasElement?.Children.LastOrDefault() is ResizableImage lastImage)
                 {
-                    await AddButtonToCanvasWithAnimation(lastImage);
+                    AddButtonToCanvasWithAnimation(lastImage);
                 }
 
                 // Now add to the ViewModel's collection (which won't trigger another visual update due to _isAddingFromDrop)
@@ -274,14 +266,6 @@ namespace MI_GUI_WinUI.Pages
                    ViewModel.CustomButtons.FirstOrDefault(b => b.Name == buttonType);
         }
 
-        private async Task SwitchToTriggeredState(ResizableImage image, string imagePath)
-        {
-            string triggeredPath = imagePath.Replace(".png", "_triggered.png");
-            await Task.Delay(100);
-            image.Source = new BitmapImage(new Uri(triggeredPath));
-            await Task.Delay(200);
-            image.Source = new BitmapImage(new Uri(imagePath));
-        }
 
         private Storyboard CreateDropAnimation(ScaleTransform transform)
         {
