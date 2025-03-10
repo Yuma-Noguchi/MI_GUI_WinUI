@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -86,8 +86,7 @@ namespace MI_GUI_WinUI.ViewModels
                         .Where(p => p.Name != null && p.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                         .ToList();
                 }
-                
-                GenerateGuiElementsPreviews();
+                _logger.LogInformation($"Updated filtered profiles. Count: {_filteredProfiles.Count}");
             }
             catch (Exception ex)
             {
@@ -180,15 +179,18 @@ namespace MI_GUI_WinUI.ViewModels
                 IsPopupOpen = false;
                 SelectedProfilePreview = null;
                 ErrorMessage = null;
+                previews.Clear();
+                _previewCache.Clear();
 
-                // Load profiles if needed
-                if (_profiles.Count == 0)
-                {
-                    await LoadProfilesAsync();
-                }
+                // Load profiles
+                await LoadProfilesAsync();
                 
                 // Generate previews after loading
-                GenerateGuiElementsPreviews();
+                if (_profiles.Count > 0)
+                {
+                    await GenerateGuiElementsPreviewsAsync();
+                    _logger.LogInformation($"Initialization complete. Profile count: {_profiles.Count}, Preview count: {previews.Count}");
+                }
             }
             catch (Exception ex)
             {
@@ -260,8 +262,6 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
-                IsLoading = true;
-                ErrorMessage = null;
                 _profiles = await _profileService.ReadProfilesFromJsonAsync(profilesFolderPath);
                 _logger.LogInformation($"Loaded {_profiles?.Count ?? 0} profiles from {profilesFolderPath}");
                 UpdateFilteredProfiles();
@@ -271,14 +271,11 @@ namespace MI_GUI_WinUI.ViewModels
                 _logger.LogError(ex, "Error loading profiles");
                 ErrorMessage = "Failed to load profiles. Please try again.";
                 _profiles = new List<Profile>();
-            }
-            finally
-            {
-                IsLoading = false;
+                _filteredProfiles = new List<Profile>();
             }
         }
 
-        public async void GenerateGuiElementsPreviews()
+        public async Task GenerateGuiElementsPreviewsAsync()
         {
             try
             {
@@ -291,21 +288,34 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
+                // Remove any cached previews that no longer exist in filtered profiles
+                var filteredProfileNames = _filteredProfiles.Select(p => p.Name).ToHashSet();
+                var keysToRemove = _previewCache.Keys.Where(k => !filteredProfileNames.Contains(k)).ToList();
+                foreach (var key in keysToRemove)
+                {
+                    _previewCache.Remove(key);
+                }
+
+                // Generate previews for filtered profiles
                 foreach (var profile in _filteredProfiles)
                 {
-                    if (_previewCache.TryGetValue(profile.Name, out var cachedPreview))
+                    ProfilePreview? preview;
+                    if (!_previewCache.TryGetValue(profile.Name, out preview))
                     {
-                        previews.Add(cachedPreview);
-                        continue;
+                        preview = await GeneratePreviewForProfileAsync(profile);
+                        if (preview != null)
+                        {
+                            _previewCache[profile.Name] = preview;
+                        }
                     }
 
-                    var preview = await GeneratePreviewForProfileAsync(profile);
                     if (preview != null)
                     {
-                        _previewCache[profile.Name] = preview;
                         previews.Add(preview);
                     }
                 }
+                
+                _logger.LogInformation($"Generated {previews.Count} previews");
             }
             catch (Exception ex)
             {
@@ -422,19 +432,42 @@ namespace MI_GUI_WinUI.ViewModels
                 IsLoading = true;
                 ErrorMessage = null;
                 
-                var profileIndex = _profiles.FindIndex(p => p.Name == profileName);
-                if (profileIndex >= 0)
-                {
-                    _profiles.RemoveAt(profileIndex);
-                    await _profileService.SaveProfilesToJsonAsync(_profiles, profilesFolderPath);
-                    _previewCache.Remove(profileName);
-                    UpdateFilteredProfiles();
-                }
+                _logger.LogInformation($"Starting deletion of profile: {profileName}");
+                
+                // Remove from preview cache first
+                _previewCache.Remove(profileName);
+
+                // Delete the profile file first
+                await _profileService.DeleteProfileAsync(profileName, profilesFolderPath);
+                _logger.LogInformation($"Deleted profile file for: {profileName}");
+
+                // Remove from in-memory list
+                _profiles.RemoveAll(p => p.Name == profileName);
+                _logger.LogInformation($"Removed profile from memory. Remaining profiles: {_profiles.Count}");
+
+                // Update filtered profiles
+                UpdateFilteredProfiles();
+                
+                // Generate new previews
+                await GenerateGuiElementsPreviewsAsync();
+                
+                _logger.LogInformation($"Profile deletion completed. Preview count: {previews.Count}");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error deleting profile: {profileName}");
                 ErrorMessage = "Failed to delete profile.";
+                
+                // Try to reload profiles in case of error to ensure UI consistency
+                try
+                {
+                    await LoadProfilesAsync();
+                    await GenerateGuiElementsPreviewsAsync();
+                }
+                catch (Exception reloadEx)
+                {
+                    _logger.LogError(reloadEx, "Error reloading profiles after delete error");
+                }
             }
             finally
             {
