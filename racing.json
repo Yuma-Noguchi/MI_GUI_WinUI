@@ -1,0 +1,73 @@
+{
+  "gui": [
+    {
+      "file": "button.py",
+      "pos": [60, 70],
+      "radius": 50,
+      "skin": "racing/toggle_switch.png",
+      "action": {
+        "class": "mode_controller",
+        "method": "change_mode",
+        "args": ["snowboarding"]
+      }
+    },
+    {
+      "file": "button.py",
+      "pos": [150, 40],
+      "radius": 25,
+      "skin": "common/hide.png",
+      "toggle": true,
+      "action": {
+        "class": "flags",
+        "method": "toggle",
+        "args": ["tilt_icons_racing"]
+      }
+    },
+    {
+      "file": "button.py",
+      "pos": [600, 40],
+      "radius": 30,
+      "skin": "icons/logo.png",
+      "action": {
+        "class": "system",
+        "method": "open_url",
+        "args": ["https://motioninputapps.com/velocity/"]
+      }
+    }
+  ],
+  "poses": [
+    {
+      "file": "head_tilt_joystick.py",
+      "left_skin": "racing/left_arrow.png",
+      "right_skin": "racing/right_arrow.png",
+      "sensitivity": 0.75,
+      "deadzone": 1,
+      "linear": false,
+      "flag": "tilt_icons_racing"
+    },
+    {
+      "file": "hit_trigger.py",
+      "landmark": "right_wrist",
+      "pos": [550, 360],
+      "radius": 60,
+      "skin": "racing/forward.png",
+      "action": {
+        "class": "ds4_gamepad",
+        "method": "right_trigger",
+        "args": [0.75]
+      }
+    },
+    {
+      "file": "hit_trigger.py",
+      "landmark": "left_wrist",
+      "pos": [90, 360],
+      "radius": 60,
+      "skin": "racing/backward.png",
+      "action": {
+        "class": "ds4_gamepad",
+        "method": "left_trigger",
+        "args": [1.0]
+      }
+    }
+  ]
+}

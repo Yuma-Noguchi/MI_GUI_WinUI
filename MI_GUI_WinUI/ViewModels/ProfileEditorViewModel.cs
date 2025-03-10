@@ -196,11 +196,16 @@ namespace MI_GUI_WinUI.ViewModels
 
         private GuiElement ConvertToGuiElement(ButtonPositionInfo buttonInfo)
         {
+            // Calculate center position by adding radius to top-left corner
+            int radius = (int)(buttonInfo.Size.Width / 2);
             return new GuiElement
             {
                 File = buttonInfo.Button.Name,
-                Position = new List<int> { (int)buttonInfo.Position.X, (int)buttonInfo.Position.Y },
-                Radius = (int)(buttonInfo.Size.Width / 2),
+                Position = new List<int> { 
+                    (int)(buttonInfo.Position.X + radius),  // X center
+                    (int)(buttonInfo.Position.Y + radius)   // Y center
+                },
+                Radius = radius,
                 Skin = buttonInfo.Button.IconPath,
                 Action = CreateDefaultActionConfig(buttonInfo.Button)
             };
@@ -218,11 +223,16 @@ namespace MI_GUI_WinUI.ViewModels
                 IconPath = ConvertToMsAppxPath(element.Skin)
             };
 
+            // Calculate top-left position by subtracting radius from center
+            var diameter = element.Radius * 2;
             return new ButtonPositionInfo
             {
                 Button = button,
-                Position = new Point(element.Position[0], element.Position[1]),
-                Size = new Size(element.Radius * 2, element.Radius * 2)
+                Position = new Point(
+                    element.Position[0] - element.Radius,  // X top-left
+                    element.Position[1] - element.Radius   // Y top-left
+                ),
+                Size = new Size(diameter, diameter)
             };
         }
 

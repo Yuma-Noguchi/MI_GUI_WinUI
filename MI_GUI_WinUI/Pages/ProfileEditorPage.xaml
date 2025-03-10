@@ -118,14 +118,15 @@
                 <!-- Right Panel - Canvas -->
                 <Border 
                     Grid.Row="0"
-                    BorderBrush="{ThemeResource SystemBaseLowColor}"
-                    BorderThickness="1,0,0,0"
-                    Padding="16">
+                    BorderBrush="AliceBlue"
+                    BorderThickness="1,0,0,0">
                     <Border
                         BorderBrush="{ThemeResource SystemListLowColor}"
                         BorderThickness="2"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}"
                         CornerRadius="8"
+                        Background="AliceBlue"
+                        Height="480"
+                        Width="640"
                        >
                         <Grid>
                             <TextBlock
@@ -142,7 +143,8 @@
                                 DragOver="EditorCanvas_DragOver"
                                 Drop="EditorCanvas_Drop"
                                 Height="480"
-                                Width="640"/>
+                                Width="640"
+                                HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
                 </Border>

@@ -20,6 +20,7 @@ using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MI_GUI_WinUI.Pages
 {
@@ -188,7 +189,12 @@ namespace MI_GUI_WinUI.Pages
 
                 if (string.IsNullOrEmpty(imagePath)) return;
 
-                Point dropPosition = e.GetPosition((UIElement)sender);
+                // Get the position relative to the canvas
+                Point dropPosition = e.GetPosition(EditorCanvasElement);
+                
+                // Ensure position stays within canvas bounds
+                dropPosition.X = Math.Max(DROPPED_IMAGE_SIZE/2, Math.Min(dropPosition.X, 640 - DROPPED_IMAGE_SIZE/2));
+                dropPosition.Y = Math.Max(DROPPED_IMAGE_SIZE/2, Math.Min(dropPosition.Y, 480 - DROPPED_IMAGE_SIZE/2));
 
                 // Find the source button from DefaultButtons or CustomButtons
                 var sourceButton = FindSourceButton(buttonType);
@@ -197,7 +203,10 @@ namespace MI_GUI_WinUI.Pages
                 var buttonInfo = new ButtonPositionInfo
                 {
                     Button = sourceButton.Clone(),
-                    Position = new Point(dropPosition.X - DROPPED_IMAGE_SIZE / 2, dropPosition.Y - DROPPED_IMAGE_SIZE / 2),
+                    Position = new Point(
+                        Math.Round(dropPosition.X - DROPPED_IMAGE_SIZE / 2), // Round to nearest pixel
+                        Math.Round(dropPosition.Y - DROPPED_IMAGE_SIZE / 2)
+                    ),
                     Size = new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
                 };
 
@@ -234,10 +243,20 @@ namespace MI_GUI_WinUI.Pages
         {
             if (activeImage == null) return;
 
-            Point newPosition = new Point(
-                originalPosition.X + e.Cumulative.Translation.X,
-                originalPosition.Y + e.Cumulative.Translation.Y
-            );
+            // Calculate new position
+            var newX = originalPosition.X + e.Cumulative.Translation.X;
+            var newY = originalPosition.Y + e.Cumulative.Translation.Y;
+
+            // Ensure the center of the button stays within canvas bounds
+            var radius = activeImage.ActualWidth / 2;
+            newX = Math.Max(radius, Math.Min(newX + radius, 640 - radius)) - radius;
+            newY = Math.Max(radius, Math.Min(newY + radius, 480 - radius)) - radius;
+
+            // Round to nearest pixel for grid alignment
+            newX = Math.Round(newX);
+            newY = Math.Round(newY);
+
+            Point newPosition = new Point(newX, newY);
 
             // Update visual position
             Canvas.SetLeft(activeImage, newPosition.X);

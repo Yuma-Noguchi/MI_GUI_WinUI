@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -46,28 +46,40 @@ public struct GuiElement
     public ActionConfig Action { get; set; }
 }
 
-public struct PoseConfig
+public struct PoseGuiElement
 {
     [JsonProperty("file")]
     public string File { get; set; }
 
-    [JsonProperty("x")]
-    public int X { get; set; }
+    [JsonProperty("left_skin")]
+    public string LeftSkin { get; set; }
 
-    [JsonProperty("y")]
-    public int Y { get; set; }
+    [JsonProperty("right_skin")]
+    public string RightSkin { get; set; }
 
-    [JsonProperty("jitter_correction_strength")]
-    public int JitterCorrectionStrength { get; set; }
+    [JsonProperty("sensitivity")]
+    public double Sensitivity { get; set; }
 
-    [JsonProperty("finger")]
-    public string Finger { get; set; }
+    [JsonProperty("deadzone")]
+    public int Deadzone { get; set; }
 
-    [JsonProperty("pinch_threshold")]
-    public int PinchThreshold { get; set; }
+    [JsonProperty("linear")]
+    public bool Linear { get; set; }
 
-    [JsonProperty("unpinch_threshold")]
-    public int UnpinchThreshold { get; set; }
+    [JsonProperty("flag")]
+    public string Flag { get; set; }
+
+    [JsonProperty("landmark")]
+    public string Landmark { get; set; }
+
+    [JsonProperty("pos")]
+    public List<int> Position { get; set; }
+
+    [JsonProperty("radius")]
+    public int Radius { get; set; }
+
+    [JsonProperty("skin")]
+    public string Skin { get; set; }
 
     [JsonProperty("action")]
     public ActionConfig Action { get; set; }
@@ -103,7 +115,7 @@ public struct Profile
     public required List<GuiElement> GuiElements { get; set; }
 
     [JsonProperty("poses")]
-    public required List<PoseConfig> Poses { get; set; }
+    public required List<PoseGuiElement> Poses { get; set; }
 
     [JsonProperty("speech")]
     public required Dictionary<string, SpeechCommand> SpeechCommands { get; set; }
