@@ -1,4 +1,4 @@
-﻿﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -60,7 +60,7 @@ namespace MI_GUI_WinUI
             services.AddSingleton<SelectProfilesViewModel>();
             services.AddSingleton<ActionStudioViewModel>();
             services.AddSingleton<IconStudioViewModel>();
-            services.AddSingleton<ProfileEditorViewModel>();
+            services.AddTransient<ProfileEditorViewModel>();
 
             // Register converters
             services.AddSingleton<StringToBoolConverter>();

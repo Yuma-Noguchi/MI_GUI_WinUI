@@ -182,7 +182,7 @@ namespace MI_GUI_WinUI.ViewModels
 
         public bool IsNotGenerating => !IsGenerating;
         public bool IsReady => _sdService.IsInitialized && !IsInitializing;
-        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
 
         partial void OnIsGeneratingChanged(bool value)
         {
@@ -200,7 +200,7 @@ namespace MI_GUI_WinUI.ViewModels
             OnPropertyChanged(nameof(CanGenerate));
         }
 
-        partial void OnPromptChanged(string value)
+        partial void OnInputDescriptionChanged(string value)
         {
             OnPropertyChanged(nameof(CanGenerate));
         }

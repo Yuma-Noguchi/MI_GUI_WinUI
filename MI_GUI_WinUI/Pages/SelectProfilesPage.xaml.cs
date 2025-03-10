@@ -65,9 +65,8 @@ namespace MI_GUI_WinUI.Pages
 
                 if (_viewModel != null)
                 {
-                    // Initialize profiles and generate previews
+                    // Initialize profiles (preview generation is handled inside)
                     await _viewModel.InitializeAsync();
-                    _viewModel.GenerateGuiElementsPreviews();
                 }
                 else
                 {
