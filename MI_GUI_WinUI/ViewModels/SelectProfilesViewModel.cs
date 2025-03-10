@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Newtonsoft.Json;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Pages;
 using MI_GUI_WinUI.Services;
@@ -354,10 +355,44 @@ namespace MI_GUI_WinUI.ViewModels
                                 Canvas.SetLeft(image, guiElement.Position[0] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 Canvas.SetTop(image, guiElement.Position[1] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 preview.Children.Add(image);
+                            }
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Error loading image for {guiElement.Skin}");
+                        }
+                    }
+                }
+
+                // Add poses to preview
+                if (profile.Poses != null)
+                {
+                    foreach (PoseGuiElement pose in profile.Poses)
+                    {
+                        try
+                        {
+                            string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin);
+                            // Create a GuiElement-like structure for loading the image
+                            var poseAsGuiElement = new GuiElement
+                            {
+                                Position = pose.Position,
+                                Radius = pose.Radius,
+                                Skin = pose.Skin
+                            };
+                            
+                            var image = await LoadImageAsync(poseFilePath, poseAsGuiElement);
+                            
+                            if (image != null)
+                            {
+                                // Scale positions and offset by scaled radius
+                                Canvas.SetLeft(image, pose.Position[0] * SCALE_FACTOR - (pose.Radius * SCALE_FACTOR));
+                                Canvas.SetTop(image, pose.Position[1] * SCALE_FACTOR - (pose.Radius * SCALE_FACTOR));
+                                preview.Children.Add(image);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error loading image for pose {pose.File}");
                         }
                     }
                 }
@@ -411,6 +446,7 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
+                // Load the full profile data
                 var profile = GetProfileByName(profileName);
                 if (profile == null)
                 {
@@ -419,8 +455,8 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Ensure we have all profile data
-                _logger.LogInformation($"Found profile with {profile?.GuiElements?.Count ?? 0} GUI elements");
+                // Log the profile data
+                _logger.LogInformation($"Found profile with {profile?.GuiElements?.Count ?? 0} GUI elements and {profile?.Poses?.Count ?? 0} poses");
 
                 // Navigate to editor with the profile
                 _navigationService.Navigate<ProfileEditorPage>(profile);

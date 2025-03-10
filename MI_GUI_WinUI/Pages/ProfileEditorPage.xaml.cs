@@ -339,7 +339,7 @@ namespace MI_GUI_WinUI.Pages
 
             var image = new ResizableImage
             {
-                Source = new BitmapImage(new Uri(poseInfo.Pose.Skin)),
+                Source = new BitmapImage(new Uri($"ms-appx:///MotionInput/data/assets/{poseInfo.Pose.Skin}")),
                 Width = poseInfo.Size.Width,
                 Height = poseInfo.Size.Height,
                 Tag = poseInfo.Pose.File,
