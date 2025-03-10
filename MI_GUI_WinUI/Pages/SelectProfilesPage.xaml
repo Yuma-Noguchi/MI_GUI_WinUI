@@ -15,8 +15,8 @@
         <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
     </Page.Resources>
 
-    <Grid Margin="36,40">
-        <Grid x:Name="MainContent">
+    <Grid>
+        <Grid x:Name="MainContent" Margin="36,40">
             <!-- Blur effect when popup is open -->
             <Grid.Resources>
                 <ThemeShadow x:Name="SharedShadow"/>
@@ -25,35 +25,25 @@
                 <ThemeShadow/>
             </Grid.Shadow>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Error Bar -->
+                <RowDefinition Height="*"/>    <!-- Content -->
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
                 <controls:PageHeader Grid.Row="0" Title="Select Profiles"/>
             </Grid>
 
-            <AutoSuggestBox
-                Grid.Row="1"
-                Margin="0,24"
-                Width="300"
-                HorizontalAlignment="Left"
-                PlaceholderText="Search Profiles"
-                Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                QueryIcon="Find"/>
-
             <!-- Error Message -->
             <InfoBar
-                Grid.Row="2"
+                Grid.Row="1"
                 IsOpen="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}"
                 Message="{Binding ErrorMessage}"
                 Severity="Error"
                 Title="Error"/>
 
             <!-- Loading State -->
-            <Grid Grid.Row="3"
+            <Grid Grid.Row="2"
                    Visibility="{Binding IsLoading}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <ProgressRing IsActive="True" Width="50" Height="50"/>
@@ -64,7 +54,7 @@
             </Grid>
 
             <!-- Profile Grid -->
-            <ScrollViewer Grid.Row="3"
+            <ScrollViewer Grid.Row="2"
                          HorizontalScrollBarVisibility="Disabled"
                          VerticalScrollBarVisibility="Auto"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityInverseConverter}}">
@@ -72,8 +62,8 @@
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"
-                                         MaximumRowsOrColumns="4"
-                                         HorizontalAlignment="Center"/>
+                                     HorizontalAlignment="Center"
+                                     Width="{Binding ActualWidth}"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -85,13 +75,23 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     CommandParameter="{Binding}">
-                                    <Border Margin="10"
+                                    <Border Margin="8"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="4">
-                                        <ContentPresenter Content="{Binding Canvas}"/>
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        CornerRadius="8"
+                                        MinWidth="240"
+                                        MaxWidth="320"
+                                        Translation="0,0,8">
+                                        <Border.Shadow>
+                                            <ThemeShadow />
+                                        </Border.Shadow>
+                                        <Grid>
+                                            <ContentPresenter Content="{Binding Canvas}"/>
+                                        </Grid>
                                     </Border>
                                 </Button>
-                                <Grid Margin="20,10">
+                                <Grid Margin="20,10" Height="60">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -139,10 +139,22 @@
                         CornerRadius="8"
                         Padding="24">
 
-                    <Border Margin="0,0,0,16"
-                            BorderThickness="1"
-                            CornerRadius="4">
-                        <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"/>
+                        <Border Margin="0,0,0,16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderThickness="1"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        CornerRadius="8"
+                        MaxWidth="640"
+                        MaxHeight="480"
+                        Translation="0,0,8">
+                        <Border.Shadow>
+                            <ThemeShadow />
+                        </Border.Shadow>
+                        <Grid MaxWidth="640" MaxHeight="480">
+                            <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                        </Grid>
                     </Border>
 
                     <TextBlock Text="{Binding SelectedProfilePreview.ProfileName}"

@@ -182,7 +182,7 @@ namespace MI_GUI_WinUI.ViewModels
 
         public bool IsNotGenerating => !IsGenerating;
         public bool IsReady => _sdService.IsInitialized && !IsInitializing;
-        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(Prompt);
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
 
         partial void OnIsGeneratingChanged(bool value)
         {
@@ -200,14 +200,12 @@ namespace MI_GUI_WinUI.ViewModels
             OnPropertyChanged(nameof(CanGenerate));
         }
 
-        partial void OnPromptChanged(string value)
+        partial void OnInputDescriptionChanged(string value)
         {
             OnPropertyChanged(nameof(CanGenerate));
         }
 
-        //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
-        private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
-        //private string helperPrompt = "";
+        private string helperPrompt = "{}";
 
         private string BuildFinalPrompt(string prompt)
         {

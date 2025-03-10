@@ -24,6 +24,7 @@
                 Grid.Column="1"
                 Style="{StaticResource DefaultButtonStyle}"
                 Click="HomeButton_Click"
+                IsEnabled="{x:Bind HomeButtonEnabled, Mode=OneWay}"
                 Margin="12">
             <SymbolIcon Symbol="Home"/>
         </Button>

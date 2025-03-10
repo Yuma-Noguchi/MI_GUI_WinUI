@@ -53,7 +53,9 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <controls:PageHeader Grid.Row="0" Title="{x:Bind ViewModel.Title, Mode=OneWay}"/>
+        <controls:PageHeader Grid.Row="0" 
+                          Title="{x:Bind ViewModel.Title, Mode=OneWay}"
+                          HomeButtonEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
 
         <!-- Main content -->
         <Grid Grid.Row="1" Margin="20">
@@ -105,29 +107,25 @@
                     </Border>
                 </Grid>
 
-                <!-- GPU/CPU Selection -->
-                <StackPanel>
-                    <ToggleSwitch Header="Use GPU"
-                                IsOn="{x:Bind ViewModel.UseGpu, Mode=TwoWay}"
-                                IsEnabled="{x:Bind ViewModel.IsNotGenerating, Mode=OneWay}"/>
-                    <TextBlock Text="GPU acceleration requires DirectML support"
-                             Style="{StaticResource CaptionTextBlockStyle}"
-                             Foreground="{ThemeResource TextFillColorSecondary}"/>
-                </StackPanel>
-
                 <!-- Prompt Input -->
                 <TextBox Header="Prompt"
                         Text="{Binding InputDescription, Mode=TwoWay}"
                         AcceptsReturn="True"
                         TextWrapping="Wrap"
-                        Height="100"
-                        PlaceholderText="Enter a description of the icon you want to generate..."
+                        Height="120"
+                        Padding="12,8"
+                        BorderThickness="1"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        CornerRadius="4"
+                        PlaceholderText="Describe your icon, e.g. 'A minimalist gamepad icon in flat design style'..."
                         IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
 
                 <!-- Generate Button -->
                 <Button Content="Generate Icon"
                         Command="{Binding GenerateCommand}"
+                        IsEnabled="{x:Bind ViewModel.CanGenerate, Mode=OneWay}"
                         HorizontalAlignment="Stretch"
+                        Height="40"
                         Style="{ThemeResource AccentButtonStyle}"/>
 
                 <!-- Generation Progress -->
@@ -165,12 +163,12 @@
                         </Storyboard>
                     </Grid.Resources>
                     <ProgressBar x:Name="ProgressBar"
-                                Value="{Binding ProgressPercentage}"
+                                Value="{Binding Progress}"
                                 IsIndeterminate="False"
                                 Maximum="100"
                                 Height="6"
                                 Margin="0,0,0,8"
-                                Foreground="Blue"
+                                Foreground="{ThemeResource SystemAccentColor}"
                                 Background="{ThemeResource CardStrokeColorDefaultBrush}"
                                 CornerRadius="3"/>
                     <StackPanel HorizontalAlignment="Center" Margin="0,12,0,8">
@@ -201,41 +199,48 @@
                 </Grid>
 
                 <!-- Save Section -->
-                <StackPanel Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}">
+                <StackPanel Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}"
+                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                          BorderBrush="{ThemeResource SystemFillColorSuccessBackground}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="16"
+                          Spacing="12">
                     <TextBox Header="Icon Name"
                             Text="{x:Bind ViewModel.IconName, Mode=TwoWay}"
-                            PlaceholderText="Enter a name for your icon..."
-                            Margin="0,12,0,0"/>
+                            PlaceholderText="Enter a name for your icon..."/>
                     <Button Content="Save Icon"
                             Command="{x:Bind ViewModel.SaveCommand}"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,12,0,0"/>
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Height="40"
+                            HorizontalAlignment="Stretch"/>
                 </StackPanel>
             </StackPanel>
 
             <!-- Preview Panel -->
-            <Grid Grid.Column="1">
-                <ListBox
-                     VerticalAlignment="Center"
-                     Margin="10,0,20,0"
-                     MinWidth="530"
-                     Height="350"
-                     ItemsSource="{Binding Images}"
-                     Style="{StaticResource ImageListBoxStyle}">
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Image Source="{Binding }"
-                               Width="330" Height="330"
+            <Grid Grid.Column="1" Margin="20,0">
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="24">
+                    <Grid MinWidth="530" Height="350">
+                        <TextBlock Text="Generated icon will appear here"
+                                 Foreground="{ThemeResource TextFillColorSecondary}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 FontSize="16"
+                                 Opacity="0.7"
+                                 Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay, Converter={StaticResource BoolToVisibilityInverseConverter}}"/>
+                        <Image Source="{Binding Images[0]}"
+                               Width="450" Height="450"
                                Stretch="UniformToFill"
-                               Margin="5"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{x:Bind ViewModel.IsImageGenerated, Mode=OneWay}"/>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
     </Grid>
