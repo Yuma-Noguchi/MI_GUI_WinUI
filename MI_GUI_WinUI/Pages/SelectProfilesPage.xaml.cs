@@ -152,24 +152,6 @@ namespace MI_GUI_WinUI.Pages
             }
         }
 
-        private async void SelectProfile_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewModel?.SelectedProfilePreview != null)
-            {
-                try
-                {
-                    string selectedProfileName = ViewModel.SelectedProfilePreview.ProfileName;
-                    ViewModel.SelectedProfile = selectedProfileName;
-                    await ViewModel.ClosePopupAsync();
-                    // Additional navigation or profile loading logic can be added here
-                }
-                catch (Exception)
-                {
-                    ViewModel.ErrorMessage = "Error selecting profile.";
-                }
-            }
-        }
-
         private async void BackToList_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel != null)

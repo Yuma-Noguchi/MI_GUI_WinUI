@@ -62,12 +62,14 @@ namespace MI_GUI_WinUI.ViewModels
 
             foreach (var button in defaultButtons)
             {
-                string normalImagePath = $"ms-appx:///MotionInput/data/assets/gamepad/{button.BasePath}.png";
+                string relativePath = $"gamepad/{button.BasePath}.png";
+                string displayPath = Utils.FileNameHelper.GetFullAssetPath(relativePath);
 
                 DefaultButtons.Add(new EditorButton
                 {
                     Name = button.Name,
-                    IconPath = normalImagePath,
+                    IconPath = displayPath,
+                    FileName = relativePath,
                     IsDefault = true
                 });
             }
@@ -86,9 +88,13 @@ namespace MI_GUI_WinUI.ViewModels
                     foreach (var file in files)
                     {
                         var fileName = Path.GetFileNameWithoutExtension(file);
+                        string relativePath = $"generated_icons/{Path.GetFileName(file)}";
+                        string displayPath = Utils.FileNameHelper.GetFullAssetPath(relativePath);
+                        
                         CustomButtons.Add(new EditorButton(
                             name: fileName,
-                            iconPath: $"ms-appx:///MotionInput/data/assets/generated_icons/{Path.GetFileName(file)}",
+                            iconPath: displayPath,
+                            fileName: relativePath,
                             isDefault: false
                         ));
                     }
@@ -114,8 +120,15 @@ namespace MI_GUI_WinUI.ViewModels
 
         public void AddElementToCanvas(ElementAddRequest request)
         {
+            var element = request.Element;
+            var updatedElement = element with 
+            {
+                // Update skin to be relative path if FileName is set in EditorButton
+                Skin = request.Button?.FileName ?? element.Skin
+            };
+
             var info = new UnifiedPositionInfo(
-                request.Element,
+                updatedElement,
                 request.Position,
                 new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
             );

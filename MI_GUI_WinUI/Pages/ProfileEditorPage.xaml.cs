@@ -273,9 +273,12 @@ namespace MI_GUI_WinUI.Pages
                 {
                     _isAddingFromDrop = true;
                     
+                    // Convert element skin to full path for display
+                    var elementWithDisplayPath = request.Element.WithSkin(Utils.FileNameHelper.GetFullAssetPath(request.Element.Skin));
+                    
                     // Create the position info with proper positioning
                     var elementInfo = new UnifiedPositionInfo(
-                        request.Element,
+                        elementWithDisplayPath,
                         new Point(
                             dropPosition.X - DROPPED_IMAGE_SIZE/2, // Calculate top-left from center
                             dropPosition.Y - DROPPED_IMAGE_SIZE/2

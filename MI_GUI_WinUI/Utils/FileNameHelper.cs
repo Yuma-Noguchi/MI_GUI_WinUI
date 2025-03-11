@@ -28,5 +28,21 @@ namespace MI_GUI_WinUI.Utils
 
             return fileName.Trim();
         }
+
+        public static string ConvertToAssetsRelativePath(string fullPath)
+        {
+            // Extract everything after "assets/"
+            int index = fullPath.IndexOf("assets/");
+            if (index >= 0)
+            {
+                return fullPath.Substring(index + "assets/".Length);
+            }
+            return fullPath;
+        }
+
+        public static string GetFullAssetPath(string relativePath)
+        {
+            return $"ms-appx:///MotionInput/data/assets/{relativePath}";
+        }
     }
 }

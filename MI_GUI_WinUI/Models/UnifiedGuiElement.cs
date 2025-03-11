@@ -54,13 +54,13 @@ namespace MI_GUI_WinUI.Models
         {
             return new UnifiedGuiElement
             {
-                File = "button",
+                File = "button.py",
                 Position = new List<int> { x, y },
                 Radius = radius,
                 Action = new Models.ActionConfig
                 {
                     ClassName = "ds4_gamepad",
-                    MethodName = "",
+                    MethodName = "press",
                     Arguments = new List<object>()
                 }
             };
@@ -76,7 +76,7 @@ namespace MI_GUI_WinUI.Models
                 Action = new Models.ActionConfig
                 {
                     ClassName = "ds4_gamepad",
-                    MethodName = "",
+                    MethodName = "press",
                     Arguments = new List<object>()
                 },
                 _landmarks = new List<string> { "RIGHT_WRIST" },
@@ -123,7 +123,7 @@ namespace MI_GUI_WinUI.Models
             File = File,
             Position = Position,
             Radius = Radius,
-            Skin = Skin,
+            Skin = Utils.FileNameHelper.ConvertToAssetsRelativePath(Skin),
             Action = Action
         };
 
@@ -132,7 +132,7 @@ namespace MI_GUI_WinUI.Models
             File = File,
             Position = Position,
             Radius = Radius,
-            Skin = Skin,
+            Skin = Utils.FileNameHelper.ConvertToAssetsRelativePath(Skin),
             LeftSkin = LeftSkin ?? string.Empty,
             RightSkin = RightSkin ?? string.Empty,
             Sensitivity = Sensitivity ?? 1.0,
@@ -147,7 +147,7 @@ namespace MI_GUI_WinUI.Models
             File = element.File,
             Position = element.Position,
             Radius = element.Radius,
-            Skin = element.Skin,
+            Skin = Utils.FileNameHelper.GetFullAssetPath(element.Skin),
             Action = element.Action
         };
 
@@ -156,7 +156,7 @@ namespace MI_GUI_WinUI.Models
             File = element.File,
             Position = element.Position,
             Radius = element.Radius,
-            Skin = element.Skin,
+            Skin = Utils.FileNameHelper.GetFullAssetPath(element.Skin),
             LeftSkin = element.LeftSkin,
             RightSkin = element.RightSkin,
             Sensitivity = element.Sensitivity,

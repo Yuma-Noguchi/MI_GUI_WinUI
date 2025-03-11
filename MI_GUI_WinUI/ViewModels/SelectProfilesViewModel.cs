@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Newtonsoft.Json;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Pages;
@@ -26,6 +27,7 @@ namespace MI_GUI_WinUI.ViewModels
     {
         private readonly ILogger<SelectProfilesViewModel> _logger;
         private readonly INavigationService _navigationService;
+        private readonly MotionInputService _motionInputService;
         private readonly Dictionary<string, ProfilePreview> _previewCache = new();
 
         [ObservableProperty]
@@ -61,11 +63,16 @@ namespace MI_GUI_WinUI.ViewModels
         private List<Profile> _profiles = new();
         private List<Profile> _filteredProfiles = new();
 
-        public SelectProfilesViewModel(ProfileService profileService, ILogger<SelectProfilesViewModel> logger, INavigationService navigationService)
+        public SelectProfilesViewModel(
+            ProfileService profileService, 
+            ILogger<SelectProfilesViewModel> logger, 
+            INavigationService navigationService,
+            MotionInputService motionInputService)
         {
             _logger = logger;
             _profileService = profileService;
             _navigationService = navigationService;
+            _motionInputService = motionInputService;
         }
 
         private Profile? GetProfileByName(string name)
@@ -536,6 +543,42 @@ namespace MI_GUI_WinUI.ViewModels
         internal void Help()
         {
             // TODO: Implement help functionality
+        }
+
+        [RelayCommand]
+        private async Task SelectProfileAsync()
+        {
+            if (SelectedProfilePreview == null) return;
+            
+            try
+            {
+                // replace white spaces with underscores
+                var _profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
+                                    // copy the selected profile file to MotionInput/data/modes
+                    string sourcePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, profilesFolderPath, $"{_profileName}.json");
+                    string destPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "modes", $"{_profileName}.json");
+                    File.Copy(sourcePath, destPath, true);
+                // Start Motion Input with selected profile
+                bool success = await _motionInputService.Start(_profileName);
+                
+                if (success)
+                {
+  
+
+                    
+                    await ClosePopupAsync();
+                    
+                }
+                else
+                {
+                    ErrorMessage = "Failed to launch MotionInput.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error selecting profile");
+                ErrorMessage = "Error launching MotionInput.";
+            }
         }
     }
 }

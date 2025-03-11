@@ -13,6 +13,7 @@
     <Page.Resources>
         <converters:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverseConverter"/>
         <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
     </Page.Resources>
 
     <Grid>
@@ -171,9 +172,10 @@
                                 <TextBlock Text="Back"/>
                             </StackPanel>
                         </Button>
-                        <Button Click="SelectProfile_Click"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Width="120">
+                        <Button Command="{x:Bind ViewModel.SelectProfileCommand}"
+                               IsEnabled="{x:Bind ViewModel.SelectedProfilePreview, Mode=OneWay, Converter={StaticResource NullToBoolConverter}}"
+                               Style="{StaticResource AccentButtonStyle}"
+                               Width="120">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Accept"/>
                                 <TextBlock Text="Select"/>

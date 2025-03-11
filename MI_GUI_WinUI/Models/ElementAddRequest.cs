@@ -1,5 +1,6 @@
+using System;
 using Windows.Foundation;
-using System.Collections.Generic;
+using MI_GUI_WinUI.Models;
 
 namespace MI_GUI_WinUI.Models
 {
@@ -7,64 +8,49 @@ namespace MI_GUI_WinUI.Models
     {
         public UnifiedGuiElement Element { get; }
         public Point Position { get; }
-        public int Radius { get; }
+        public EditorButton? Button { get; }
 
-        private ElementAddRequest(UnifiedGuiElement element, Point dropPosition, int radius)
+        public ElementAddRequest(UnifiedGuiElement element, Point position, EditorButton? button = null)
         {
-            Radius = radius;
-            // Store the top-left position for the visual element
-            Position = new Point(dropPosition.X, dropPosition.Y);
-
-            // Update the element's center position
-            var centerX = (int)(dropPosition.X + radius);
-            var centerY = (int)(dropPosition.Y + radius);
-            
-            Element = element with
-            {
-                Position = new List<int> { centerX, centerY },
-                Radius = radius
-            };
-        }
-
-        public static ElementAddRequest CreateButtonRequest(string imagePath, Point position, int radius)
-        {
-            var element = UnifiedGuiElement.CreateGuiElement() with
-            {
-                Skin = imagePath,
-                Action = new ActionConfig
-                {
-                    ClassName = "ds4_gamepad",
-                    MethodName = "button_down",
-                    Arguments = new List<object> { "A" }
-                }
-            };
-            
-            return new ElementAddRequest(element, position, radius);
-        }
-
-        public static ElementAddRequest CreatePoseRequest(Point position, int radius)
-        {
-            var element = UnifiedGuiElement.CreatePoseElement() with
-            {
-                Skin = "ms-appx:///MotionInput/data/assets/racing/forward.png",
-                Landmarks = new List<string> { "RIGHT_WRIST" },
-                Action = new ActionConfig
-                {
-                    ClassName = "ds4_gamepad",
-                    MethodName = "right_trigger",
-                    Arguments = new List<object> { "0.75" }
-                }
-            };
-
-            return new ElementAddRequest(element, position, radius);
+            Element = element;
+            Position = position;
+            Button = button;
         }
 
         public static ElementAddRequest FromExisting(UnifiedGuiElement element, Point position)
         {
-            // Calculate the top-left position from center
-            var topLeftX = position.X - element.Radius;
-            var topLeftY = position.Y - element.Radius;
-            return new ElementAddRequest(element, new Point(topLeftX, topLeftY), element.Radius);
+            return new ElementAddRequest(element, position);
+        }
+
+        public static ElementAddRequest FromButton(EditorButton button, Point position, bool isPose = false)
+        {
+            var element = isPose ? UnifiedGuiElement.CreatePoseElement() : UnifiedGuiElement.CreateGuiElement();
+            element = element.WithSkin(button.FileName);  // Use FileName for relative path
+            return new ElementAddRequest(element, position, button);
+        }
+
+        public static ElementAddRequest CreatePoseRequest(Point position, int radius)
+        {
+            var element = UnifiedGuiElement.CreatePoseElement(
+                (int)position.X,
+                (int)position.Y,
+                radius
+            );
+            return new ElementAddRequest(element, position);
+        }
+
+        public static ElementAddRequest CreateButtonRequest(string imagePath, Point position, int radius)
+        {
+            // Convert display path to relative path for storage
+            string relativePath = Utils.FileNameHelper.ConvertToAssetsRelativePath(imagePath);
+
+            var element = UnifiedGuiElement.CreateGuiElement(
+                (int)position.X,
+                (int)position.Y,
+                radius
+            ).WithSkin(relativePath);
+            
+            return new ElementAddRequest(element, position);
         }
     }
 }
