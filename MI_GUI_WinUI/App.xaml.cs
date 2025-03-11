@@ -67,11 +67,7 @@ namespace MI_GUI_WinUI
             services.AddSingleton<StringToBoolConverter>();
             services.AddSingleton<BoolToVisibilityInverseConverter>();
             services.AddSingleton<BoolToVisibilityConverter>();
-            services.AddSingleton<ArgumentDescriptionConverter>();
             services.AddSingleton<NumberToVisibilityConverter>();
-
-            // Register dialog view models
-            services.AddTransient<ActionConfigurationDialogViewModel>();
 
             // Register pages
             services.AddTransient<HomePage>();

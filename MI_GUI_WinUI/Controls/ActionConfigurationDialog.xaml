@@ -15,14 +15,14 @@
     Height="600">
 
     <ContentDialog.Resources>
-        <converters:ArgumentDescriptionConverter x:Key="ArgumentDescriptionConverter"/>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <x:Double x:Key="ContentDialogMaxWidth">800</x:Double>
     </ContentDialog.Resources>
 
     <ScrollViewer>
         <StackPanel Spacing="12">
             <InfoBar
-                IsOpen="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}"
                 Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
                 Severity="Error"
                 IsClosable="False"/>
@@ -52,12 +52,12 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.Arguments}">
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.ArgumentsWithDescriptions}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBox Header="{Binding Converter={StaticResource ArgumentDescriptionConverter}}"
-                                         Text="{Binding Mode=TwoWay}"
-                                         Margin="0,4,0,0"/>
+                            <DataTemplate x:DataType="models:ArgumentInfo">
+                                <TextBox Header="{x:Bind Description}"
+                                        Text="{x:Bind Value, Mode=TwoWay}"
+                                        Margin="0,4,0,0"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

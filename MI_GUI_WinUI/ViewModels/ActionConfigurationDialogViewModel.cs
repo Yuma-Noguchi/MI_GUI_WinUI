@@ -20,6 +20,8 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string validationMessage = string.Empty;
 
+        public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
+
         [ObservableProperty]
         private ObservableCollection<MethodDescription> availableMethods;
 
@@ -30,7 +32,7 @@ namespace MI_GUI_WinUI.ViewModels
         private MethodDescription selectedMethod;
 
         [ObservableProperty]
-        private ObservableCollection<string> arguments;
+        private ObservableCollection<ArgumentInfo> argumentsWithDescriptions = new();
 
         // Pose detection properties
         [ObservableProperty]
@@ -82,7 +84,7 @@ namespace MI_GUI_WinUI.ViewModels
             CancelCommand = new RelayCommand(Cancel);
 
             SelectedClass = "ds4_gamepad";
-            Arguments = new ObservableCollection<string>();
+            ArgumentsWithDescriptions = new ObservableCollection<ArgumentInfo>();
             SelectedMethod = AvailableMethods[0];
             UpdateArgumentInputs();
         }
@@ -112,12 +114,14 @@ namespace MI_GUI_WinUI.ViewModels
                 if (method != null)
                 {
                     SelectedMethod = method;
-                    Arguments.Clear();
+                    ArgumentsWithDescriptions.Clear();
                     if (element.Action.Arguments?.Any() == true)
                     {
-                        foreach (var arg in element.Action.Arguments)
+                        var descriptions = GetArgumentDescriptions(method.Id);
+                        for (int i = 0; i < element.Action.Arguments.Count; i++)
                         {
-                            Arguments.Add(arg);
+                            string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
+                            ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, element.Action.Arguments[i]));
                         }
                     }
                     else
@@ -153,37 +157,17 @@ namespace MI_GUI_WinUI.ViewModels
             IsDialogOpen = true;
         }
 
-        public string GetArgumentDescription(string argument)
+        private string[] GetArgumentDescriptions(string methodId) => methodId switch
         {
-            if (SelectedMethod == null) return string.Empty;
-            int index = Arguments.IndexOf(argument);
-            if (index < 0) return string.Empty;
-
-            return (SelectedMethod.Id, index) switch
-            {
-                // Button operations
-                var (m, _) when m is "button_down" => "Button to Hold Down",
-                var (m, _) when m is "button_up" => "Button to Release",
-                var (m, _) when m is "toggle_button" => "Button to Toggle",
-                
-                // Hold button
-                ("hold_button", 0) => "Button to Hold",
-                ("hold_button", 1) => "Duration in Seconds (e.g., 0.5)",
-                
-                // Press button
-                ("press_button", 0) => "Button to Press",
-                ("press_button", 1) => "Number of Times to Press (e.g., 2)",
-                
-                // Joysticks
-                ("left_joystick", 0) or ("right_joystick", 0) => "X Position (-1.0 to 1.0)",
-                ("left_joystick", 1) or ("right_joystick", 1) => "Y Position (-1.0 to 1.0)",
-                
-                // Triggers
-                var (m, _) when m is "left_trigger" or "right_trigger" => "Trigger Pressure (0.0 to 1.0)",
-                
-                _ => $"Argument {index + 1}"
-            };
-        }
+            "button_down" => new[] { "Button to Hold Down" },
+            "button_up" => new[] { "Button to Release" },
+            "toggle_button" => new[] { "Button to Toggle" },
+            "hold_button" => new[] { "Button to Hold", "Duration in Seconds (e.g., 0.5)" },
+            "press_button" => new[] { "Button to Press", "Number of Times to Press (e.g., 2)" },
+            "left_joystick" or "right_joystick" => new[] { "X Position (-1.0 to 1.0)", "Y Position (-1.0 to 1.0)" },
+            "left_trigger" or "right_trigger" => new[] { "Trigger Pressure (0.0 to 1.0)" },
+            _ => Array.Empty<string>()
+        };
 
         partial void OnSelectedMethodChanged(MethodDescription value)
         {
@@ -231,35 +215,36 @@ namespace MI_GUI_WinUI.ViewModels
 
         private void UpdateArgumentInputs()
         {
-            Arguments.Clear();
-            
+            ArgumentsWithDescriptions.Clear();
+            var descriptions = GetArgumentDescriptions(SelectedMethod.Id);
+
             switch (SelectedMethod.Id)
             {
                 case "button_down":
                 case "button_up":
                 case "toggle_button":
-                    Arguments.Add("A"); // Default button
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
                     break;
 
                 case "hold_button":
-                    Arguments.Add("A"); // Button
-                    Arguments.Add("0.5"); // Duration in seconds
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[1], "0.5"));
                     break;
 
                 case "press_button":
-                    Arguments.Add("A"); // Button
-                    Arguments.Add("2"); // Press count
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[1], "2"));
                     break;
 
                 case "left_joystick":
                 case "right_joystick":
-                    Arguments.Add("0.0"); // X-axis
-                    Arguments.Add("0.0"); // Y-axis
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "0.0"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[1], "0.0"));
                     break;
 
                 case "left_trigger":
                 case "right_trigger":
-                    Arguments.Add("0.5"); // Trigger value
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "0.5"));
                     break;
             }
         }
@@ -268,6 +253,8 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
+                var arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList();
+
                 // Validate action configuration
                 switch (SelectedMethod.Id)
                 {
@@ -276,12 +263,12 @@ namespace MI_GUI_WinUI.ViewModels
                     case "toggle_button":
                     case "press_button":
                     case "hold_button":
-                        if (string.IsNullOrWhiteSpace(Arguments[0]))
+                        if (string.IsNullOrWhiteSpace(arguments[0]))
                             return "Please enter a button name";
                             
-                        if (Arguments.Count > 1)
+                        if (arguments.Count > 1)
                         {
-                            if (!float.TryParse(Arguments[1], out float paramValue))
+                            if (!float.TryParse(arguments[1], out float paramValue))
                                 return "Please enter a valid number";
                                 
                             if (SelectedMethod.Id == "hold_button" && paramValue <= 0)
@@ -294,16 +281,16 @@ namespace MI_GUI_WinUI.ViewModels
 
                     case "left_joystick":
                     case "right_joystick":
-                        if (!float.TryParse(Arguments[0], out float xAxis) || xAxis < -1 || xAxis > 1)
+                        if (!float.TryParse(arguments[0], out float xAxis) || xAxis < -1 || xAxis > 1)
                             return "X-axis must be between -1.0 and 1.0";
                             
-                        if (!float.TryParse(Arguments[1], out float yAxis) || yAxis < -1 || yAxis > 1)
+                        if (!float.TryParse(arguments[1], out float yAxis) || yAxis < -1 || yAxis > 1)
                             return "Y-axis must be between -1.0 and 1.0";
                         break;
 
                     case "left_trigger":
                     case "right_trigger":
-                        if (!float.TryParse(Arguments[0], out float triggerValue) || triggerValue < 0 || triggerValue > 1)
+                        if (!float.TryParse(arguments[0], out float triggerValue) || triggerValue < 0 || triggerValue > 1)
                             return "Trigger value must be between 0.0 and 1.0";
                         break;
                 }
@@ -352,7 +339,7 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     ClassName = SelectedClass,
                     MethodName = SelectedMethod.Id,
-                    Arguments = Arguments.ToList()
+                    Arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList()
                 }
             };
 
