@@ -107,25 +107,17 @@
 </Content>
 </ItemGroup>
 
-<!-- XAML Page Compilation -->
-<ItemGroup>
-<Page Update="Pages\ProfileEditorPage.xaml">
-<Generator>MSBuild:Compile</Generator>
-<SubType>Designer</SubType>
-</Page>
-<Page Update="Pages\SelectProfilesPage.xaml">
-<Generator>MSBuild:Compile</Generator>
-<SubType>Designer</SubType>
-</Page>
-<Page Update="Pages\ActionStudioPage.xaml">
-<Generator>MSBuild:Compile</Generator>
-<SubType>Designer</SubType>
-</Page>
-<Page Update="Pages\IconStudioPage.xaml">
-<Generator>MSBuild:Compile</Generator>
-<SubType>Designer</SubType>
-</Page>
-</ItemGroup>
+  <!-- XAML Page Compilation -->
+  <ItemGroup>
+    <Page Update="Controls\*.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Pages\*.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
 
 <!-- MotionInput Assets -->
 <ItemGroup>

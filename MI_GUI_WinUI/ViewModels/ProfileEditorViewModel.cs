@@ -1,16 +1,17 @@
-using System;
-using System.Linq;
-using System.Collections.ObjectModel;
-using Windows.Foundation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MI_GUI_WinUI.Controls;
 using MI_GUI_WinUI.Models;
-using System.IO;
-using System.Text.Json;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using Newtonsoft.Json;
+using MI_GUI_WinUI.Utils;
 using Microsoft.UI.Xaml;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Windows.Foundation;
 using Microsoft.Extensions.Logging;
 
 namespace MI_GUI_WinUI.ViewModels
@@ -18,71 +19,10 @@ namespace MI_GUI_WinUI.ViewModels
     public partial class ProfileEditorViewModel : ObservableObject
     {
         private readonly ILogger<ProfileEditorViewModel> _logger;
-        private readonly string _baseAppPath;
-        private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
-        private XamlRoot? _xamlRoot;
-
-        public ProfileEditorViewModel(ILogger<ProfileEditorViewModel> logger)
-        {
-            _logger = logger;
-            _baseAppPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
-            InitializeDefaultButtons();
-            LoadCustomButtons();
-            InitializeDefaultPoses();
-        }
-
-        private void InitializeDefaultPoses()
-        {
-            var defaultPoses = new[]
-            {
-                new PoseGuiElement 
-                {
-                    File = "head_tilt_joystick.py",
-                    LeftSkin = ConvertToMsAppxPath("racing/left_arrow.png"),
-                    RightSkin = ConvertToMsAppxPath("racing/right_arrow.png"),
-                    Sensitivity = 0.75,
-                    Deadzone = 1,
-                    Linear = false
-                },
-                new PoseGuiElement
-                {
-                    File = "hit_trigger.py",
-                    Landmark = "right_wrist",
-                    Skin = ConvertToMsAppxPath("racing/forward.png"),
-                    Radius = 60,
-                    Action = new ActionConfig
-                    {
-                        ClassName = "ds4_gamepad",
-                        MethodName = "right_trigger",
-                        Arguments = new List<string> { "0.75" }
-                    }
-                },
-                new PoseGuiElement
-                {
-                    File = "hit_trigger.py",
-                    Landmark = "left_wrist",
-                    Skin = ConvertToMsAppxPath("racing/backward.png"),
-                    Radius = 60,
-                    Action = new ActionConfig
-                    {
-                        ClassName = "ds4_gamepad",
-                        MethodName = "left_trigger",
-                        Arguments = new List<string> { "1.0" }
-                    }
-                }
-            };
-
-            foreach (var pose in defaultPoses)
-            {
-                DefaultPoses.Add(pose);
-            }
-        }
-
-        public XamlRoot? XamlRoot
-        {
-            get => _xamlRoot;
-            set => _xamlRoot = value;
-        }
+        private readonly string PROFILES_DIR = Path.Combine(
+            Windows.ApplicationModel.Package.Current.InstalledLocation.Path, 
+            "MotionInput", "data", "profiles"
+        );
 
         [ObservableProperty]
         private string profileName = string.Empty;
@@ -90,83 +30,26 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string validationMessage = string.Empty;
 
+        public bool HasValidationMessage
+        {
+            get => !string.IsNullOrWhiteSpace(ValidationMessage);
+        }
+
+        [ObservableProperty]
+        private XamlRoot? xamlRoot;
+
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
-        public ObservableCollection<ButtonPositionInfo> CanvasButtons { get; } = new();
-        public ObservableCollection<PoseGuiElement> DefaultPoses { get; } = new();
-        public ObservableCollection<PosePositionInfo> CanvasPoses { get; } = new();
+        public ObservableCollection<UnifiedPositionInfo> CanvasElements { get; } = new();
 
-        private void PrepareForEdit()
+        public ProfileEditorViewModel(ILogger<ProfileEditorViewModel> logger)
         {
-            CanvasButtons.Clear();
-            CanvasPoses.Clear();
-            ValidationMessage = string.Empty;
+            _logger = logger;
+            LoadDefaultButtons();
+            LoadCustomButtons();
         }
 
-        public async Task LoadExistingProfile(Profile profile)
-        {
-            try
-            {
-                PrepareForEdit();
-                
-                // Set profile name
-                ProfileName = profile.Name;
-
-                // Load GUI elements
-                if (profile.GuiElements != null)
-                {
-                    _logger?.LogInformation($"Loading {profile.GuiElements.Count} GUI elements for profile {profile.Name}");
-                    
-                    foreach (var element in profile.GuiElements)
-                    {
-                        try
-                        {
-                            var buttonInfo = ConvertFromGuiElement(element);
-                            if (buttonInfo != null)
-                            {
-                                CanvasButtons.Add(buttonInfo);
-                                _logger?.LogInformation($"Added GUI element: {element.File} at position {element.Position[0]}, {element.Position[1]}");
-                            }
-                        }
-                        catch (Exception elementEx)
-                        {
-                            _logger?.LogError(elementEx, $"Error loading GUI element: {element.File}");
-                        }
-                    }
-                }
-
-                // Load poses
-                if (profile.Poses != null)
-                {
-                    _logger?.LogInformation($"Loading {profile.Poses.Count} poses for profile {profile.Name}");
-
-                    foreach (var pose in profile.Poses)
-                    {
-                        try
-                        {
-                            var poseInfo = ConvertFromPoseElement(pose);
-                            CanvasPoses.Add(poseInfo);
-                            _logger?.LogInformation($"Added pose: {pose.File} at position {pose.Position?[0]}, {pose.Position?[1]}");
-                        }
-                        catch (Exception poseEx)
-                        {
-                            _logger?.LogError(poseEx, $"Error loading pose: {pose.File}");
-                        }
-                    }
-                }
-
-                _logger?.LogInformation($"Successfully loaded profile {profile.Name} with {CanvasButtons.Count} GUI elements and {CanvasPoses.Count} poses");
-                ValidationMessage = "Profile loaded successfully";
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, $"Error loading profile: {profile.Name}");
-                ValidationMessage = $"Error loading profile: {ex.Message}";
-                throw;
-            }
-        }
-
-        private void InitializeDefaultButtons()
+        private void LoadDefaultButtons()
         {
             var defaultButtons = new[]
             {
@@ -192,8 +75,6 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     Name = button.Name,
                     IconPath = normalImagePath,
-                    Category = "Default",
-                    Action = null,
                     IsDefault = true
                 });
             }
@@ -205,27 +86,6 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         [RelayCommand]
-        public void AddButtonToCanvas(ButtonPositionInfo buttonInfo)
-        {
-            CanvasButtons.Add(buttonInfo);
-        }
-
-        public void UpdateButtonPosition(ButtonPositionInfo buttonInfo)
-        {
-            var existingButton = CanvasButtons.FirstOrDefault(b => b.Button.Name == buttonInfo.Button.Name);
-            if (existingButton != null)
-            {
-                var index = CanvasButtons.IndexOf(existingButton);
-                CanvasButtons[index] = new ButtonPositionInfo
-                {
-                    Button = buttonInfo.Button,
-                    Position = buttonInfo.Position,
-                    Size = buttonInfo.Size
-                };
-            }
-        }
-
-        [RelayCommand]
         public void NewProfile()
         {
             try
@@ -233,8 +93,7 @@ namespace MI_GUI_WinUI.ViewModels
                 _logger?.LogInformation("Creating new profile");
                 ProfileName = string.Empty;
                 ValidationMessage = string.Empty;
-                CanvasButtons.Clear();
-                CanvasPoses.Clear();
+                CanvasElements.Clear();
             }
             catch (Exception ex)
             {
@@ -246,71 +105,8 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         public void ClearCanvas()
         {
-            CanvasButtons.Clear();
-            CanvasPoses.Clear();
+            CanvasElements.Clear();
             ValidationMessage = string.Empty;
-        }
-
-        private ActionConfig CreateDefaultActionConfig(EditorButton button)
-        {
-            return new ActionConfig
-            {
-                ClassName = "XboxController",
-                MethodName = "PressButton",
-                Arguments = new List<string> { button.Name }
-            };
-        }
-
-        private GuiElement ConvertToGuiElement(ButtonPositionInfo buttonInfo)
-        {
-            // Calculate center position by adding radius to top-left corner
-            int radius = (int)(buttonInfo.Size.Width / 2);
-            return new GuiElement
-            {
-                File = buttonInfo.Button.Name,
-                Position = new List<int> { 
-                    (int)(buttonInfo.Position.X + radius),  // X center
-                    (int)(buttonInfo.Position.Y + radius)   // Y center
-                },
-                Radius = radius,
-                Skin = buttonInfo.Button.IconPath,
-                Action = CreateDefaultActionConfig(buttonInfo.Button)
-            };
-        }
-
-        private ButtonPositionInfo ConvertFromGuiElement(GuiElement element)
-        {
-            // Try to find existing button first
-            var sourceButton = FindSourceButton(element.File);
-            
-            // If found, use its paths, otherwise construct paths from the JSON data
-            var button = sourceButton?.Clone() ?? new EditorButton
-            {
-                Name = element.File,
-                IconPath = ConvertToMsAppxPath(element.Skin)
-            };
-
-            // Calculate top-left position by subtracting radius from center
-            var diameter = element.Radius * 2;
-            return new ButtonPositionInfo
-            {
-                Button = button,
-                Position = new Point(
-                    element.Position[0] - element.Radius,  // X top-left
-                    element.Position[1] - element.Radius   // Y top-left
-                ),
-                Size = new Size(diameter, diameter)
-            };
-        }
-
-        private string ConvertToMsAppxPath(string relativePath)
-        {
-            if (relativePath.StartsWith("ms-appx:///"))
-                return relativePath;
-
-            // Remove any leading slashes and combine with base path
-            relativePath = relativePath.TrimStart('/');
-            return $"ms-appx:///MotionInput/data/assets/{relativePath}";
         }
 
         [RelayCommand]
@@ -323,17 +119,20 @@ namespace MI_GUI_WinUI.ViewModels
                     ValidationMessage = "Please enter a profile name";
                     if (XamlRoot != null)
                     {
-                        await Utils.DialogHelper.ShowError("Please enter a name for the profile.", XamlRoot);
+                        await DialogHelper.ShowError("Please enter a name for the profile.", XamlRoot);
                     }
                     return;
                 }
 
-                if (!Utils.FileNameHelper.IsValidFileName(ProfileName))
+                if (!FileNameHelper.IsValidFileName(ProfileName))
                 {
                     ValidationMessage = "The profile name contains invalid characters";
                     if (XamlRoot != null)
                     {
-                        await Utils.DialogHelper.ShowError("The profile name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
+                        await DialogHelper.ShowError(
+                            "The profile name contains invalid characters. Please use only letters, numbers, and basic punctuation.",
+                            XamlRoot
+                        );
                     }
                     return;
                 }
@@ -343,16 +142,17 @@ namespace MI_GUI_WinUI.ViewModels
                     Directory.CreateDirectory(PROFILES_DIR);
                 }
 
-                var sanitizedName = Utils.FileNameHelper.SanitizeFileName(ProfileName);
+                var sanitizedName = FileNameHelper.SanitizeFileName(ProfileName);
                 var filePath = Path.Combine(PROFILES_DIR, $"{sanitizedName}.json");
 
                 // Check if file exists
                 if (File.Exists(filePath) && XamlRoot != null)
                 {
-                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
+                    var overwrite = await DialogHelper.ShowConfirmation(
                         $"A profile named '{sanitizedName}.json' already exists.\nDo you want to replace it?",
                         "Replace Existing Profile?",
-                        XamlRoot);
+                        XamlRoot
+                    );
 
                     if (!overwrite)
                     {
@@ -360,12 +160,28 @@ namespace MI_GUI_WinUI.ViewModels
                     }
                 }
 
+                // Convert UnifiedGuiElements to appropriate types
+                var guiElements = new List<GuiElement>();
+                var poseElements = new List<PoseGuiElement>();
+
+                foreach (var elementInfo in CanvasElements)
+                {
+                    if (elementInfo.Element.IsPose)
+                    {
+                        poseElements.Add(elementInfo.Element.ToPoseElement());
+                    }
+                    else
+                    {
+                        guiElements.Add(elementInfo.Element.ToGuiElement());
+                    }
+                }
+
                 var profile = new Profile
                 {
                     Name = sanitizedName,
-                    GlobalConfig = new Dictionary<string, string>(),
-                    GuiElements = CanvasButtons.Select(ConvertToGuiElement).ToList(),
-                    Poses = CanvasPoses.Select(p => p.Pose).ToList(),
+                    GlobalConfig = new Dictionary<string, string>() { { "grid_snap", "false" } },
+                    GuiElements = guiElements,
+                    Poses = poseElements,
                     SpeechCommands = new Dictionary<string, SpeechCommand>()
                 };
 
@@ -376,100 +192,132 @@ namespace MI_GUI_WinUI.ViewModels
                 
                 if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowMessage($"Profile saved as {sanitizedName}.json", "Success", XamlRoot);
+                    await DialogHelper.ShowMessage(
+                        $"Profile saved as {sanitizedName}.json",
+                        "Success",
+                        XamlRoot
+                    );
                 }
+
+                _logger?.LogInformation($"Successfully saved profile: {filePath}");
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, "Error saving profile");
                 ValidationMessage = $"Error saving profile: {ex.Message}";
+                
                 if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowError("Failed to save profile. Please try again.", XamlRoot);
+                    await DialogHelper.ShowError(
+                        "Failed to save profile. Please try again.",
+                        XamlRoot
+                    );
                 }
             }
         }
 
-        [RelayCommand]
-        public async Task LoadProfile()
+        public async Task LoadProfile(Profile profile)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(ProfileName))
+                _logger?.LogInformation($"Loading profile {profile.Name}");
+                ProfileName = profile.Name;
+                CanvasElements.Clear();
+
+                // Convert GuiElements to UnifiedGuiElements
+                if (profile.GuiElements != null)
                 {
-                    ValidationMessage = "Please enter a profile name to load";
-                    return;
+                    foreach (var element in profile.GuiElements)
+                    {
+                        var unifiedElement = UnifiedGuiElement.FromGuiElement(element);
+                        await AddElement(unifiedElement, ElementType.Button);
+                    }
                 }
 
-                var filePath = Path.Combine(PROFILES_DIR, $"{ProfileName}.json");
-                if (!File.Exists(filePath))
+                // Convert PoseElements to UnifiedGuiElements
+                if (profile.Poses != null)
                 {
-                    ValidationMessage = "Profile not found";
-                    return;
+                    foreach (var element in profile.Poses)
+                    {
+                        var unifiedElement = UnifiedGuiElement.FromPoseElement(element);
+                        await AddElement(unifiedElement, ElementType.Pose);
+                    }
                 }
 
-                var json = await File.ReadAllTextAsync(filePath);
-                var profile = JsonConvert.DeserializeObject<Profile>(json);
-
-                if (profile.GuiElements == null)
-                {
-                    ValidationMessage = "Error loading profile: Invalid format";
-                    return;
-                }
-
-                CanvasButtons.Clear();
-                foreach (var element in profile.GuiElements)
-                {
-                    CanvasButtons.Add(ConvertFromGuiElement(element));
-                }
-
-                foreach (var pose in profile.Poses)
-                {
-                    var poseInfo = ConvertFromPoseElement(pose);
-                    CanvasPoses.Add(poseInfo);
-                }
-
-                ValidationMessage = "Profile loaded successfully";
+                ValidationMessage = string.Empty;
             }
             catch (Exception ex)
             {
+                _logger?.LogError(ex, $"Error loading profile {profile.Name}");
                 ValidationMessage = $"Error loading profile: {ex.Message}";
+                throw;
             }
         }
 
-        private EditorButton? FindSourceButton(string buttonName)
+        private async Task AddElement(UnifiedGuiElement element, ElementType type)
         {
-            return DefaultButtons.FirstOrDefault(b => b.Name == buttonName) ??
-                   CustomButtons.FirstOrDefault(b => b.Name == buttonName);
+            if (element.Position.Count != 2) return;
+
+            double width = element.Radius * 2;
+            double height = element.Radius * 2;
+            Point position = new Point(element.Position[0] - width/2, element.Position[1] - height/2);
+
+            var request = new ElementAddRequest(element, position, type);
+            AddElementToCanvas(request);
         }
 
-        [RelayCommand]
-        public void AddPoseToCanvas(PosePositionInfo poseInfo)
+        public void AddElementToCanvas(ElementAddRequest request)
         {
-            CanvasPoses.Add(poseInfo);
+            var elementInfo = new UnifiedPositionInfo(
+                request.Element,
+                request.Position,
+                new Size(request.Element.Radius * 2, request.Element.Radius * 2)
+            );
+
+            CanvasElements.Add(elementInfo);
+            _logger?.LogInformation($"Added element to canvas: {request.Element.File} at position {request.Position.X}, {request.Position.Y}");
         }
 
-        public void UpdatePosePosition(PosePositionInfo poseInfo)
+        public void UpdateElementPosition(UnifiedPositionInfo info)
         {
-            var existingPose = CanvasPoses.FirstOrDefault(p => p.Pose.File == poseInfo.Pose.File);
-            if (existingPose != null)
+            var index = CanvasElements.IndexOf(info);
+            if (index >= 0)
             {
-                var index = CanvasPoses.IndexOf(existingPose);
-                CanvasPoses[index] = poseInfo.Clone();
+                // Update element with new center position
+                var updatedElement = info.Element.WithPosition(
+                    (int)(info.Position.X + info.Size.Width/2),
+                    (int)(info.Position.Y + info.Size.Height/2)
+                );
+
+                CanvasElements[index] = new UnifiedPositionInfo(
+                    updatedElement,
+                    info.Position,
+                    info.Size
+                );
             }
         }
 
-        private PosePositionInfo ConvertFromPoseElement(PoseGuiElement pose)
+        public async Task ConfigureAction(UnifiedPositionInfo elementInfo)
         {
-            double radius = pose.Radius;
-            double x = pose.Position?[0] ?? 0;
-            double y = pose.Position?[1] ?? 0;
+            if (XamlRoot == null) return;
 
-            return new PosePositionInfo
+            var dialog = new ActionConfigurationDialog();
+            dialog.XamlRoot = XamlRoot;
+            
+            dialog.Configure(elementInfo.Element, updatedElement =>
             {
-                Pose = pose,
-                Position = new Point(x - radius, y - radius),
-                Size = new Size(radius * 2, radius * 2)
-            };
+                var index = CanvasElements.IndexOf(elementInfo);
+                if (index >= 0)
+                {
+                    CanvasElements[index] = new UnifiedPositionInfo(
+                        updatedElement,
+                        elementInfo.Position,
+                        elementInfo.Size
+                    );
+                }
+            });
+
+            await dialog.ShowAsync();
         }
     }
 }

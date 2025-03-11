@@ -1,0 +1,152 @@
+<ContentDialog
+    x:Class="MI_GUI_WinUI.Controls.ActionConfigurationDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:MI_GUI_WinUI.Controls"
+    xmlns:models="using:MI_GUI_WinUI.Models"
+    xmlns:viewmodels="using:MI_GUI_WinUI.ViewModels"
+    xmlns:converters="using:MI_GUI_WinUI.Converters"
+    Title="Configure Action"
+    DefaultButton="Primary"
+    PrimaryButtonText="Save"
+    CloseButtonText="Cancel"
+    IsSecondaryButtonEnabled="False"
+    Style="{ThemeResource DefaultContentDialogStyle}"
+    Height="600">
+
+    <ContentDialog.Resources>
+        <converters:ArgumentDescriptionConverter x:Key="ArgumentDescriptionConverter"/>
+        <x:Double x:Key="ContentDialogMaxWidth">800</x:Double>
+    </ContentDialog.Resources>
+
+    <ScrollViewer>
+        <StackPanel Spacing="12">
+            <InfoBar
+                IsOpen="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                Severity="Error"
+                IsClosable="False"/>
+
+            <ToggleSwitch
+                Header="Enable Pose Detection"
+                IsOn="{x:Bind ViewModel.IsPoseEnabled, Mode=TwoWay}"/>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Action Configuration -->
+                <StackPanel Grid.Column="0" Spacing="8">
+                    <TextBlock Text="Action Settings" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+
+                    <ComboBox Header="Method"
+                            ItemsSource="{x:Bind ViewModel.AvailableMethods}"
+                            SelectedItem="{x:Bind ViewModel.SelectedMethod, Mode=TwoWay}"
+                            HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:MethodDescription">
+                                <TextBlock Text="{x:Bind DisplayName}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Arguments}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBox Header="{Binding Converter={StaticResource ArgumentDescriptionConverter}}"
+                                         Text="{Binding Mode=TwoWay}"
+                                         Margin="0,4,0,0"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- Help Panel -->
+                <Border Grid.Column="1" 
+                        BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                        BorderThickness="1"
+                        Padding="12"
+                        Width="200">
+                    <StackPanel>
+                        <TextBlock Text="{x:Bind ViewModel.HeaderText, Mode=OneWay}"
+                                 Style="{ThemeResource CaptionTextBlockStyle}"
+                                 Margin="0,0,0,8"/>
+                        <TextBlock Text="{x:Bind ViewModel.HelpText, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 Style="{ThemeResource CaptionTextBlockStyle}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Pose Settings -->
+            <StackPanel Visibility="{x:Bind ViewModel.IsPoseEnabled, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Pose Settings" 
+                         Style="{ThemeResource SubtitleTextBlockStyle}"
+                         Margin="0,12,0,8"/>
+
+                <Grid ColumnSpacing="12" RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Detection Settings -->
+                    <NumberBox Grid.Column="0" Grid.Row="0"
+                              Header="Sensitivity"
+                              Value="{x:Bind ViewModel.Sensitivity, Mode=TwoWay}"
+                              SpinButtonPlacementMode="Compact"
+                              Minimum="0.1"
+                              Maximum="2.0"
+                              SmallChange="0.1"/>
+
+                    <NumberBox Grid.Column="1" Grid.Row="0"
+                              Header="Deadzone"
+                              Value="{x:Bind ViewModel.Deadzone, Mode=TwoWay}"
+                              SpinButtonPlacementMode="Compact"
+                              Minimum="0"
+                              Maximum="50"/>
+
+                    <CheckBox Grid.Column="2" Grid.Row="0"
+                             Content="Linear Movement"
+                             IsChecked="{x:Bind ViewModel.Linear, Mode=TwoWay}"/>
+
+                    <!-- Landmark Selection -->
+                    <TextBlock Grid.ColumnSpan="3" Grid.Row="1" 
+                              Text="Select Landmarks"
+                              Style="{ThemeResource BaseTextBlockStyle}"
+                              Margin="0,12,0,4"/>
+
+                    <CheckBox Grid.Column="0" Grid.Row="2"
+                             Content="Left Wrist"
+                             IsChecked="{x:Bind ViewModel.HasLeftWrist, Mode=TwoWay}"/>
+                    <CheckBox Grid.Column="1" Grid.Row="2"
+                             Content="Right Wrist"
+                             IsChecked="{x:Bind ViewModel.HasRightWrist, Mode=TwoWay}"/>
+
+                    <CheckBox Grid.Column="0" Grid.Row="3"
+                             Content="Left Elbow"
+                             IsChecked="{x:Bind ViewModel.HasLeftElbow, Mode=TwoWay}"/>
+                    <CheckBox Grid.Column="1" Grid.Row="3"
+                             Content="Right Elbow"
+                             IsChecked="{x:Bind ViewModel.HasRightElbow, Mode=TwoWay}"/>
+
+                    <CheckBox Grid.Column="2" Grid.Row="2"
+                             Content="Left Shoulder"
+                             IsChecked="{x:Bind ViewModel.HasLeftShoulder, Mode=TwoWay}"/>
+                    <CheckBox Grid.Column="2" Grid.Row="3"
+                             Content="Right Shoulder"
+                             IsChecked="{x:Bind ViewModel.HasRightShoulder, Mode=TwoWay}"/>
+                </Grid>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

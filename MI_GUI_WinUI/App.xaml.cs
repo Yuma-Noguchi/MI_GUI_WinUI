@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -61,10 +61,17 @@ namespace MI_GUI_WinUI
             services.AddSingleton<ActionStudioViewModel>();
             services.AddSingleton<IconStudioViewModel>();
             services.AddTransient<ProfileEditorViewModel>();
+            services.AddTransient<ActionConfigurationDialogViewModel>();
 
             // Register converters
             services.AddSingleton<StringToBoolConverter>();
             services.AddSingleton<BoolToVisibilityInverseConverter>();
+            services.AddSingleton<BoolToVisibilityConverter>();
+            services.AddSingleton<ArgumentDescriptionConverter>();
+            services.AddSingleton<NumberToVisibilityConverter>();
+
+            // Register dialog view models
+            services.AddTransient<ActionConfigurationDialogViewModel>();
 
             // Register pages
             services.AddTransient<HomePage>();
@@ -75,6 +82,7 @@ namespace MI_GUI_WinUI
 
             // Register controls
             services.AddTransient<Controls.PageHeader>();
+            services.AddTransient<Controls.ActionConfigurationDialog>();
 
             // Build and configure services
             _serviceProvider = services.BuildServiceProvider();
