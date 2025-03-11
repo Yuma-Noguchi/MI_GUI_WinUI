@@ -16,6 +16,7 @@
 
     <ContentDialog.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverseConverter"/>
         <x:Double x:Key="ContentDialogMaxWidth">800</x:Double>
     </ContentDialog.Resources>
 
@@ -55,9 +56,16 @@
                     <ItemsControl ItemsSource="{x:Bind ViewModel.ArgumentsWithDescriptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:ArgumentInfo">
-                                <TextBox Header="{x:Bind Description}"
-                                        Text="{x:Bind Value, Mode=TwoWay}"
-                                        Margin="0,4,0,0"/>
+                                <StackPanel Margin="0,4,0,0">
+                                    <ComboBox Header="{x:Bind Description}"
+                                            ItemsSource="{x:Bind ButtonOptions}"
+                                            SelectedItem="{x:Bind Value, Mode=TwoWay}"
+                                            Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityConverter}}"
+                                            HorizontalAlignment="Stretch"/>
+                                    <TextBox Header="{x:Bind Description}"
+                                            Text="{x:Bind Value, Mode=TwoWay}"
+                                            Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityInverseConverter}}"/>
+                                </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -96,7 +104,6 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Detection Settings -->
@@ -121,30 +128,15 @@
 
                     <!-- Landmark Selection -->
                     <TextBlock Grid.ColumnSpan="3" Grid.Row="1" 
-                              Text="Select Landmarks"
+                              Text="Select One Landmark"
                               Style="{ThemeResource BaseTextBlockStyle}"
                               Margin="0,12,0,4"/>
 
-                    <CheckBox Grid.Column="0" Grid.Row="2"
-                             Content="Left Wrist"
-                             IsChecked="{x:Bind ViewModel.HasLeftWrist, Mode=TwoWay}"/>
-                    <CheckBox Grid.Column="1" Grid.Row="2"
-                             Content="Right Wrist"
-                             IsChecked="{x:Bind ViewModel.HasRightWrist, Mode=TwoWay}"/>
-
-                    <CheckBox Grid.Column="0" Grid.Row="3"
-                             Content="Left Elbow"
-                             IsChecked="{x:Bind ViewModel.HasLeftElbow, Mode=TwoWay}"/>
-                    <CheckBox Grid.Column="1" Grid.Row="3"
-                             Content="Right Elbow"
-                             IsChecked="{x:Bind ViewModel.HasRightElbow, Mode=TwoWay}"/>
-
-                    <CheckBox Grid.Column="2" Grid.Row="2"
-                             Content="Left Shoulder"
-                             IsChecked="{x:Bind ViewModel.HasLeftShoulder, Mode=TwoWay}"/>
-                    <CheckBox Grid.Column="2" Grid.Row="3"
-                             Content="Right Shoulder"
-                             IsChecked="{x:Bind ViewModel.HasRightShoulder, Mode=TwoWay}"/>
+                    <!-- Radio Buttons for Landmarks -->
+                    <RadioButtons Grid.ColumnSpan="3" Grid.Row="2"
+                                ItemsSource="{x:Bind ViewModel.LandmarkList}"
+                                SelectedItem="{x:Bind ViewModel.SelectedLandmark, Mode=TwoWay}"
+                                MaxColumns="2"/>
                 </Grid>
             </StackPanel>
         </StackPanel>

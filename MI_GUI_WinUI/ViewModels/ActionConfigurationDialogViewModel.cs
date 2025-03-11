@@ -48,22 +48,14 @@ namespace MI_GUI_WinUI.ViewModels
         private bool linear = true;
 
         [ObservableProperty]
-        private bool hasLeftWrist;
+        private string selectedLandmark = string.Empty;
 
-        [ObservableProperty]
-        private bool hasRightWrist;
-
-        [ObservableProperty]
-        private bool hasLeftElbow;
-
-        [ObservableProperty]
-        private bool hasRightElbow;
-
-        [ObservableProperty]
-        private bool hasLeftShoulder;
-
-        [ObservableProperty]
-        private bool hasRightShoulder;
+        private readonly List<string> LandmarkOptions = new()
+        {
+            "LEFT_WRIST", "RIGHT_WRIST", 
+            "LEFT_ELBOW", "RIGHT_ELBOW",
+            "LEFT_SHOULDER", "RIGHT_SHOULDER"
+        };
 
         public ActionConfigurationDialogViewModel()
         {
@@ -95,7 +87,7 @@ namespace MI_GUI_WinUI.ViewModels
             "• Sensitivity affects how quickly the pose is detected\n" +
             "• Deadzone sets minimum movement required\n" +
             "• Linear movement provides smoother transitions\n" +
-            "• Select landmarks that should trigger the action" :
+            "• Select one landmark that should trigger the action" :
             "A, B, X, Y\n" +
             "LB, RB, LT, RT\n" +
             "Start, Back, LS, RS\n" +
@@ -121,7 +113,7 @@ namespace MI_GUI_WinUI.ViewModels
                         for (int i = 0; i < element.Action.Arguments.Count; i++)
                         {
                             string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
-                            ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, element.Action.Arguments[i]));
+                            ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, element.Action.Arguments[i], IsButtonArgument(method.Id, i)));
                         }
                     }
                     else
@@ -143,18 +135,25 @@ namespace MI_GUI_WinUI.ViewModels
                 Sensitivity = element.Sensitivity ?? 1.0;
                 Deadzone = element.Deadzone ?? 10;
                 Linear = element.Linear ?? true;
-
-                // Set landmark checkboxes
-                HasLeftWrist = element.Landmarks.Contains("LEFT_WRIST");
-                HasRightWrist = element.Landmarks.Contains("RIGHT_WRIST");
-                HasLeftElbow = element.Landmarks.Contains("LEFT_ELBOW");
-                HasRightElbow = element.Landmarks.Contains("RIGHT_ELBOW");
-                HasLeftShoulder = element.Landmarks.Contains("LEFT_SHOULDER");
-                HasRightShoulder = element.Landmarks.Contains("RIGHT_SHOULDER");
+                SelectedLandmark = element.Landmarks.FirstOrDefault() ?? "";
+            }
+            else
+            {
+                SelectedLandmark = "";
             }
             
             ValidationMessage = string.Empty;
             IsDialogOpen = true;
+        }
+
+        private bool IsButtonArgument(string methodId, int index)
+        {
+            return methodId switch
+            {
+                "button_down" or "button_up" or "toggle_button" => true,
+                "hold_button" or "press_button" => index == 0,
+                _ => false
+            };
         }
 
         private string[] GetArgumentDescriptions(string methodId) => methodId switch
@@ -178,39 +177,19 @@ namespace MI_GUI_WinUI.ViewModels
         partial void OnIsPoseEnabledChanged(bool value)
         {
             OnPropertyChanged(nameof(HeaderText));
+            OnPropertyChanged(nameof(HelpText));
             
-            // Update file and landmarks when switching between pose and regular modes
             if (value)
             {
-                _element = _element with { File = "hit_trigger.py" };
-                UpdateLandmarks();
+                if (string.IsNullOrEmpty(SelectedLandmark))
+                {
+                    SelectedLandmark = LandmarkOptions[0];
+                }
             }
             else
             {
-                _element = _element with
-                { 
-                    File = "button",
-                    Landmarks = new List<string>(),
-                    LeftSkin = null,
-                    RightSkin = null,
-                    Sensitivity = null,
-                    Deadzone = null,
-                    Linear = null
-                };
+                SelectedLandmark = "";
             }
-        }
-
-        private void UpdateLandmarks()
-        {
-            var landmarks = new List<string>();
-            if (HasLeftWrist) landmarks.Add("LEFT_WRIST");
-            if (HasRightWrist) landmarks.Add("RIGHT_WRIST");
-            if (HasLeftElbow) landmarks.Add("LEFT_ELBOW");
-            if (HasRightElbow) landmarks.Add("RIGHT_ELBOW");
-            if (HasLeftShoulder) landmarks.Add("LEFT_SHOULDER");
-            if (HasRightShoulder) landmarks.Add("RIGHT_SHOULDER");
-
-            _element = _element.WithLandmarks(landmarks);
         }
 
         private void UpdateArgumentInputs()
@@ -223,16 +202,16 @@ namespace MI_GUI_WinUI.ViewModels
                 case "button_down":
                 case "button_up":
                 case "toggle_button":
-                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A", true));
                     break;
 
                 case "hold_button":
-                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A", true));
                     ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[1], "0.5"));
                     break;
 
                 case "press_button":
-                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A"));
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "A", true));
                     ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[1], "2"));
                     break;
 
@@ -304,14 +283,8 @@ namespace MI_GUI_WinUI.ViewModels
                     if (Deadzone < 0 || Deadzone > 50)
                         return "Deadzone must be between 0 and 50";
 
-                    var selectedLandmarks = new[] 
-                    { 
-                        HasLeftWrist, HasRightWrist, HasLeftElbow, 
-                        HasRightElbow, HasLeftShoulder, HasRightShoulder 
-                    };
-
-                    if (!selectedLandmarks.Any(x => x))
-                        return "At least one landmark must be selected";
+                    if (string.IsNullOrEmpty(SelectedLandmark))
+                        return "Please select a landmark";
                 }
 
                 return string.Empty;
@@ -333,26 +306,31 @@ namespace MI_GUI_WinUI.ViewModels
                 return;
             }
 
-            var updatedElement = _element with
+            var updatedAction = new ActionConfig
             {
-                Action = new ActionConfig
-                {
-                    ClassName = SelectedClass,
-                    MethodName = SelectedMethod.Id,
-                    Arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList()
-                }
+                ClassName = SelectedClass,
+                MethodName = SelectedMethod.Id,
+                Arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList()
+            };
+
+            var baseElement = _element.WithAction(updatedAction);
+
+            var updatedElement = baseElement with
+            {
+                File = IsPoseEnabled ? "hit_trigger.py" : "button.py"
             };
 
             if (IsPoseEnabled)
             {
-                UpdateLandmarks();
-                updatedElement = updatedElement with
-                {
-                    Sensitivity = Sensitivity,
-                    Deadzone = Deadzone,
-                    Linear = Linear,
-                    File = "hit_trigger.py"
-                };
+                updatedElement = updatedElement
+                    .WithLandmarks(new List<string> { SelectedLandmark })
+                    .WithPoseSettings(Sensitivity, Deadzone, Linear);
+            }
+            else
+            {
+                updatedElement = updatedElement
+                    .WithLandmarks(new List<string>())
+                    .WithPoseSettings(1.0, 10, true);
             }
 
             _onSave(updatedElement);
@@ -366,5 +344,6 @@ namespace MI_GUI_WinUI.ViewModels
 
         public IRelayCommand SaveCommand { get; }
         public IRelayCommand CancelCommand { get; }
+        public IEnumerable<string> LandmarkList => LandmarkOptions;
     }
 }

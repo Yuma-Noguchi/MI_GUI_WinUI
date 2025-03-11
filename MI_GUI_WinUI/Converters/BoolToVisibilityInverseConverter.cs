@@ -17,11 +17,7 @@ namespace MI_GUI_WinUI.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
-            if (value is Visibility visibility)
-            {
-                return visibility == Visibility.Collapsed;
-            }
-            return false;
+            throw new NotImplementedException();
         }
     }
 }

@@ -48,7 +48,7 @@ namespace MI_GUI_WinUI.Models
         public Models.ActionConfig Action { get; init; } = new();
 
         [JsonIgnore]
-        public bool IsPose => _landmarks?.Count > 0 || LeftSkin != null || RightSkin != null;
+        public bool IsPose => File == "hit_trigger.py";
 
         public static UnifiedGuiElement CreateGuiElement(int x = 0, int y = 0, int radius = 30)
         {
