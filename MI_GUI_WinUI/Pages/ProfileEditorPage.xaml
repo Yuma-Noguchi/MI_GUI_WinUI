@@ -22,26 +22,21 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Profile Management -->
-        <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
-            <AppBarButton Icon="Save" Label="Save Profile" Command="{x:Bind ViewModel.SaveProfileCommand}"/>
-            <AppBarButton Icon="Add" Label="New Profile" Command="{x:Bind ViewModel.NewProfileCommand}"/>
-            <AppBarButton Icon="Clear" Label="Clear Canvas" Command="{x:Bind ViewModel.ClearCanvasCommand}"/>
-        </CommandBar>
+        <controls:PageHeader Grid.Row="0" 
+                  Title="Profile Editor"/>
 
-        <!-- Profile Name and Messages -->
-        <StackPanel Grid.Row="1" Margin="0,8,0,8" Spacing="8">
+        <!-- Profile Management -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8">
             <TextBox PlaceholderText="Enter profile name"
-                     Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
-                     Width="300"
-                     HorizontalAlignment="Left"/>
-            
-            <InfoBar 
-                Title="Profile Status"
-                IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}"
-                Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
-                Severity="Error"
-                IsClosable="False"/>
+                 Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
+                 VerticalAlignment="Center"
+                 Width="300"
+                 HorizontalAlignment="Left"/>
+            <CommandBar  DefaultLabelPosition="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <AppBarButton Icon="Save" Label="Save Profile" Command="{x:Bind ViewModel.SaveProfileCommand}"/>
+                <AppBarButton Icon="Add" Label="New Profile" Command="{x:Bind ViewModel.NewProfileCommand}"/>
+                <AppBarButton Icon="Clear" Label="Clear Canvas" Command="{x:Bind ViewModel.ClearCanvasCommand}"/>
+            </CommandBar>
         </StackPanel>
 
         <Grid Grid.Row="2">
@@ -110,27 +105,37 @@
             </ScrollViewer>
 
             <!-- Canvas Area -->
-            <Border Grid.Column="1"
-                    BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                    BorderThickness="1">
-                <Grid>
-                    <!-- Place TextBlock and Canvas in separate Grid rows for proper z-ordering -->
-                    <TextBlock Text="Drop buttons here"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center"
-                             Foreground="{ThemeResource SystemBaseMediumColor}"
-                             Opacity="0.5"/>
-
-                    <Canvas
-                        x:Name="EditorCanvas"
-                        Background="Transparent"
-                        AllowDrop="True"
-                        DragOver="EditorCanvas_DragOver"
-                        Drop="EditorCanvas_Drop"
-                        Height="480"
-                        Width="640"
-                        HorizontalAlignment="Center"/>
-                </Grid>
+            <Border 
+                Grid.Column="1"
+                BorderBrush="AliceBlue"
+                BorderThickness="1,0,0,0">
+                <Border
+                    BorderBrush="{ThemeResource SystemListLowColor}"
+                    BorderThickness="2"
+                    CornerRadius="8"
+                    Background="AliceBlue"
+                    Height="480"
+                    Width="640"
+                    >
+                    <Grid>
+                        <TextBlock
+                            Text="Drop Buttons Here"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="20"
+                            Opacity="0.5"/>
+                        <Canvas
+                            x:Name="EditorCanvas"
+                            Background="Transparent"
+                            AllowDrop="True"
+                            DragOver="EditorCanvas_DragOver"
+                            Drop="EditorCanvas_Drop"
+                            Height="480"
+                            Width="640"
+                            HorizontalAlignment="Center"/>
+                    </Grid>
+                </Border>
             </Border>
         </Grid>
     </Grid>

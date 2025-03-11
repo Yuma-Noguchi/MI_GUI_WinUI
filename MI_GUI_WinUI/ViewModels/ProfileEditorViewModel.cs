@@ -279,13 +279,29 @@ namespace MI_GUI_WinUI.ViewModels
 
             var dialog = new ActionConfigurationDialog();
             dialog.XamlRoot = XamlRoot;
+            var originalIndex = CanvasElements.IndexOf(elementInfo);
+            if (originalIndex < 0)
+            {
+                // Fallback to position-based identification if index not found
+                originalIndex = CanvasElements.ToList().FindIndex(e => 
+                    Math.Abs(e.Position.X - elementInfo.Position.X) < 1 &&
+                    Math.Abs(e.Position.Y - elementInfo.Position.Y) < 1);
+            }
+
             dialog.Configure(elementInfo.Element, element => 
             {
-                var updatedInfo = elementInfo with { Element = element };
-                var index = CanvasElements.IndexOf(elementInfo);
-                if (index >= 0)
+                // Create updated element with the same position and size
+                var updatedInfo = new UnifiedPositionInfo(
+                    element,
+                    elementInfo.Position, 
+                    elementInfo.Size
+                );
+                
+                // Update at the saved index
+                if (originalIndex >= 0 && originalIndex < CanvasElements.Count)
                 {
-                    CanvasElements[index] = updatedInfo;
+                    CanvasElements[originalIndex] = updatedInfo;
+                    System.Diagnostics.Debug.WriteLine($"Updated element at index {originalIndex} with action: {element.Action.ClassName}.{element.Action.MethodName}");
                 }
             });
 

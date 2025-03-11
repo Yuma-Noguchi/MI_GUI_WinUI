@@ -123,11 +123,38 @@ namespace MI_GUI_WinUI.Pages
             var configureItem = new MenuFlyoutItem { Text = "Configure Action" };
             var deleteItem = new MenuFlyoutItem { Text = "Delete" };
             
-            configureItem.Click += async (s, e) => await ViewModel.ConfigureAction(elementInfo);
+            configureItem.Click += async (s, e) => 
+            {
+                // Get the current position of the image
+                var imageX = Canvas.GetLeft(image);
+                var imageY = Canvas.GetTop(image);
+
+                // Find the current element info from CanvasElements based on position
+                var currentElementInfo = ViewModel.CanvasElements.FirstOrDefault(e => 
+                    Math.Abs(e.Position.X - imageX) < 1 && 
+                    Math.Abs(e.Position.Y - imageY) < 1);
+
+                if (currentElementInfo != null)
+                {
+                    await ViewModel.ConfigureAction(currentElementInfo);
+                }
+            };
+
             deleteItem.Click += (s, e) =>
             {
-                ViewModel.CanvasElements.Remove(elementInfo);
-                EditorCanvasElement.Children.Remove(image);
+                // Similarly, find current element for deletion
+                var imageX = Canvas.GetLeft(image);
+                var imageY = Canvas.GetTop(image);
+                
+                var currentElementInfo = ViewModel.CanvasElements.FirstOrDefault(e => 
+                    Math.Abs(e.Position.X - imageX) < 1 && 
+                    Math.Abs(e.Position.Y - imageY) < 1);
+
+                if (currentElementInfo != null)
+                {
+                    ViewModel.CanvasElements.Remove(currentElementInfo);
+                    EditorCanvasElement.Children.Remove(image);
+                }
             };
 
             menu.Items.Add(configureItem);

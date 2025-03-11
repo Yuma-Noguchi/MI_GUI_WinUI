@@ -11,7 +11,6 @@ namespace MI_GUI_WinUI.Controls
         {
             this.InitializeComponent();
             ViewModel = new ActionConfigurationDialogViewModel();
-            this.Closing += ActionConfigurationDialog_Closing;
             this.PrimaryButtonClick += ActionConfigurationDialog_PrimaryButtonClick;
         }
 
@@ -22,21 +21,10 @@ namespace MI_GUI_WinUI.Controls
             ViewModel.Initialize(element, onSave);
         }
 
-        private void ActionConfigurationDialog_Closing(ContentDialog sender, ContentDialogClosingEventArgs args)
-        {
-            if (args.Result == ContentDialogResult.Primary)
-            {
-                if (!string.IsNullOrEmpty(ViewModel.ValidationMessage))
-                {
-                    args.Cancel = true;
-                }
-            }
-        }
-
         private void ActionConfigurationDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
-            args.Cancel = !string.IsNullOrEmpty(ViewModel.ValidationMessage);
             ViewModel.SaveCommand.Execute(null);
+            args.Cancel = !string.IsNullOrEmpty(ViewModel.ValidationMessage);
         }
     }
 }
