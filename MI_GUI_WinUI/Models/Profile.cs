@@ -46,45 +46,6 @@ public struct GuiElement
     public ActionConfig Action { get; set; }
 }
 
-public struct PoseGuiElement
-{
-    [JsonProperty("file")]
-    public string File { get; set; }
-
-    [JsonProperty("left_skin")]
-    public string LeftSkin { get; set; }
-
-    [JsonProperty("right_skin")]
-    public string RightSkin { get; set; }
-
-    [JsonProperty("sensitivity")]
-    public double Sensitivity { get; set; }
-
-    [JsonProperty("deadzone")]
-    public int Deadzone { get; set; }
-
-    [JsonProperty("linear")]
-    public bool Linear { get; set; }
-
-    [JsonProperty("flag")]
-    public string Flag { get; set; }
-
-    [JsonProperty("landmark")]
-    public string Landmark { get; set; }
-
-    [JsonProperty("pos")]
-    public List<int> Position { get; set; }
-
-    [JsonProperty("radius")]
-    public int Radius { get; set; }
-
-    [JsonProperty("skin")]
-    public string Skin { get; set; }
-
-    [JsonProperty("action")]
-    public ActionConfig Action { get; set; }
-}
-
 public struct SpeechActionConfig
 {
     [JsonProperty("class")]

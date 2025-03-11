@@ -160,7 +160,7 @@ namespace MI_GUI_WinUI.Models
             LeftSkin = element.LeftSkin,
             RightSkin = element.RightSkin,
             Sensitivity = element.Sensitivity,
-            Deadzone = element.Deadzone,
+            Deadzone = (int)element.Deadzone,
             Linear = element.Linear,
             _landmarks = string.IsNullOrEmpty(element.Landmark) ? null : new List<string> { element.Landmark },
             Action = element.Action

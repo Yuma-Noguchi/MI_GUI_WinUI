@@ -10,8 +10,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-    
-    <!-- Page Resources -->
+
     <Page.Resources>
         <converters:NumberToVisibilityConverter x:Key="NumberToVisibilityConverter"/>
     </Page.Resources>
@@ -37,10 +36,12 @@
                      Width="300"
                      HorizontalAlignment="Left"/>
             
-            <InfoBar IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}"
-                     Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
-                     Severity="Error"
-                     IsClosable="False"/>
+            <InfoBar 
+                Title="Profile Status"
+                IsOpen="{x:Bind ViewModel.HasValidationMessage, Mode=OneWay}"
+                Message="{x:Bind ViewModel.ValidationMessage, Mode=OneWay}"
+                Severity="Error"
+                IsClosable="False"/>
         </StackPanel>
 
         <Grid Grid.Row="2">
@@ -112,19 +113,24 @@
             <Border Grid.Column="1"
                     BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                     BorderThickness="1">
-                <Canvas x:Name="EditorCanvas"
-                        Width="640" Height="480"
+                <Grid>
+                    <!-- Place TextBlock and Canvas in separate Grid rows for proper z-ordering -->
+                    <TextBlock Text="Drop buttons here"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Foreground="{ThemeResource SystemBaseMediumColor}"
+                             Opacity="0.5"/>
+
+                    <Canvas
+                        x:Name="EditorCanvas"
                         Background="Transparent"
                         AllowDrop="True"
                         DragOver="EditorCanvas_DragOver"
-                        Drop="EditorCanvas_Drop">
-                    <FlyoutBase.AttachedFlyout>
-                        <MenuFlyout>
-                            <MenuFlyoutItem Text="Configure Action" Click="ConfigureAction_Click"/>
-                            <MenuFlyoutItem Text="Delete" Click="DeleteElement_Click"/>
-                        </MenuFlyout>
-                    </FlyoutBase.AttachedFlyout>
-                </Canvas>
+                        Drop="EditorCanvas_Drop"
+                        Height="480"
+                        Width="640"
+                        HorizontalAlignment="Center"/>
+                </Grid>
             </Border>
         </Grid>
     </Grid>
