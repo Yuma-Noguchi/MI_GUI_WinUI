@@ -75,7 +75,29 @@ namespace MI_GUI_WinUI.ViewModels
 
         private void LoadCustomButtons()
         {
-            // TODO: Load custom buttons from IconStudio
+            var iconsPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, 
+                                       "MotionInput", "data", "assets", "generated_icons");
+
+            if (Directory.Exists(iconsPath))
+            {
+                try
+                {
+                    var files = Directory.GetFiles(iconsPath);
+                    foreach (var file in files)
+                    {
+                        var fileName = Path.GetFileNameWithoutExtension(file);
+                        CustomButtons.Add(new EditorButton(
+                            name: fileName,
+                            iconPath: $"ms-appx:///MotionInput/data/assets/generated_icons/{Path.GetFileName(file)}",
+                            isDefault: false
+                        ));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading custom buttons: {ex.Message}");
+                }
+            }
         }
 
         private void PrepareForEdit()

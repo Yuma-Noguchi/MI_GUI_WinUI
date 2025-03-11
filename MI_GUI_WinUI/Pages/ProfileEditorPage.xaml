@@ -26,7 +26,7 @@
                   Title="Profile Editor"/>
 
         <!-- Profile Management -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8">
+        <StackPanel Grid.Row="1" Orientation="Horizontal">
             <TextBox PlaceholderText="Enter profile name"
                  Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
                  VerticalAlignment="Center"
