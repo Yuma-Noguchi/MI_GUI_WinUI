@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Windows.Input;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace MI_GUI_WinUI.ViewModels
 {
@@ -57,6 +59,11 @@ namespace MI_GUI_WinUI.ViewModels
             "LEFT_SHOULDER", "RIGHT_SHOULDER"
         };
 
+        private readonly string ACTIONS_DIR = Path.Combine(
+            Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
+            "MotionInput", "data", "assets", "generated_actions"
+        );
+
         public ActionConfigurationDialogViewModel()
         {
             AvailableMethods = new ObservableCollection<MethodDescription>
@@ -72,6 +79,9 @@ namespace MI_GUI_WinUI.ViewModels
                 new("right_trigger", "Set Right Trigger")
             };
 
+            // Load custom chain actions
+            LoadCustomActions();
+
             SaveCommand = new RelayCommand(Save);
             CancelCommand = new RelayCommand(Cancel);
 
@@ -79,6 +89,29 @@ namespace MI_GUI_WinUI.ViewModels
             ArgumentsWithDescriptions = new ObservableCollection<ArgumentInfo>();
             SelectedMethod = AvailableMethods[0];
             UpdateArgumentInputs();
+        }
+
+        private void LoadCustomActions()
+        {
+            try
+            {
+                if (Directory.Exists(ACTIONS_DIR))
+                {
+                    var files = Directory.GetFiles(ACTIONS_DIR, "*.json");
+                    foreach (var file in files)
+                    {
+                        var actionName = Path.GetFileNameWithoutExtension(file);
+                        AvailableMethods.Add(new MethodDescription(
+                            $"chain_{actionName}",
+                            $"Custom: {actionName}"
+                        ));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading custom actions: {ex.Message}");
+            }
         }
 
         public string HeaderText => IsPoseEnabled ? "Pose Detection Help" : "Available Buttons";
@@ -109,11 +142,24 @@ namespace MI_GUI_WinUI.ViewModels
                     ArgumentsWithDescriptions.Clear();
                     if (element.Action.Arguments?.Any() == true)
                     {
-                        var descriptions = GetArgumentDescriptions(method.Id);
-                        for (int i = 0; i < element.Action.Arguments.Count; i++)
+                        if (method.Id.StartsWith("chain_"))
                         {
-                            string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
-                            ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, element.Action.Arguments[i], IsButtonArgument(method.Id, i)));
+                            var actionName = method.Id.Substring(6);
+                            ArgumentsWithDescriptions.Add(new ArgumentInfo(
+                                "Using custom action: " + actionName,
+                                "chain",
+                                false
+                            ));
+                        }
+                        else
+                        {
+                            var descriptions = GetArgumentDescriptions(method.Id);
+                            for (int i = 0; i < element.Action.Arguments.Count; i++)
+                            {
+                                string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
+                                string value = element.Action.Arguments[i]?.ToString() ?? "";
+                                ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, value, IsButtonArgument(method.Id, i)));
+                            }
                         }
                     }
                     else
@@ -156,22 +202,65 @@ namespace MI_GUI_WinUI.ViewModels
             };
         }
 
-        private string[] GetArgumentDescriptions(string methodId) => methodId switch
+        private string[] GetArgumentDescriptions(string methodId)
         {
-            "button_down" => new[] { "Button to Hold Down" },
-            "button_up" => new[] { "Button to Release" },
-            "toggle_button" => new[] { "Button to Toggle" },
-            "hold_button" => new[] { "Button to Hold", "Duration in Seconds (e.g., 0.5)" },
-            "press_button" => new[] { "Button to Press", "Number of Times to Press (e.g., 2)" },
-            "left_joystick" or "right_joystick" => new[] { "X Position (-1.0 to 1.0)", "Y Position (-1.0 to 1.0)" },
-            "left_trigger" or "right_trigger" => new[] { "Trigger Pressure (0.0 to 1.0)" },
-            _ => Array.Empty<string>()
-        };
+            if (methodId.StartsWith("chain_"))
+            {
+                return Array.Empty<string>();
+            }
+
+            return methodId switch
+            {
+                "button_down" => new[] { "Button to Hold Down" },
+                "button_up" => new[] { "Button to Release" },
+                "toggle_button" => new[] { "Button to Toggle" },
+                "hold_button" => new[] { "Button to Hold", "Duration in Seconds (e.g., 0.5)" },
+                "press_button" => new[] { "Button to Press", "Number of Times to Press (e.g., 2)" },
+                "left_joystick" or "right_joystick" => new[] { "X Position (-1.0 to 1.0)", "Y Position (-1.0 to 1.0)" },
+                "left_trigger" or "right_trigger" => new[] { "Trigger Pressure (0.0 to 1.0)" },
+                _ => Array.Empty<string>()
+            };
+        }
 
         partial void OnSelectedMethodChanged(MethodDescription value)
         {
-            UpdateArgumentInputs();
             ValidationMessage = string.Empty;
+
+            if (value.Id.StartsWith("chain_"))
+            {
+                try
+                {
+                    var actionName = value.Id.Substring(6); // Remove "chain_" prefix
+                    var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
+                    
+                    if (File.Exists(filePath))
+                    {
+                        var json = File.ReadAllText(filePath);
+                        var actionData = JsonConvert.DeserializeObject<dynamic>(json);
+
+                        ArgumentsWithDescriptions.Clear();
+                        ArgumentsWithDescriptions.Add(new ArgumentInfo(
+                            "Using custom action: " + actionName,
+                            "chain",
+                            false
+                        ));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading custom action: {ex.Message}");
+                    ArgumentsWithDescriptions.Clear();
+                    ArgumentsWithDescriptions.Add(new ArgumentInfo(
+                        "Error loading custom action",
+                        "",
+                        false
+                    ));
+                }
+            }
+            else
+            {
+                UpdateArgumentInputs();
+            }
         }
 
         partial void OnIsPoseEnabledChanged(bool value)
@@ -235,43 +324,47 @@ namespace MI_GUI_WinUI.ViewModels
                 var arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList();
 
                 // Validate action configuration
-                switch (SelectedMethod.Id)
+                // Skip validation for chain actions
+                if (!SelectedMethod.Id.StartsWith("chain_"))
                 {
-                    case "button_down":
-                    case "button_up":
-                    case "toggle_button":
-                    case "press_button":
-                    case "hold_button":
-                        if (string.IsNullOrWhiteSpace(arguments[0]))
-                            return "Please enter a button name";
-                            
-                        if (arguments.Count > 1)
-                        {
-                            if (!float.TryParse(arguments[1], out float paramValue))
-                                return "Please enter a valid number";
+                    switch (SelectedMethod.Id)
+                    {
+                        case "button_down":
+                        case "button_up":
+                        case "toggle_button":
+                        case "press_button":
+                        case "hold_button":
+                            if (string.IsNullOrWhiteSpace(arguments[0]))
+                                return "Please enter a button name";
                                 
-                            if (SelectedMethod.Id == "hold_button" && paramValue <= 0)
-                                return "Duration must be greater than 0";
+                            if (arguments.Count > 1)
+                            {
+                                if (!float.TryParse(arguments[1], out float paramValue))
+                                    return "Please enter a valid number";
+                                    
+                                if (SelectedMethod.Id == "hold_button" && paramValue <= 0)
+                                    return "Duration must be greater than 0";
+                                    
+                                if (SelectedMethod.Id == "press_button" && paramValue < 1)
+                                    return "Must press at least once";
+                            }
+                            break;
+
+                        case "left_joystick":
+                        case "right_joystick":
+                            if (!float.TryParse(arguments[0], out float xAxis) || xAxis < -1 || xAxis > 1)
+                                return "X-axis must be between -1.0 and 1.0";
                                 
-                            if (SelectedMethod.Id == "press_button" && paramValue < 1)
-                                return "Must press at least once";
-                        }
-                        break;
+                            if (!float.TryParse(arguments[1], out float yAxis) || yAxis < -1 || yAxis > 1)
+                                return "Y-axis must be between -1.0 and 1.0";
+                            break;
 
-                    case "left_joystick":
-                    case "right_joystick":
-                        if (!float.TryParse(arguments[0], out float xAxis) || xAxis < -1 || xAxis > 1)
-                            return "X-axis must be between -1.0 and 1.0";
-                            
-                        if (!float.TryParse(arguments[1], out float yAxis) || yAxis < -1 || yAxis > 1)
-                            return "Y-axis must be between -1.0 and 1.0";
-                        break;
-
-                    case "left_trigger":
-                    case "right_trigger":
-                        if (!float.TryParse(arguments[0], out float triggerValue) || triggerValue < 0 || triggerValue > 1)
-                            return "Trigger value must be between 0.0 and 1.0";
-                        break;
+                        case "left_trigger":
+                        case "right_trigger":
+                            if (!float.TryParse(arguments[0], out float triggerValue) || triggerValue < 0 || triggerValue > 1)
+                                return "Trigger value must be between 0.0 and 1.0";
+                            break;
+                    }
                 }
 
                 // Validate pose settings if enabled
@@ -306,12 +399,44 @@ namespace MI_GUI_WinUI.ViewModels
                 return;
             }
 
-            var updatedAction = new ActionConfig
+            var updatedAction = new ActionConfig();
+
+            if (SelectedMethod.Id.StartsWith("chain_"))
             {
-                ClassName = SelectedClass,
-                MethodName = SelectedMethod.Id,
-                Arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList()
-            };
+                // Load the chain action configuration
+                var actionName = SelectedMethod.Id.Substring(6);
+                var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
+                
+                try
+                {
+                    var json = File.ReadAllText(filePath);
+                    var actionData = JsonConvert.DeserializeObject<dynamic>(json);
+
+                    updatedAction = new ActionConfig
+                    {
+                        ClassName = actionData.action.@class.ToString(),
+                        MethodName = actionData.action.method.ToString(),
+                        Arguments = ((System.Collections.IEnumerable)actionData.action.args).Cast<object>().ToList()
+                    };
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error applying chain action: {ex.Message}");
+                    ValidationMessage = "Error applying chain action";
+                    return;
+                }
+            }
+            else
+            {
+                updatedAction = new ActionConfig
+                {
+                    ClassName = SelectedClass,
+                    MethodName = SelectedMethod.Id,
+                    Arguments = ArgumentsWithDescriptions.Select(a => 
+                        float.TryParse(a.Value, out float number) ? number :
+                        a.Value as object).ToList()
+                };
+            }
 
             var baseElement = _element.WithAction(updatedAction);
 

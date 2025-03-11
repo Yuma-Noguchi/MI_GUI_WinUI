@@ -35,7 +35,7 @@ namespace MI_GUI_WinUI.Models
                 {
                     ClassName = "ds4_gamepad",
                     MethodName = "button_down",
-                    Arguments = new List<string> { "A" }
+                    Arguments = new List<object> { "A" }
                 }
             };
             
@@ -52,7 +52,7 @@ namespace MI_GUI_WinUI.Models
                 {
                     ClassName = "ds4_gamepad",
                     MethodName = "right_trigger",
-                    Arguments = new List<string> { "0.75" }
+                    Arguments = new List<object> { "0.75" }
                 }
             };
 

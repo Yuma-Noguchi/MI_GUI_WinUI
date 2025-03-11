@@ -61,7 +61,7 @@ namespace MI_GUI_WinUI.Models
                 {
                     ClassName = "ds4_gamepad",
                     MethodName = "",
-                    Arguments = new List<string>()
+                    Arguments = new List<object>()
                 }
             };
         }
@@ -77,7 +77,7 @@ namespace MI_GUI_WinUI.Models
                 {
                     ClassName = "ds4_gamepad",
                     MethodName = "",
-                    Arguments = new List<string>()
+                    Arguments = new List<object>()
                 },
                 _landmarks = new List<string> { "RIGHT_WRIST" },
                 Sensitivity = 1.0,

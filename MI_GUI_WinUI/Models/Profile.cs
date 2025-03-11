@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,7 +22,7 @@ public struct ActionConfig
     public string MethodName { get; set; }
 
     [JsonProperty("args")]
-    public List<string> Arguments { get; set; }
+    public List<object> Arguments { get; set; }
 }
 
 public struct GuiElement
