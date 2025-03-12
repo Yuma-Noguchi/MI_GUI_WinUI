@@ -12,7 +12,7 @@ using Newtonsoft.Json.Converters;
 
 namespace MI_GUI_WinUI.Models;
 
-// [Previous struct definitions remained unchanged...]
+
 public struct ActionConfig
 {
     [JsonProperty("class")]

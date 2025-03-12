@@ -101,10 +101,26 @@ namespace MI_GUI_WinUI.ViewModels
                     foreach (var file in files)
                     {
                         var actionName = Path.GetFileNameWithoutExtension(file);
-                        AvailableMethods.Add(new MethodDescription(
-                            $"chain_{actionName}",
-                            $"Custom: {actionName}"
-                        ));
+                        try
+                        {
+                            var json = File.ReadAllText(file);
+                            var actionData = JsonConvert.DeserializeObject<dynamic>(json);
+                            // Verify the JSON structure is valid for a chain action
+                            if (actionData.action != null && 
+                                actionData.action.@class != null && 
+                                actionData.action.method != null && 
+                                actionData.action.args != null)
+                            {
+                                AvailableMethods.Add(new MethodDescription(
+                                    $"chain_{actionName}",
+                                    $"Custom: {actionName}"
+                                ));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error parsing custom action {actionName}: {ex.Message}");
+                        }
                     }
                 }
             }
@@ -145,11 +161,27 @@ namespace MI_GUI_WinUI.ViewModels
                         if (method.Id.StartsWith("chain_"))
                         {
                             var actionName = method.Id.Substring(6);
-                            ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                                "Using custom action: " + actionName,
-                                "chain",
-                                false
-                            ));
+                            var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
+                            
+                            if (File.Exists(filePath))
+                            {
+                                var json = File.ReadAllText(filePath);
+                                var actionData = JsonConvert.DeserializeObject<dynamic>(json);
+
+                                ArgumentsWithDescriptions.Add(new ArgumentInfo(
+                                    $"Custom action: {actionName}",
+                                    JsonConvert.SerializeObject(actionData.action.args, Formatting.Indented),
+                                    false
+                                ));
+                            }
+                            else
+                            {
+                                ArgumentsWithDescriptions.Add(new ArgumentInfo(
+                                    "Error: Custom action not found",
+                                    "",
+                                    false
+                                ));
+                            }
                         }
                         else
                         {
@@ -240,8 +272,8 @@ namespace MI_GUI_WinUI.ViewModels
 
                         ArgumentsWithDescriptions.Clear();
                         ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                            "Using custom action: " + actionName,
-                            "chain",
+                            $"Custom action: {actionName}",
+                            JsonConvert.SerializeObject(actionData.action.args, Formatting.Indented),
                             false
                         ));
                     }
@@ -412,11 +444,31 @@ namespace MI_GUI_WinUI.ViewModels
                     var json = File.ReadAllText(filePath);
                     var actionData = JsonConvert.DeserializeObject<dynamic>(json);
 
+                    var args = new List<object>();
+                    foreach (var arg in actionData.action.args)
+                    {
+                        if (arg.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                        {
+                            // Preserve object structure for chain methods
+                            args.Add(arg.ToObject<Dictionary<string, object>>());
+                        }
+                        else if (arg.Type == Newtonsoft.Json.Linq.JTokenType.Array)
+                        {
+                            // Convert array to List<object>
+                            args.Add(arg.ToObject<List<object>>());
+                        }
+                        else
+                        {
+                            // Handle primitive types
+                            args.Add(arg.ToObject<object>());
+                        }
+                    }
+
                     updatedAction = new ActionConfig
                     {
                         ClassName = actionData.action.@class.ToString(),
                         MethodName = actionData.action.method.ToString(),
-                        Arguments = ((System.Collections.IEnumerable)actionData.action.args).Cast<object>().ToList()
+                        Arguments = args
                     };
                 }
                 catch (Exception ex)
