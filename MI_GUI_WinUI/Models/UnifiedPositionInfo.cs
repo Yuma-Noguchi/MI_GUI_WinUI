@@ -15,11 +15,16 @@ namespace MI_GUI_WinUI.Models
             Size = size;
         }
 
-        public UnifiedPositionInfo With(UnifiedGuiElement? element = null, Point? position = null, Size? size = null) => new()
+        public UnifiedPositionInfo With(UnifiedGuiElement? element = null, Point? position = null, Size? size = null)
         {
-            Element = element ?? Element,
-            Position = position ?? Position,
-            Size = size ?? Size
-        };
+            // Create a new instance while properly handling the Element reference
+            var updatedElement = element ?? Element with { };
+            
+            return new UnifiedPositionInfo(
+                updatedElement,
+                position ?? Position,
+                size ?? Size
+            );
+        }
     }
 }

@@ -136,14 +136,10 @@ namespace MI_GUI_WinUI.ViewModels
             CanvasElements.Add(info);
         }
 
-        public void UpdateElementPosition(UnifiedPositionInfo info)
+        public void UpdateElementPosition(UnifiedPositionInfo info, int index)
         {
-            var existingElement = CanvasElements.FirstOrDefault(e => 
-                e.Element.Position.SequenceEqual(info.Element.Position));
-
-            if (existingElement != null)
+            if (index >= 0 && index < CanvasElements.Count)
             {
-                var index = CanvasElements.IndexOf(existingElement);
                 CanvasElements[index] = info;
             }
         }
@@ -308,20 +304,13 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public async Task ConfigureAction(UnifiedPositionInfo elementInfo)
+        public async Task ConfigureAction(UnifiedPositionInfo elementInfo, ResizableImage image)
         {
             if (XamlRoot == null) return;
 
             var dialog = new ActionConfigurationDialog();
             dialog.XamlRoot = XamlRoot;
-            var originalIndex = CanvasElements.IndexOf(elementInfo);
-            if (originalIndex < 0)
-            {
-                // Fallback to position-based identification if index not found
-                originalIndex = CanvasElements.ToList().FindIndex(e => 
-                    Math.Abs(e.Position.X - elementInfo.Position.X) < 1 &&
-                    Math.Abs(e.Position.Y - elementInfo.Position.Y) < 1);
-            }
+            var index = CanvasElements.IndexOf(elementInfo);
 
             dialog.Configure(elementInfo.Element, element => 
             {
@@ -332,11 +321,12 @@ namespace MI_GUI_WinUI.ViewModels
                     elementInfo.Size
                 );
                 
-                // Update at the saved index
-                if (originalIndex >= 0 && originalIndex < CanvasElements.Count)
+                // Update both the collection and UI
+                if (index >= 0 && index < CanvasElements.Count)
                 {
-                    CanvasElements[originalIndex] = updatedInfo;
-                    System.Diagnostics.Debug.WriteLine($"Updated element at index {originalIndex} with action: {element.Action.ClassName}.{element.Action.MethodName}");
+                    CanvasElements[index] = updatedInfo;
+                    image.Tag = updatedInfo; // Update the UI element's Tag
+                    System.Diagnostics.Debug.WriteLine($"Updated element at index {index} with action: {element.Action.ClassName}.{element.Action.MethodName}");
                 }
             });
 

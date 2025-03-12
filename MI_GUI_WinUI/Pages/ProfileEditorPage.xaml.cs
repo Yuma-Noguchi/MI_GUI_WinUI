@@ -125,32 +125,15 @@ namespace MI_GUI_WinUI.Pages
             
             configureItem.Click += async (s, e) => 
             {
-                // Get the current position of the image
-                var imageX = Canvas.GetLeft(image);
-                var imageY = Canvas.GetTop(image);
-
-                // Find the current element info from CanvasElements based on position
-                var currentElementInfo = ViewModel.CanvasElements.FirstOrDefault(e => 
-                    Math.Abs(e.Position.X - imageX) < 1 && 
-                    Math.Abs(e.Position.Y - imageY) < 1);
-
-                if (currentElementInfo != null)
+                if (image.Tag is UnifiedPositionInfo currentElementInfo)
                 {
-                    await ViewModel.ConfigureAction(currentElementInfo);
+                    await ViewModel.ConfigureAction(currentElementInfo, image);
                 }
             };
 
             deleteItem.Click += (s, e) =>
             {
-                // Similarly, find current element for deletion
-                var imageX = Canvas.GetLeft(image);
-                var imageY = Canvas.GetTop(image);
-                
-                var currentElementInfo = ViewModel.CanvasElements.FirstOrDefault(e => 
-                    Math.Abs(e.Position.X - imageX) < 1 && 
-                    Math.Abs(e.Position.Y - imageY) < 1);
-
-                if (currentElementInfo != null)
+                if (image.Tag is UnifiedPositionInfo currentElementInfo)
                 {
                     ViewModel.CanvasElements.Remove(currentElementInfo);
                     EditorCanvasElement.Children.Remove(image);
@@ -317,7 +300,7 @@ namespace MI_GUI_WinUI.Pages
 
         private void Image_ManipulationDelta(object sender, ManipulationDeltaRoutedEventArgs e)
         {
-            if (activeImage == null || !(activeImage.Tag is UnifiedPositionInfo elementInfo)) return;
+            if (activeImage?.Tag is not UnifiedPositionInfo elementInfo) return;
 
             var newX = originalPosition.X + e.Cumulative.Translation.X;
             var newY = originalPosition.Y + e.Cumulative.Translation.Y;
@@ -330,11 +313,22 @@ namespace MI_GUI_WinUI.Pages
 
             Point newPosition = new Point(newX, newY);
 
+            // Create a new position info that preserves the original element
+            var updatedInfo = new UnifiedPositionInfo(
+                elementInfo.Element,
+                newPosition,
+                elementInfo.Size
+            );
+
             Canvas.SetLeft(activeImage, newPosition.X);
             Canvas.SetTop(activeImage, newPosition.Y);
 
-            var updatedInfo = elementInfo.With(position: newPosition);
-            ViewModel.UpdateElementPosition(updatedInfo);
+            // Find the element's index in the CanvasElements collection
+            var index = ViewModel.CanvasElements.IndexOf(elementInfo);
+
+            // Update both the ViewModel and UI
+            ViewModel.UpdateElementPosition(updatedInfo, index);
+            activeImage.Tag = updatedInfo;
         }
 
         private void Element_RightTapped(object sender, RightTappedRoutedEventArgs e)
