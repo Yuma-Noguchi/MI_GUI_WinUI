@@ -28,12 +28,12 @@
         <!-- Profile Management -->
         <StackPanel Grid.Row="1" Orientation="Horizontal">
             <TextBox PlaceholderText="Enter profile name"
-                 Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay}"
+                 Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                  VerticalAlignment="Center"
                  Width="300"
                  HorizontalAlignment="Left"/>
             <CommandBar  DefaultLabelPosition="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <AppBarButton Icon="Save" Label="Save Profile" Command="{x:Bind ViewModel.SaveProfileCommand}"/>
+                <AppBarButton Icon="Save" Label="Save Profile" Click="SaveProfile_Click"/>
                 <AppBarButton Icon="Add" Label="New Profile" Command="{x:Bind ViewModel.NewProfileCommand}"/>
                 <AppBarButton Icon="Clear" Label="Clear Canvas" Command="{x:Bind ViewModel.ClearCanvasCommand}"/>
             </CommandBar>

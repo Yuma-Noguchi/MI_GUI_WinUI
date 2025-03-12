@@ -16,6 +16,7 @@ using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace MI_GUI_WinUI.Pages
 {
@@ -353,6 +354,18 @@ namespace MI_GUI_WinUI.Pages
             {
                 EditorCanvasElement.Children.Clear();
             }
+        }
+
+        private async void SaveProfile_Click(object sender, RoutedEventArgs e)
+        {
+            // Move focus to a non-input element to force binding update
+            if (FocusManager.GetFocusedElement() is TextBox && EditorCanvasElement != null)
+            {
+                EditorCanvasElement.Focus(FocusState.Programmatic);
+                await Task.Delay(50); // Allow time for binding to update
+            }
+
+            await ViewModel.SaveProfileCommand.ExecuteAsync(null);
         }
     }
 }
