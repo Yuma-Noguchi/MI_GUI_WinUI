@@ -28,6 +28,9 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private XamlRoot? xamlRoot;
 
+        [ObservableProperty]
+        private bool shouldClearCanvas;
+
         public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
 
         partial void OnValidationMessageChanged(string value)
@@ -147,9 +150,9 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         public void NewProfile()
         {
+            ShouldClearCanvas = true;
             ProfileName = string.Empty;
             ValidationMessage = string.Empty;
-            CanvasElements.Clear();
         }
 
         [RelayCommand]
@@ -252,6 +255,7 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
+                ShouldClearCanvas = true;
                 if (string.IsNullOrWhiteSpace(ProfileName))
                 {
                     ValidationMessage = "Please enter a profile name to load";

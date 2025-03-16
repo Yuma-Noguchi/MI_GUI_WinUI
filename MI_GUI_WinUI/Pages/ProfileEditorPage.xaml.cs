@@ -40,9 +40,11 @@ namespace MI_GUI_WinUI.Pages
 
             ViewModel.PropertyChanged += (sender, e) =>
             {
-                if (e.PropertyName == nameof(ProfileEditorViewModel.ProfileName))
+                if (e.PropertyName == nameof(ProfileEditorViewModel.ShouldClearCanvas) && 
+                    ViewModel.ShouldClearCanvas)
                 {
                     ClearCanvas();
+                    ViewModel.ShouldClearCanvas = false;  // Reset flag
                 }
             };
 
