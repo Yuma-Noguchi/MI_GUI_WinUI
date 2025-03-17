@@ -115,6 +115,52 @@ namespace MI_GUI_WinUI.ViewModels
             ValidationMessage = string.Empty;
         }
 
+        public async Task LoadExistingProfile(Profile profile)
+        {
+            try
+            {
+                ShouldClearCanvas = true;
+                PrepareForEdit();
+                ProfileName = profile.Name;
+
+                // Load GUI elements
+                if (profile.GuiElements != null)
+                {
+                    foreach (var element in profile.GuiElements)
+                    {
+                        var unifiedElement = UnifiedGuiElement.FromGuiElement(element);
+                        AddElementToCanvas(ElementAddRequest.FromExisting(
+                            unifiedElement, 
+                            new Point(element.Position[0], element.Position[1])
+                        ));
+                    }
+                }
+
+                // Load poses
+                if (profile.Poses != null)
+                {
+                    foreach (var pose in profile.Poses)
+                    {
+                        // if skin is set, add element with skin
+                        if (!string.IsNullOrEmpty(pose.Skin))
+                        {
+                            var unifiedElement = UnifiedGuiElement.FromPoseElement(pose);
+                            AddElementToCanvas(ElementAddRequest.FromExisting(
+                            unifiedElement,
+                            new Point(pose.Position[0], pose.Position[1])
+                            ));
+                        }   
+                    }
+                }
+
+                ValidationMessage = "Profile loaded successfully";
+            }
+            catch (Exception ex)
+            {
+                ValidationMessage = $"Error loading profile: {ex.Message}";
+            }
+        }
+
         [RelayCommand]
         public void AddButtonToCanvas(UnifiedPositionInfo buttonInfo)
         {

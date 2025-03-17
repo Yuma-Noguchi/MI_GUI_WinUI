@@ -64,7 +64,7 @@ namespace MI_GUI_WinUI.Pages
                 {
                     try
                     {
-                        //await ViewModel.LoadExistingProfile(profile);
+                        await ViewModel.LoadExistingProfile(profile);
                     }
                     catch (Exception ex)
                     {
