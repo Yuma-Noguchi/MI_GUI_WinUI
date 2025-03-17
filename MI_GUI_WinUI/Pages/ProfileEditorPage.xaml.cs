@@ -147,9 +147,9 @@ namespace MI_GUI_WinUI.Pages
             menu.Items.Add(deleteItem);
             image.ContextFlyout = menu;
 
-            // Set position
-            Canvas.SetLeft(image, elementInfo.Position.X);
-            Canvas.SetTop(image, elementInfo.Position.Y);
+            // Convert center position to top-left for canvas display
+            Canvas.SetLeft(image, elementInfo.Position.X - (image.Width/2));
+            Canvas.SetTop(image, elementInfo.Position.Y - (image.Height/2));
 
             // Add to canvas
             EditorCanvasElement.Children.Add(image);
@@ -262,13 +262,10 @@ namespace MI_GUI_WinUI.Pages
                     // Convert element skin to full path for display
                     var elementWithDisplayPath = request.Element.WithSkin(Utils.FileNameHelper.GetFullAssetPath(request.Element.Skin));
                     
-                    // Create the position info with proper positioning
+                    // Store center position in UnifiedPositionInfo
                     var elementInfo = new UnifiedPositionInfo(
                         elementWithDisplayPath,
-                        new Point(
-                            dropPosition.X - DROPPED_IMAGE_SIZE/2, // Calculate top-left from center
-                            dropPosition.Y - DROPPED_IMAGE_SIZE/2
-                        ),
+                        dropPosition, // Store the center position directly
                         new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
                     );
                     
@@ -314,17 +311,22 @@ namespace MI_GUI_WinUI.Pages
             newX = Math.Round(newX);
             newY = Math.Round(newY);
 
-            Point newPosition = new Point(newX, newY);
+            // Calculate center position from top-left dragged position
+            Point centerPosition = new Point(
+                newX + activeImage.ActualWidth/2,
+                newY + activeImage.ActualHeight/2
+            );
 
-            // Create a new position info that preserves the original element
+            // Create a new position info with center position
             var updatedInfo = new UnifiedPositionInfo(
                 elementInfo.Element,
-                newPosition,
+                centerPosition,
                 elementInfo.Size
             );
 
-            Canvas.SetLeft(activeImage, newPosition.X);
-            Canvas.SetTop(activeImage, newPosition.Y);
+            // Set canvas position using top-left coordinates
+            Canvas.SetLeft(activeImage, newX);
+            Canvas.SetTop(activeImage, newY);
 
             // Find the element's index in the CanvasElements collection
             var index = ViewModel.CanvasElements.IndexOf(elementInfo);

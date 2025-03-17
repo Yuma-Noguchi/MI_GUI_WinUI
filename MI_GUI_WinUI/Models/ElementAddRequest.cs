@@ -32,8 +32,7 @@ namespace MI_GUI_WinUI.Models
         public static ElementAddRequest CreatePoseRequest(Point position, int radius)
         {
             var element = UnifiedGuiElement.CreatePoseElement(
-                (int)position.X,
-                (int)position.Y,
+                0, 0, // Pass initial zero position since we're handling position via request
                 radius
             );
             return new ElementAddRequest(element, position);
@@ -45,8 +44,7 @@ namespace MI_GUI_WinUI.Models
             string relativePath = Utils.FileNameHelper.ConvertToAssetsRelativePath(imagePath);
 
             var element = UnifiedGuiElement.CreateGuiElement(
-                (int)position.X,
-                (int)position.Y,
+                0, 0, // Pass initial zero position since we're handling position via request
                 radius
             ).WithSkin(relativePath);
             

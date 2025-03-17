@@ -178,9 +178,10 @@ namespace MI_GUI_WinUI.ViewModels
                 Skin = request.Button?.FileName ?? element.Skin
             };
 
+            // Request position is assumed to be center position
             var info = new UnifiedPositionInfo(
                 updatedElement,
-                request.Position,
+                request.Position, // Already in center coordinates
                 new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
             );
 
