@@ -16,6 +16,7 @@ namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ProfileEditorViewModel : ObservableObject
     {
+        private readonly ProfileService _profileService;
         private const float DROPPED_IMAGE_SIZE = 80;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
 
@@ -42,8 +43,9 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
 
-        public ProfileEditorViewModel()
+        public ProfileEditorViewModel(ProfileService profileService)
         {
+            _profileService = profileService;
             InitializeDefaultButtons();
             LoadCustomButtons();
         }
@@ -279,6 +281,9 @@ namespace MI_GUI_WinUI.ViewModels
 
                 var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
                 await File.WriteAllTextAsync(filePath, json);
+
+                // Clear profile cache to ensure fresh data on next load
+                _profileService.ClearCache();
 
                 ValidationMessage = "Profile saved successfully";
                 if (XamlRoot != null)
