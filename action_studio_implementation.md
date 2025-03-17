@@ -2,33 +2,19 @@
 
 ## 1. Core Components
 
-### A. Visual Action Configuration Interface
-1. Button Mapping Area
-   - Interactive visual representation of controller/keyboard
-   - Drag-and-drop functionality for mapping
-   - Clear visual indicators for mapped buttons
+### A. Two-Panel Layout
+1. Saved Actions Panel (Left)
+   - ListView of existing actions
+   - New Action button
+   - Load action functionality
+   - Delete action option
 
-2. Input Sequence Editor
-   - Timeline-based interface for creating action sequences
-   - Support for multiple input types (press, hold, release)
-   - Visual timing indicators
-   - Duration controls for held inputs
-
-3. Action Preview Panel
-   - Real-time visualization of configured actions
-   - Animation of button sequences
-   - Timing display
-
-### B. Action Management System
-1. Action Library
-   - Categorized list of created actions
-   - Search and filter functionality
-   - Quick access to frequently used actions
-
-2. Action Templates
-   - Pre-configured common gaming actions
-   - Template customization options
-   - Import/export capability
+2. Action Editor Panel (Right)
+   - Action name input
+   - Button selection dropdown
+   - Add to sequence button
+   - Sequence preview list
+   - Save action button
 
 ## 2. Technical Implementation
 
@@ -36,100 +22,69 @@
 ```mermaid
 classDiagram
     class Action {
-        +string Id
         +string Name
-        +string Description
-        +List~InputSequence~ Sequences
-        +ActionType Type
-        +bool IsEnabled
+        +List~ButtonSequence~ Sequence
     }
-    class InputSequence {
-        +List~Input~ Inputs
-        +int Duration
-        +int Delay
-    }
-    class Input {
-        +InputType Type
+    class ButtonSequence {
         +string Button
-        +int Duration
-        +int StartTime
+        +double Duration
     }
-    Action --> InputSequence
-    InputSequence --> Input
+    Action --> ButtonSequence
 ```
 
 ### B. Key Services
-1. Action Configuration Service
-   - Input validation
-   - Sequence timing management
-   - Action persistence
+1. Action Service
+   - Load/Save actions
+   - Manage action sequence
+   - File I/O operations
 
-2. Input Mapping Service
-   - Button mapping logic
-   - Input type handling
-   - Conflict detection
-
-3. Action Testing Service
-   - Real-time action simulation
-   - Validation checks
-   - Performance monitoring
+2. Validation Service
+   - Action name validation
+   - Sequence validation
+   - Save state management
 
 ## 3. User Interface Flow
 ```mermaid
 graph TD
-    A[Action Studio Home] --> B[Create New Action]
-    A --> C[Edit Existing Action]
-    B --> D[Configure Inputs]
+    A[Action Studio Home] --> B[New Action]
+    A --> C[Select Existing Action]
+    B --> D[Edit Action]
     C --> D
-    D --> E[Test Action]
-    E --> F[Save Action]
-    F --> A
-    D --> G[Add to Sequence]
-    G --> D
+    D -->|Add Button| D
+    D --> E[Save Action]
+    E --> A
 ```
 
-## 4. Implementation Phases
+## 4. Implementation Steps
 
-### Phase 1: Core Infrastructure
-- Basic UI layout
-- Action data models
-- Core services setup
-- Basic input mapping
+### Phase 1: Basic Structure
+- Updated XAML layout
+- Core view model properties
+- Basic action management
 
-### Phase 2: Visual Editor
-- Button mapping interface
-- Sequence timeline
-- Real-time preview
-- Basic validation
+### Phase 2: Sequence Building
+- Button sequence logic
+- Preview functionality
+- Sequence manipulation
 
-### Phase 3: Advanced Features
-- Template system
-- Import/export functionality
-- Advanced validation
-- Performance optimizations
-
-### Phase 4: Testing & Polish
-- Unit tests
-- Integration tests
-- UI/UX improvements
-- Performance tuning
+### Phase 3: File Operations
+- Save/Load implementation
+- Action persistence
+- Error handling
 
 ## 5. Technical Considerations
 
 ### A. Performance
-- Efficient action processing
-- Smooth UI animations
-- Optimized data structures
-- Cache management
+- Efficient action list updates
+- Quick sequence manipulation
+- Smooth UI interactions
 
-### B. Reliability
-- Input validation
-- Error handling
-- State management
-- Data persistence
+### B. User Experience
+- Clear feedback on actions
+- Simple navigation
+- Intuitive sequence building
 
-### C. Extensibility
-- Plugin architecture
-- Custom action types
-- External integrations
-- API design
+### C. Reliability
+- Proper error handling
+- Data validation
+- File operation safety
