@@ -195,10 +195,8 @@
                                         </Grid.ColumnDefinitions>
                                         <!-- Button Press Display -->
                                         <TextBlock VerticalAlignment="Center"
-                                                 Visibility="{x:Bind IsPress, Mode=OneWay}">
-                                            <Run Text="{x:Bind ButtonName, Mode=OneWay, Converter={StaticResource ButtonDisplayConverter}}"/>
-                                            <Run Text=" press"/>
-                                        </TextBlock>
+                                                 Visibility="{x:Bind IsPress, Mode=OneWay}"
+                                                 Text="{x:Bind ButtonName, Mode=OneWay, Converter={StaticResource ButtonDisplayConverter}, ConverterParameter='append_press'}"/>
                                         <!-- Sleep Duration Display -->
                                         <TextBlock VerticalAlignment="Center"
                                                  Visibility="{x:Bind IsSleep, Mode=OneWay}">
