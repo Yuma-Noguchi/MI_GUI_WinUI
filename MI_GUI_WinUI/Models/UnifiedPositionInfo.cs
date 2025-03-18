@@ -17,12 +17,16 @@ namespace MI_GUI_WinUI.Models
 
         public UnifiedPositionInfo With(UnifiedGuiElement? element = null, Point? position = null, Size? size = null)
         {
-            // Create a new instance while properly handling the Element reference
-            var updatedElement = element ?? Element with { };
+            // Create a new instance while properly handling position updates
+            Point newPosition = position ?? Position;
+            var updatedElement = (element ?? Element) with { };
+            
+            // Always update the underlying element's position to match
+            updatedElement = updatedElement.WithPosition((int)newPosition.X, (int)newPosition.Y);
             
             return new UnifiedPositionInfo(
                 updatedElement,
-                position ?? Position,
+                newPosition,
                 size ?? Size
             );
         }

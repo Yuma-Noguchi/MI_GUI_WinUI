@@ -175,16 +175,18 @@ namespace MI_GUI_WinUI.ViewModels
 
         public void AddElementToCanvas(ElementAddRequest request)
         {
+            // Request already contains element with correct position and skin
             var element = request.Element;
-            var updatedElement = element with 
+
+            // Ensure the skin path is updated if we have a button
+            if (request.Button?.FileName != null)
             {
-                // Update skin to be relative path if FileName is set in EditorButton
-                Skin = request.Button?.FileName ?? element.Skin
-            };
+                element = element.WithSkin(request.Button.FileName);
+            }
 
             // Request position is assumed to be center position
             var info = new UnifiedPositionInfo(
-                updatedElement,
+                element,
                 request.Position, // Already in center coordinates
                 new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
             );
@@ -274,13 +276,19 @@ namespace MI_GUI_WinUI.ViewModels
                 // Split elements into GUI and Pose arrays
                 foreach (var element in CanvasElements)
                 {
-                    if (element.Element.IsPose)
+                    // Update the element's position before converting
+                    var elementWithPosition = element.Element.WithPosition(
+                        (int)element.Position.X,
+                        (int)element.Position.Y
+                    );
+
+                    if (elementWithPosition.IsPose)
                     {
-                        profile.Poses.Add(element.Element.ToPoseElement());
+                        profile.Poses.Add(elementWithPosition.ToPoseElement());
                     }
                     else
                     {
-                        profile.GuiElements.Add(element.Element.ToGuiElement());
+                        profile.GuiElements.Add(elementWithPosition.ToGuiElement());
                     }
                 }
 
@@ -374,11 +382,12 @@ namespace MI_GUI_WinUI.ViewModels
 
             dialog.Configure(elementInfo.Element, element => 
             {
-                // Create updated element with the same position and size
-                var updatedInfo = new UnifiedPositionInfo(
-                    element,
-                    elementInfo.Position, 
-                    elementInfo.Size
+                // Create updated element and maintain position and size
+                var updatedInfo = elementInfo.With(
+                    element: element.WithPosition(
+                        (int)elementInfo.Position.X,
+                        (int)elementInfo.Position.Y
+                    )
                 );
                 
                 // Update both the collection and UI

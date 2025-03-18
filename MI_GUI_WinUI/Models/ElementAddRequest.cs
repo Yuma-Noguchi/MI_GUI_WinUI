@@ -12,6 +12,8 @@ namespace MI_GUI_WinUI.Models
 
         public ElementAddRequest(UnifiedGuiElement element, Point position, EditorButton? button = null)
         {
+            // Update element position during creation
+            element = element.WithPosition((int)position.X, (int)position.Y);
             Element = element;
             Position = position;
             Button = button;
@@ -19,20 +21,25 @@ namespace MI_GUI_WinUI.Models
 
         public static ElementAddRequest FromExisting(UnifiedGuiElement element, Point position)
         {
-            return new ElementAddRequest(element, position);
+            // Update element position for existing elements
+            return new ElementAddRequest(element.WithPosition((int)position.X, (int)position.Y), position);
         }
 
         public static ElementAddRequest FromButton(EditorButton button, Point position, bool isPose = false)
         {
             var element = isPose ? UnifiedGuiElement.CreatePoseElement() : UnifiedGuiElement.CreateGuiElement();
-            element = element.WithSkin(button.FileName);  // Use FileName for relative path
+            // Set both position and skin
+            element = element
+                .WithPosition((int)position.X, (int)position.Y)
+                .WithSkin(button.FileName);  // Use FileName for relative path
             return new ElementAddRequest(element, position, button);
         }
 
         public static ElementAddRequest CreatePoseRequest(Point position, int radius)
         {
             var element = UnifiedGuiElement.CreatePoseElement(
-                0, 0, // Pass initial zero position since we're handling position via request
+                (int)position.X,  // Pass actual position
+                (int)position.Y,
                 radius
             );
             return new ElementAddRequest(element, position);
@@ -44,7 +51,8 @@ namespace MI_GUI_WinUI.Models
             string relativePath = Utils.FileNameHelper.ConvertToAssetsRelativePath(imagePath);
 
             var element = UnifiedGuiElement.CreateGuiElement(
-                0, 0, // Pass initial zero position since we're handling position via request
+                (int)position.X,  // Pass actual position
+                (int)position.Y,
                 radius
             ).WithSkin(relativePath);
             

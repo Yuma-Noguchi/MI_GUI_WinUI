@@ -317,12 +317,8 @@ namespace MI_GUI_WinUI.Pages
                 newY + activeImage.ActualHeight/2
             );
 
-            // Create a new position info with center position
-            var updatedInfo = new UnifiedPositionInfo(
-                elementInfo.Element,
-                centerPosition,
-                elementInfo.Size
-            );
+            // Create a new position info with center position and update element position
+            var updatedInfo = elementInfo.With(position: centerPosition);
 
             // Set canvas position using top-left coordinates
             Canvas.SetLeft(activeImage, newX);
@@ -334,6 +330,9 @@ namespace MI_GUI_WinUI.Pages
             // Update both the ViewModel and UI
             ViewModel.UpdateElementPosition(updatedInfo, index);
             activeImage.Tag = updatedInfo;
+
+            // Debug output
+            System.Diagnostics.Debug.WriteLine($"Updated element position to ({updatedInfo.Element.Position[0]}, {updatedInfo.Element.Position[1]})");
         }
 
         private void Element_RightTapped(object sender, RightTappedRoutedEventArgs e)
