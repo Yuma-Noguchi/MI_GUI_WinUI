@@ -7,10 +7,10 @@ namespace MI_GUI_WinUI.Controls
 {
     public sealed partial class ActionConfigurationDialog : ContentDialog
     {
-        public ActionConfigurationDialog()
+        public ActionConfigurationDialog(ActionConfigurationDialogViewModel viewModel)
         {
             this.InitializeComponent();
-            ViewModel = new ActionConfigurationDialogViewModel();
+            ViewModel = viewModel;
             this.PrimaryButtonClick += ActionConfigurationDialog_PrimaryButtonClick;
         }
 

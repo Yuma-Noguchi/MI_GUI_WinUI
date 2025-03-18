@@ -8,16 +8,31 @@ using System.Linq;
 using System.Windows.Input;
 using System.IO;
 using Newtonsoft.Json;
+using MI_GUI_WinUI.Services;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ActionConfigurationDialogViewModel : ObservableObject
     {
-        private Action<UnifiedGuiElement>? _onSave;
-        private UnifiedGuiElement _element;
-        
-        [ObservableProperty]
-        private bool isDialogOpen;
+    private readonly ActionService _actionService;
+    private Action<UnifiedGuiElement>? _onSave;
+    private UnifiedGuiElement _element;
+    
+    [ObservableProperty]
+    private bool isDialogOpen;
+
+    [ObservableProperty]
+    private bool useCustomAction;
+
+    [ObservableProperty]
+    private ObservableCollection<ActionData> availableActions;
+
+    [ObservableProperty]
+    private ActionData? selectedCustomAction;
+
+    private bool _isLoadingActions;
+    public bool ShowBasicSettings => !UseCustomAction;
+    public bool ShowCustomSettings => UseCustomAction;
 
         [ObservableProperty]
         private string validationMessage = string.Empty;
@@ -64,8 +79,9 @@ namespace MI_GUI_WinUI.ViewModels
             "MotionInput", "data", "assets", "generated_actions"
         );
 
-        public ActionConfigurationDialogViewModel()
+        public ActionConfigurationDialogViewModel(ActionService actionService)
         {
+            _actionService = actionService;
             AvailableMethods = new ObservableCollection<MethodDescription>
             {
                 new("button_down", "Hold Button"),
@@ -80,10 +96,12 @@ namespace MI_GUI_WinUI.ViewModels
             };
 
             // Load custom chain actions
-            LoadCustomActions();
+            AvailableActions = new ObservableCollection<ActionData>();
 
             SaveCommand = new RelayCommand(Save);
             CancelCommand = new RelayCommand(Cancel);
+
+            LoadAvailableActions();
 
             SelectedClass = "ds4_gamepad";
             ArgumentsWithDescriptions = new ObservableCollection<ArgumentInfo>();
@@ -91,46 +109,32 @@ namespace MI_GUI_WinUI.ViewModels
             UpdateArgumentInputs();
         }
 
-        private void LoadCustomActions()
+        private async void LoadAvailableActions()
         {
+            if (_isLoadingActions) return;
+            _isLoadingActions = true;
+
             try
             {
-                if (Directory.Exists(ACTIONS_DIR))
+                var actions = await _actionService.LoadActionsAsync();
+                AvailableActions.Clear();
+                foreach (var action in actions)
                 {
-                    var files = Directory.GetFiles(ACTIONS_DIR, "*.json");
-                    foreach (var file in files)
-                    {
-                        var actionName = Path.GetFileNameWithoutExtension(file);
-                        try
-                        {
-                            var json = File.ReadAllText(file);
-                            var actionData = JsonConvert.DeserializeObject<dynamic>(json);
-                            // Verify the JSON structure is valid for a chain action
-                            if (actionData.action != null && 
-                                actionData.action.@class != null && 
-                                actionData.action.method != null && 
-                                actionData.action.args != null)
-                            {
-                                AvailableMethods.Add(new MethodDescription(
-                                    $"chain_{actionName}",
-                                    $"Custom: {actionName}"
-                                ));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error parsing custom action {actionName}: {ex.Message}");
-                        }
-                    }
+                    AvailableActions.Add(action);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading custom actions: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error loading actions: {ex.Message}");
+            }
+            finally
+            {
+                _isLoadingActions = false;
             }
         }
 
-        public string HeaderText => IsPoseEnabled ? "Pose Detection Help" : "Available Buttons";
+        public string HeaderText => IsPoseEnabled ? "Pose Detection Help" : 
+            UseCustomAction ? "Custom Action Help" : "Available Buttons";
 
         public string HelpText => IsPoseEnabled ? 
             "• Sensitivity affects how quickly the pose is detected\n" +
@@ -147,9 +151,19 @@ namespace MI_GUI_WinUI.ViewModels
             _element = element;
             _onSave = onSave;
 
+            UseCustomAction = element.Action.MethodName?.StartsWith("chain_") ?? false;
+            
             SelectedClass = !string.IsNullOrEmpty(element.Action.ClassName) ? element.Action.ClassName : "ds4_gamepad";
             
-            if (!string.IsNullOrEmpty(element.Action.MethodName))
+            if (UseCustomAction)
+            {
+                var actionName = element.Action.MethodName?.Substring(6); // Remove "chain_" prefix
+                if (!string.IsNullOrEmpty(actionName))
+                {
+                    SelectedCustomAction = AvailableActions.FirstOrDefault(a => a.Name == actionName);
+                }
+            }
+            else if (!string.IsNullOrEmpty(element.Action.MethodName))
             {
                 var method = AvailableMethods.FirstOrDefault(m => m.Id == element.Action.MethodName);
                 if (method != null)
@@ -206,6 +220,11 @@ namespace MI_GUI_WinUI.ViewModels
                 UpdateArgumentInputs();
             }
 
+            OnPropertyChanged(nameof(ShowBasicSettings));
+            OnPropertyChanged(nameof(ShowCustomSettings));
+            OnPropertyChanged(nameof(HeaderText));
+            OnPropertyChanged(nameof(HelpText));
+
             // Set up pose settings
             IsPoseEnabled = element.IsPose;
             if (element.IsPose)
@@ -226,6 +245,8 @@ namespace MI_GUI_WinUI.ViewModels
 
         private bool IsButtonArgument(string methodId, int index)
         {
+            if (UseCustomAction) return false;
+            
             return methodId switch
             {
                 "button_down" or "button_up" or "toggle_button" => true,
@@ -254,45 +275,19 @@ namespace MI_GUI_WinUI.ViewModels
             };
         }
 
-        partial void OnSelectedMethodChanged(MethodDescription value)
+        partial void OnSelectedMethodChanged(MethodDescription? value)
         {
             ValidationMessage = string.Empty;
+            if (value != null) UpdateArgumentInputs();
+        }
 
-            if (value.Id.StartsWith("chain_"))
-            {
-                try
-                {
-                    var actionName = value.Id.Substring(6); // Remove "chain_" prefix
-                    var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
-                    
-                    if (File.Exists(filePath))
-                    {
-                        var json = File.ReadAllText(filePath);
-                        var actionData = JsonConvert.DeserializeObject<dynamic>(json);
-
-                        ArgumentsWithDescriptions.Clear();
-                        ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                            $"Custom action: {actionName}",
-                            JsonConvert.SerializeObject(actionData.action.args, Formatting.Indented),
-                            false
-                        ));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error loading custom action: {ex.Message}");
-                    ArgumentsWithDescriptions.Clear();
-                    ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                        "Error loading custom action",
-                        "",
-                        false
-                    ));
-                }
-            }
-            else
-            {
-                UpdateArgumentInputs();
-            }
+        partial void OnUseCustomActionChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowBasicSettings));
+            OnPropertyChanged(nameof(ShowCustomSettings));
+            OnPropertyChanged(nameof(HeaderText));
+            OnPropertyChanged(nameof(HelpText));
+            ValidationMessage = string.Empty;
         }
 
         partial void OnIsPoseEnabledChanged(bool value)
@@ -353,12 +348,14 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
-                var arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList();
-
-                // Validate action configuration
-                // Skip validation for chain actions
-                if (!SelectedMethod.Id.StartsWith("chain_"))
+                if (UseCustomAction)
                 {
+                    if (SelectedCustomAction == null)
+                        return "Please select an action";
+                }
+                else
+                {
+                    var arguments = ArgumentsWithDescriptions.Select(a => a.Value).ToList();
                     switch (SelectedMethod.Id)
                     {
                         case "button_down":
@@ -433,50 +430,18 @@ namespace MI_GUI_WinUI.ViewModels
 
             var updatedAction = new ActionConfig();
 
-            if (SelectedMethod.Id.StartsWith("chain_"))
+            if (UseCustomAction)
             {
-                // Load the chain action configuration
-                var actionName = SelectedMethod.Id.Substring(6);
-                var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
-                
-                try
+                // Convert selected action into a chain action
+                updatedAction = new ActionConfig
                 {
-                    var json = File.ReadAllText(filePath);
-                    var actionData = JsonConvert.DeserializeObject<dynamic>(json);
-
-                    var args = new List<object>();
-                    foreach (var arg in actionData.action.args)
-                    {
-                        if (arg.Type == Newtonsoft.Json.Linq.JTokenType.Object)
-                        {
-                            // Preserve object structure for chain methods
-                            args.Add(arg.ToObject<Dictionary<string, object>>());
-                        }
-                        else if (arg.Type == Newtonsoft.Json.Linq.JTokenType.Array)
-                        {
-                            // Convert array to List<object>
-                            args.Add(arg.ToObject<List<object>>());
-                        }
-                        else
-                        {
-                            // Handle primitive types
-                            args.Add(arg.ToObject<object>());
-                        }
-                    }
-
-                    updatedAction = new ActionConfig
-                    {
-                        ClassName = actionData.action.@class.ToString(),
-                        MethodName = actionData.action.method.ToString(),
-                        Arguments = args
-                    };
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error applying chain action: {ex.Message}");
-                    ValidationMessage = "Error applying chain action";
-                    return;
-                }
+                    ClassName = "ds4_gamepad",
+                    MethodName = $"chain_{SelectedCustomAction!.Name}",
+                    Arguments = SelectedCustomAction!.Sequence.Select(seq => seq.Type == "press" ?
+                        new { type = "press", button = seq.Value } :
+                        new { type = "sleep", duration = double.Parse(seq.Value) } as object
+                    ).ToList()
+                };
             }
             else
             {

@@ -11,12 +11,15 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Windows.Foundation;
 using Newtonsoft.Json;
+using CommunityToolkit.Mvvm.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ProfileEditorViewModel : ObservableObject
     {
         private readonly ProfileService _profileService;
+        private readonly IServiceProvider _serviceProvider;
         private const float DROPPED_IMAGE_SIZE = 80;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
 
@@ -43,9 +46,10 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
 
-        public ProfileEditorViewModel(ProfileService profileService)
+        public ProfileEditorViewModel(ProfileService profileService, IServiceProvider serviceProvider)
         {
             _profileService = profileService;
+            _serviceProvider = serviceProvider;
             InitializeDefaultButtons();
             LoadCustomButtons();
         }
@@ -364,7 +368,7 @@ namespace MI_GUI_WinUI.ViewModels
         {
             if (XamlRoot == null) return;
 
-            var dialog = new ActionConfigurationDialog();
+            var dialog = _serviceProvider.GetRequiredService<ActionConfigurationDialog>();
             dialog.XamlRoot = XamlRoot;
             var index = CanvasElements.IndexOf(elementInfo);
 

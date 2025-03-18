@@ -17,6 +17,7 @@
     <ContentDialog.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverseConverter"/>
+        <converters:BoolToIntConverter x:Key="BoolToIntConverter"/>
         <x:Double x:Key="ContentDialogMaxWidth">800</x:Double>
     </ContentDialog.Resources>
 
@@ -28,65 +29,85 @@
                 Severity="Error"
                 IsClosable="False"/>
 
+            <!-- Action Type Selection -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Action Type" 
+                          Style="{ThemeResource SubtitleTextBlockStyle}" 
+                          Margin="0,0,0,8"/>
+                <RadioButtons SelectedIndex="{x:Bind ViewModel.UseCustomAction, Mode=TwoWay, Converter={StaticResource BoolToIntConverter}}">
+                    <RadioButton Content="Basic Action"/>
+                    <RadioButton Content="Custom Action"/>
+                </RadioButtons>
+            </StackPanel>
+
+            <!-- Basic Action Settings -->
+            <StackPanel Visibility="{x:Bind ViewModel.ShowBasicSettings, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="12">
+                <TextBlock Text="Basic Action Settings" 
+                          Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                <ComboBox Header="Method"
+                        ItemsSource="{x:Bind ViewModel.AvailableMethods}"
+                        SelectedItem="{x:Bind ViewModel.SelectedMethod, Mode=TwoWay}"
+                        HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:MethodDescription">
+                            <TextBlock Text="{x:Bind DisplayName}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <ItemsControl ItemsSource="{x:Bind ViewModel.ArgumentsWithDescriptions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ArgumentInfo">
+                            <StackPanel Margin="0,4,0,0">
+                                <ComboBox Header="{x:Bind Description}"
+                                        ItemsSource="{x:Bind ButtonOptions}"
+                                        SelectedItem="{x:Bind Value, Mode=TwoWay}"
+                                        Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        HorizontalAlignment="Stretch"/>
+                                <TextBox Header="{x:Bind Description}"
+                                        Text="{x:Bind Value, Mode=TwoWay}"
+                                        Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityInverseConverter}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Custom Action Settings -->
+            <StackPanel Visibility="{x:Bind ViewModel.ShowCustomSettings, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" Spacing="12">
+                <TextBlock Text="Custom Action Settings" 
+                          Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                <ComboBox Header="Select Action"
+                         ItemsSource="{x:Bind ViewModel.AvailableActions}"
+                         SelectedItem="{x:Bind ViewModel.SelectedCustomAction, Mode=TwoWay}"
+                         PlaceholderText="Choose an action..."
+                         HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:ActionData">
+                            <TextBlock Text="{x:Bind Name}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
             <ToggleSwitch
                 Header="Enable Pose Detection"
                 IsOn="{x:Bind ViewModel.IsPoseEnabled, Mode=TwoWay}"/>
 
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Action Configuration -->
-                <StackPanel Grid.Column="0" Spacing="8">
-                    <TextBlock Text="Action Settings" Style="{ThemeResource SubtitleTextBlockStyle}"/>
-
-                    <ComboBox Header="Method"
-                            ItemsSource="{x:Bind ViewModel.AvailableMethods}"
-                            SelectedItem="{x:Bind ViewModel.SelectedMethod, Mode=TwoWay}"
-                            HorizontalAlignment="Stretch">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="models:MethodDescription">
-                                <TextBlock Text="{x:Bind DisplayName}"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.ArgumentsWithDescriptions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="models:ArgumentInfo">
-                                <StackPanel Margin="0,4,0,0">
-                                    <ComboBox Header="{x:Bind Description}"
-                                            ItemsSource="{x:Bind ButtonOptions}"
-                                            SelectedItem="{x:Bind Value, Mode=TwoWay}"
-                                            Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityConverter}}"
-                                            HorizontalAlignment="Stretch"/>
-                                    <TextBox Header="{x:Bind Description}"
-                                            Text="{x:Bind Value, Mode=TwoWay}"
-                                            Visibility="{x:Bind IsButton, Converter={StaticResource BoolToVisibilityInverseConverter}}"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+            <!-- Help Panel -->
+            <Border BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                    BorderThickness="1"
+                    Padding="12"
+                    Margin="0,4,0,8">
+                <StackPanel>
+                    <TextBlock Text="{x:Bind ViewModel.HeaderText, Mode=OneWay}"
+                             Style="{ThemeResource CaptionTextBlockStyle}"
+                             Margin="0,0,0,8"/>
+                    <TextBlock Text="{x:Bind ViewModel.HelpText, Mode=OneWay}"
+                             TextWrapping="Wrap"
+                             Style="{ThemeResource CaptionTextBlockStyle}"/>
                 </StackPanel>
-
-                <!-- Help Panel -->
-                <Border Grid.Column="1" 
-                        BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                        BorderThickness="1"
-                        Padding="12"
-                        Width="200">
-                    <StackPanel>
-                        <TextBlock Text="{x:Bind ViewModel.HeaderText, Mode=OneWay}"
-                                 Style="{ThemeResource CaptionTextBlockStyle}"
-                                 Margin="0,0,0,8"/>
-                        <TextBlock Text="{x:Bind ViewModel.HelpText, Mode=OneWay}"
-                                 TextWrapping="Wrap"
-                                 Style="{ThemeResource CaptionTextBlockStyle}"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+            </Border>
 
             <!-- Pose Settings -->
             <StackPanel Visibility="{x:Bind ViewModel.IsPoseEnabled, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
