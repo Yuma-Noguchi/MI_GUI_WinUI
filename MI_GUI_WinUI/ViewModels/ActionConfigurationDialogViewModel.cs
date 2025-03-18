@@ -151,13 +151,29 @@ namespace MI_GUI_WinUI.ViewModels
             _element = element;
             _onSave = onSave;
 
-            UseCustomAction = element.Action.MethodName?.StartsWith("chain_") ?? false;
+            UseCustomAction = element.Action.MethodName == "chain" || (element.Action.MethodName?.StartsWith("chain_") ?? false);
             
             SelectedClass = !string.IsNullOrEmpty(element.Action.ClassName) ? element.Action.ClassName : "ds4_gamepad";
             
             if (UseCustomAction)
             {
-                var actionName = element.Action.MethodName?.Substring(6); // Remove "chain_" prefix
+                // Support both formats: "chain" with arg.name and "chain_name"
+                string? actionName = null;
+                if (element.Action.MethodName == "chain")
+                {
+                    // Extract name from arguments
+                    if (element.Action.Arguments?.Count > 0 && element.Action.Arguments[0] is Dictionary<string, object> firstArg)
+                    {
+                        if (firstArg.TryGetValue("name", out var nameObj))
+                        {
+                            actionName = nameObj?.ToString();
+                        }
+                    }
+                }
+                else if (element.Action.MethodName?.StartsWith("chain_") ?? false)
+                {
+                    actionName = element.Action.MethodName.Substring(6); // Remove "chain_" prefix
+                }
                 if (!string.IsNullOrEmpty(actionName))
                 {
                     SelectedCustomAction = AvailableActions.FirstOrDefault(a => a.Name == actionName);
@@ -436,11 +452,18 @@ namespace MI_GUI_WinUI.ViewModels
                 updatedAction = new ActionConfig
                 {
                     ClassName = "ds4_gamepad",
-                    MethodName = $"chain_{SelectedCustomAction!.Name}",
-                    Arguments = SelectedCustomAction!.Sequence.Select(seq => seq.Type == "press" ?
-                        new { type = "press", button = seq.Value } :
-                        new { type = "sleep", duration = double.Parse(seq.Value) } as object
-                    ).ToList()
+                    MethodName = "chain",
+                    Arguments = new List<object>
+                    {
+                        new Dictionary<string, object>
+                        {
+                            { "name", SelectedCustomAction!.Name },
+                            { "sequence", SelectedCustomAction!.Sequence.Select(seq => seq.Type == "press" ?
+                                new { type = "press", button = seq.Value } :
+                                new { type = "sleep", duration = double.Parse(seq.Value) } as object
+                            ).ToList() }
+                        }
+                    }
                 };
             }
             else
