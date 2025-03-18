@@ -10,7 +10,12 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:sys="using:System"
+    xmlns:converters="using:MI_GUI_WinUI.Converters"
     mc:Ignorable="d">
+
+    <Page.Resources>
+        <converters:ButtonDisplayConverter x:Key="ButtonDisplayConverter"/>
+    </Page.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -111,9 +116,15 @@
                                      Margin="0,0,8,0"/>
                         <ComboBox Header="Select Button"
                                  Width="200"
-                                 ItemsSource="{x:Bind ViewModel.AvailableButtons}"
-                                 SelectedItem="{x:Bind ViewModel.SelectedButton, Mode=TwoWay}"
-                                 IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"/>
+                         ItemsSource="{x:Bind ViewModel.AvailableButtons}"
+                         SelectedItem="{x:Bind ViewModel.SelectedButton, Mode=TwoWay}"
+                         IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{x:Bind Converter={StaticResource ButtonDisplayConverter}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                         
                         <Button Content="Add Button"
                                 Command="{x:Bind ViewModel.AddToSequenceCommand}"
@@ -185,7 +196,7 @@
                                         <!-- Button Press Display -->
                                         <TextBlock VerticalAlignment="Center"
                                                  Visibility="{x:Bind IsPress, Mode=OneWay}">
-                                            <Run Text="{x:Bind ButtonName, Mode=OneWay}"/>
+                                            <Run Text="{x:Bind ButtonName, Mode=OneWay, Converter={StaticResource ButtonDisplayConverter}}"/>
                                             <Run Text=" press"/>
                                         </TextBlock>
                                         <!-- Sleep Duration Display -->
