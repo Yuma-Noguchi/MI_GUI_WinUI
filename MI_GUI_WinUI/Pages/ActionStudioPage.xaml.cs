@@ -16,6 +16,15 @@ namespace MI_GUI_WinUI.Pages
             this.InitializeComponent();
             ViewModel = App.Current.Services.GetRequiredService<ActionStudioViewModel>();
             DataContext = ViewModel;
+            this.Loaded += ActionStudioPage_Loaded;
+        }
+
+        private void ActionStudioPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = XamlRoot;
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)

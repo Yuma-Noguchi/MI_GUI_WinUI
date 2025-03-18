@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Page
+<Page x:Name="Root"
     x:Class="MI_GUI_WinUI.Pages.ActionStudioPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -62,7 +62,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{x:Bind Name, Mode=OneWay}" VerticalAlignment="Center"/>
                                 <Button Grid.Column="1"
                                         Command="{Binding DataContext.DeleteActionCommand, ElementName=ActionsList}"
                                         CommandParameter="{x:Bind}"
@@ -160,6 +160,7 @@
 
                         <ListView Grid.Row="1"
                                  x:Name="SequenceList"
+                                 DataContext="{x:Bind ViewModel}"
                                  ItemsSource="{x:Bind ViewModel.SelectedAction.Sequence, Mode=OneWay}"
                                  SelectionMode="None"
                                  IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}">
@@ -196,7 +197,7 @@
                                         <!-- Delete Button -->
                                         <Button Grid.Column="1"
                                             Style="{StaticResource TextBlockButtonStyle}"
-                                            Command="{Binding Viewmodel.RemoveFromSequenceCommand, ElementName=Root}"
+                                            Command="{Binding DataContext.RemoveFromSequenceCommand, ElementName=SequenceList}"
                                             CommandParameter="{x:Bind}">
                                             <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE74D;"/>
                                         </Button>
