@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:MI_GUI_WinUI"
     xmlns:converters="using:MI_GUI_WinUI.Converters">
+
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -13,7 +14,11 @@
 
             <!-- Converters -->
             <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <converters:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverseConverter"/>
+            <converters:NumberToVisibilityConverter x:Key="NumberToVisibilityConverter"/>
+            <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
+            <converters:NumberToStringConverter x:Key="NumberToStringConverter"/>
 
             <!-- Button Styles -->
             <Style x:Key="HomeButtonStyle" TargetType="Button">

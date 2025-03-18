@@ -1,29 +1,28 @@
 using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MI_GUI_WinUI.Models;
 using System.Linq;
-using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
-using MI_GUI_WinUI.Utils;
 using Microsoft.UI.Xaml;
+using MI_GUI_WinUI.Utils;
+using System.Collections.Generic;
+using MI_GUI_WinUI.Services;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ActionStudioViewModel : ObservableObject
     {
         private readonly ILogger<ActionStudioViewModel> _logger;
-        private readonly string ACTIONS_DIR;
+        private readonly ActionService _actionService;
 
         [ObservableProperty]
-        private ObservableCollection<Models.Action> _actions;
+        private ObservableCollection<ActionData> _actions;
 
         [ObservableProperty]
-        private Models.Action? _selectedAction;
+        private ActionData? _selectedAction;
 
         [ObservableProperty]
         private string? _selectedButton;
@@ -35,7 +34,10 @@ namespace MI_GUI_WinUI.ViewModels
         private bool _isLoading;
 
         [ObservableProperty]
-        private XamlRoot? _xamlRoot;
+        private double _sleepDuration = 1.0;
+
+        [ObservableProperty]
+        private XamlRoot? xamlRoot;
 
         public bool IsActionSelected => SelectedAction != null;
 
@@ -46,16 +48,11 @@ namespace MI_GUI_WinUI.ViewModels
             "DPad_Up", "DPad_Down", "DPad_Left", "DPad_Right"
         };
 
-        public ObservableCollection<Dictionary<string, string[]>> ActionSequence { get; } = new();
-
-        public ActionStudioViewModel(ILogger<ActionStudioViewModel> logger)
+        public ActionStudioViewModel(ILogger<ActionStudioViewModel> logger, ActionService actionService)
         {
             _logger = logger;
-            _actions = new ObservableCollection<Models.Action>();
-            ACTIONS_DIR = Path.Combine(
-                Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
-                "MotionInput", "data", "assets", "generated_actions"
-            );
+            _actionService = actionService;
+            _actions = new ObservableCollection<ActionData>();
 
             InitializeAsync();
         }
@@ -67,29 +64,16 @@ namespace MI_GUI_WinUI.ViewModels
                 IsLoading = true;
                 ErrorMessage = null;
 
-                if (!Directory.Exists(ACTIONS_DIR))
+                var actions = await _actionService.LoadActionsAsync();
+                Actions.Clear();
+                foreach (var action in actions)
                 {
-                    Directory.CreateDirectory(ACTIONS_DIR);
-                    return;
-                }
-
-                var files = Directory.GetFiles(ACTIONS_DIR, "*.json");
-                foreach (var file in files)
-                {
-                    try
-                    {
-                        var name = Path.GetFileNameWithoutExtension(file);
-                        Actions.Add(new Models.Action { Name = name });
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Error loading action file: {file}");
-                    }
+                    Actions.Add(action);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error initializing actions directory");
+                _logger.LogError(ex, "Error initializing actions");
                 ErrorMessage = "Failed to load actions. Please try again.";
             }
             finally
@@ -101,14 +85,14 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         private void CreateAction()
         {
-            var newAction = new Models.Action
+            var newAction = new ActionData
             {
-                Name = $"New Action {_actions.Count + 1}"
+                Name = $"New Action {Actions.Count + 1}",
+                Sequence = new ObservableCollection<SequenceItem>()
             };
             
             Actions.Add(newAction);
             SelectedAction = newAction;
-            ActionSequence.Clear();
             ErrorMessage = null;
         }
 
@@ -118,21 +102,27 @@ namespace MI_GUI_WinUI.ViewModels
             if (string.IsNullOrEmpty(SelectedButton) || SelectedAction == null) 
                 return;
 
-            ActionSequence.Add(new Dictionary<string, string[]>
-            {
-                { "press", new[] { SelectedButton.ToLower() } }
-            });
+            SelectedAction.Sequence.Add(ActionData.CreateButtonPress(SelectedButton));
             ErrorMessage = null;
         }
 
         [RelayCommand]
-        private void RemoveFromSequence(Dictionary<string, string[]> sequence)
+        private void AddSleep()
         {
-            if (sequence != null)
-            {
-                ActionSequence.Remove(sequence);
-                ErrorMessage = null;
-            }
+            if (SelectedAction == null) return;
+
+            SelectedAction.Sequence.Add(ActionData.CreateSleep(SleepDuration));
+            ErrorMessage = null;
+        }
+
+        [RelayCommand]
+        private void RemoveFromSequence(SequenceItem item)
+        {
+            if (SelectedAction?.Sequence == null || item == null) 
+                return;
+
+            SelectedAction.Sequence.Remove(item);
+            ErrorMessage = null;
         }
 
         [RelayCommand]
@@ -148,7 +138,18 @@ namespace MI_GUI_WinUI.ViewModels
                 return;
             }
 
-            if (!ActionSequence.Any())
+            // Check for duplicate name
+            if (Actions.Any(a => a != SelectedAction && a.Name.Equals(SelectedAction.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                ErrorMessage = "An action with this name already exists";
+                if (XamlRoot != null)
+                {
+                    await DialogHelper.ShowError("An action with this name already exists. Please choose a different name.", XamlRoot);
+                }
+                return;
+            }
+
+            if (!SelectedAction.Sequence.Any())
             {
                 ErrorMessage = "Please add at least one button to the sequence";
                 if (XamlRoot != null)
@@ -160,29 +161,7 @@ namespace MI_GUI_WinUI.ViewModels
 
             try
             {
-                var actionData = new
-                {
-                    action = new
-                    {
-                        @class = "ds4_gamepad",
-                        method = "chain",
-                        args = ActionSequence.ToList()
-                    }
-                };
-
-                // Use sanitized name for file
-                var sanitizedName = SelectedAction.Name.Replace(" ", "_");
-                var filePath = Path.Combine(ACTIONS_DIR, $"{sanitizedName}.json");
-                var json = JsonConvert.SerializeObject(actionData, Formatting.Indented);
-                
-                await File.WriteAllTextAsync(filePath, json);
-                _logger.LogInformation($"Action saved successfully: {filePath}");
-
-                // Update action list if this is a new action
-                if (!Actions.Any(a => a.Name == SelectedAction.Name))
-                {
-                    Actions.Add(SelectedAction);
-                }
+                await _actionService.SaveActionAsync(SelectedAction);
 
                 ErrorMessage = null;
                 if (XamlRoot != null)
@@ -202,7 +181,7 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         [RelayCommand]
-        private async Task DeleteAction(Models.Action action)
+        private async Task DeleteAction(ActionData action)
         {
             if (action == null) return;
 
@@ -219,17 +198,12 @@ namespace MI_GUI_WinUI.ViewModels
                     if (!result) return;
                 }
 
-                var filePath = Path.Combine(ACTIONS_DIR, $"{action.Name}.json");
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                }
-
+                await _actionService.DeleteActionAsync(action.Name);
                 Actions.Remove(action);
+
                 if (SelectedAction == action)
                 {
                     SelectedAction = null;
-                    ActionSequence.Clear();
                 }
 
                 _logger.LogInformation($"Action deleted successfully: {action.Name}");
@@ -246,59 +220,9 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        partial void OnSelectedActionChanged(Models.Action? value)
+        partial void OnSelectedActionChanged(ActionData? value)
         {
             OnPropertyChanged(nameof(IsActionSelected));
-            
-            // Clear current sequence
-            ActionSequence.Clear();
-            ErrorMessage = null;
-
-            // Load sequence if an action is selected
-            if (value != null)
-            {
-                LoadActionSequence(value.Name);
-            }
-        }
-
-        private async void LoadActionSequence(string actionName)
-        {
-            try
-            {
-                IsLoading = true;
-                var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
-                if (!File.Exists(filePath))
-                {
-                    _logger.LogWarning($"Action file not found: {filePath}");
-                    return;
-                }
-
-                var json = await File.ReadAllTextAsync(filePath);
-                var data = JsonConvert.DeserializeObject<dynamic>(json);
-
-                if (data?.action?.args != null)
-                {
-                    var args = data.action.args;
-                    foreach (var arg in args)
-                    {
-                        if (arg is Dictionary<string, string[]> sequence)
-                        {
-                            ActionSequence.Add(sequence);
-                        }
-                    }
-                }
-
-                ErrorMessage = null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error loading action sequence: {actionName}");
-                ErrorMessage = "Failed to load action sequence.";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
         }
     }
 }

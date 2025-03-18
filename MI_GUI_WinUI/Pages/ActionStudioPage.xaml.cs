@@ -2,12 +2,14 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using MI_GUI_WinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
+using System.Collections;
 
 namespace MI_GUI_WinUI.Pages
 {
     public sealed partial class ActionStudioPage : Page
     {
-        private readonly ActionStudioViewModel ViewModel;
+        public ActionStudioViewModel ViewModel { get; }
 
         public ActionStudioPage()
         {

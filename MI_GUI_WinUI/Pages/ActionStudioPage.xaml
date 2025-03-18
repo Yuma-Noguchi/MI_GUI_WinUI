@@ -9,6 +9,7 @@
     xmlns:viewmodels="using:MI_GUI_WinUI.ViewModels"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:sys="using:System"
     mc:Ignorable="d">
 
     <Grid Margin="20">
@@ -55,7 +56,7 @@
                          BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                          Margin="0,0,0,10">
                     <ListView.ItemTemplate>
-                        <DataTemplate x:DataType="models:Action">
+                        <DataTemplate x:DataType="models:ActionData">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -96,22 +97,48 @@
                          IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"
                          Margin="0,0,0,20"/>
 
-                <!-- Button Selection with Loading State -->
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,20">
-                    <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                                 Width="20" Height="20"
-                                 Margin="0,0,8,0"/>
-                    <ComboBox Header="Select Button"
-                             Width="200"
-                             ItemsSource="{x:Bind ViewModel.AvailableButtons}"
-                             SelectedItem="{x:Bind ViewModel.SelectedButton, Mode=TwoWay}"
-                             IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"/>
-                    
-                    <Button Content="Add to Sequence"
-                            Command="{x:Bind ViewModel.AddToSequenceCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"
-                            VerticalAlignment="Bottom"/>
-                </StackPanel>
+                <!-- Button Selection and Sleep Controls -->
+                <Grid Grid.Row="1" Margin="0,0,0,20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Button Selection -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                        <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                                     Width="20" Height="20"
+                                     Margin="0,0,8,0"/>
+                        <ComboBox Header="Select Button"
+                                 Width="200"
+                                 ItemsSource="{x:Bind ViewModel.AvailableButtons}"
+                                 SelectedItem="{x:Bind ViewModel.SelectedButton, Mode=TwoWay}"
+                                 IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"/>
+                        
+                        <Button Content="Add Button"
+                                Command="{x:Bind ViewModel.AddToSequenceCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+
+                    <!-- Sleep Control -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                        <NumberBox Header="Sleep Duration (seconds)"
+                                 Value="{x:Bind ViewModel.SleepDuration, Mode=TwoWay}"
+                                 SpinButtonPlacementMode="Compact"
+                                 SmallChange="0.1"
+                                 LargeChange="0.5"
+                                 Minimum="0.1"
+                                 Maximum="5.0"
+                                 Width="200"
+                                 IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"/>
+                        
+                        <Button Content="Add Sleep"
+                                Command="{x:Bind ViewModel.AddSleepCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}"
+                                VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Sequence Preview -->
                 <Border Grid.Row="2"
@@ -133,21 +160,44 @@
 
                         <ListView Grid.Row="1"
                                  x:Name="SequenceList"
-                                 ItemsSource="{x:Bind ViewModel.ActionSequence, Mode=OneWay}"
+                                 ItemsSource="{x:Bind ViewModel.SelectedAction.Sequence, Mode=OneWay}"
+                                 SelectionMode="None"
                                  IsEnabled="{x:Bind ViewModel.IsActionSelected, Mode=OneWay}">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Margin" Value="0,4"/>
+                                    <Setter Property="Padding" Value="12,8"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                    <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                    <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="0,4">
+                                <DataTemplate x:DataType="models:SequenceItem">
+                                    <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding [press][0]}"
-                                                 VerticalAlignment="Center"/>
+                                        <!-- Button Press Display -->
+                                        <TextBlock VerticalAlignment="Center"
+                                                 Visibility="{x:Bind IsPress, Mode=OneWay}">
+                                            <Run Text="{x:Bind ButtonName, Mode=OneWay}"/>
+                                            <Run Text=" press"/>
+                                        </TextBlock>
+                                        <!-- Sleep Duration Display -->
+                                        <TextBlock VerticalAlignment="Center"
+                                                 Visibility="{x:Bind IsSleep, Mode=OneWay}">
+                                            <Run Text="{x:Bind SleepDuration, Mode=OneWay, Converter={StaticResource NumberToStringConverter}}"/>
+                                            <Run Text=" second delay"/>
+                                        </TextBlock>
+                                        <!-- Delete Button -->
                                         <Button Grid.Column="1"
-                                                Command="{Binding DataContext.RemoveFromSequenceCommand, ElementName=SequenceList}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource TextBlockButtonStyle}">
+                                            Style="{StaticResource TextBlockButtonStyle}"
+                                            Command="{Binding Viewmodel.RemoveFromSequenceCommand, ElementName=Root}"
+                                            CommandParameter="{x:Bind}">
                                             <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE74D;"/>
                                         </Button>
                                     </Grid>

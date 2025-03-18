@@ -53,6 +53,7 @@ namespace MI_GUI_WinUI
 
             // Register services
             services.AddSingleton<ProfileService>();
+            services.AddSingleton<ActionService>();
             services.AddTransient<StableDiffusionService>();
             services.AddTransient<MotionInputService>();
 
@@ -70,6 +71,7 @@ namespace MI_GUI_WinUI
             services.AddSingleton<BoolToVisibilityConverter>();
             services.AddSingleton<NumberToVisibilityConverter>();
             services.AddSingleton<NullToBoolConverter>();
+            services.AddSingleton<NumberToStringConverter>();
 
             // Register pages
             services.AddTransient<HomePage>();
