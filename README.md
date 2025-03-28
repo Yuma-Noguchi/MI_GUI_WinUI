@@ -1,273 +1,434 @@
-# MotionInput Configuration GUI
+# MI_GUI_WinUI - Motion Input GUI Application
 
-## Project Overview
+## System Architecture
 
-MotionInput Configuration GUI is a comprehensive solution designed to revolutionize the way users interact with the MotionInput system, particularly focusing on gaming accessibility. This project addresses the critical challenge faced by users who previously had to manually edit complex JSON configuration files to set up their gaming profiles.
+A comprehensive Windows desktop application built with WinUI 3, providing a modern interface for motion input configuration and management. The application leverages advanced technologies including DirectX for hardware acceleration, ONNX Runtime for machine learning capabilities, and a modular MVVM architecture for maintainable and testable code.
 
-### Background and Context
+### Technology Stack
 
-MotionInput is a powerful system that enables users to control their computers through various input methods, making computing more accessible. However, the original configuration process required users to:
-- Manually edit JSON configuration files
-- Understand technical JSON syntax
-- Remember specific key mappings
-- Handle configuration validation themselves
-- Create custom icons and actions through complex processes
-
-This technical barrier significantly limited the system's accessibility, particularly for users who could benefit most from MotionInput's capabilities but lacked the technical expertise to configure it effectively.
-
-### Solution Architecture
-
-The Configuration GUI implements a modern, user-friendly interface built on the following architectural principles:
-
-1. **Modern Technology Stack**:
-   - WinUI 3 for a native Windows UI experience
-   - MVVM architecture for clean separation of concerns
-   - Service-oriented design for modularity
-   - AI integration through ONNX runtime
-
-2. **Core Services**:
-   - Profile Management Service for handling configurations
-   - Icon Generation Service with AI capabilities
-   - Action Configuration Service for input mapping
-   - Navigation Service for seamless UI flow
-
-3. **Data Flow**:
-   - Reactive UI updates using observable patterns
-   - Asynchronous operations for responsive experience
-   - Local storage for profile persistence
-   - Real-time validation and error handling
-
-### Implementation Details
-
-The application is implemented with several key technical considerations:
-
-1. **Performance Optimization**:
-   - Async/await patterns for non-blocking operations
-   - Efficient caching mechanisms
-   - Lazy loading of resources
-   - Memory management for large profiles
-
-2. **AI Integration**:
-   - Stable Diffusion model for icon generation
-   - ONNX runtime optimization
-   - Batch processing capabilities
-   - Fallback mechanisms for reliability
-
-3. **User Experience**:
-   - Intuitive visual interfaces
-   - Real-time feedback and validation
-   - Progressive disclosure of advanced features
-   - Comprehensive error handling
-
-4. **Testing and Quality**:
-   - Unit testing for core services
-   - Integration testing for features
-   - UI automation testing
-   - Performance benchmarking
-
-## Features
-
-### Feature Overview
-The application consists of four main components, each designed to address specific user needs while maintaining simplicity and efficiency:
-
-### 1. Profile Management
-Key Capabilities:
-- Visual profile creation and editing interface
-- Real-time configuration validation
-- Profile categorization and organization
-- Import/export functionality
-- Preview system for configurations
-- Multi-profile management
-
-The Profile Management system revolutionizes how users interact with MotionInput configurations. Instead of manually editing complex JSON files, users can now create and modify profiles through an intuitive visual interface. The system provides real-time validation to prevent configuration errors, ensuring that all profiles are valid and functional before being saved. Users can organize their profiles into categories, making it easier to manage multiple configurations for different games or applications. The profile preview feature allows users to see their configuration changes in real-time, while the import/export functionality enables sharing profiles within the gaming community.
-
-### 2. Icon Studio with AI Integration
-Key Capabilities:
-- AI-powered icon generation using Stable Diffusion
-- Natural language to image conversion
-- Real-time preview and adjustment
-- Batch generation capabilities
-- Icon organization system
-- Custom icon editing tools
-
-The Icon Studio represents a significant leap forward in customization capabilities. Powered by Stable Diffusion AI technology and optimized through ONNX runtime integration, it enables users to generate custom icons for their profiles and actions with unprecedented ease. Users can describe their desired icons in natural language, and the AI system will generate appropriate visuals. The studio includes a robust preview system that allows users to see and adjust generated icons before finalizing them. The batch generation feature streamlines the process of creating multiple icons for related actions or profiles, while the management system helps organize and categorize the generated icons effectively.
-
-### 3. Action Studio for Gaming
-Key Capabilities:
-- Visual action configuration interface
-- Button mapping visualization
-- Input sequence creation
-- Real-time action testing
-- Validation system
-- Custom gaming actions
-
-Action Studio transforms the way users create and customize gaming actions. Through its visual interface, gamers can define complex input combinations and sequences without dealing with technical configurations. The studio supports basic button presses and holds, with a visual representation of button mappings that makes it intuitive to understand and modify actions. Each action can be tested and validated directly within the interface, ensuring it works as intended before being added to a profile. The studio's design focuses on making action creation accessible to users of all technical skill levels while maintaining the flexibility needed for complex gaming scenarios.
-
-### 4. Profile Selection and Management
-Key Capabilities:
-- Gallery-style profile view
-- Quick profile switching
-- Advanced search and filtering
-- Category-based organization
-- Profile previews
-- Drag-and-drop interface
-
-The Profile Selection interface provides a modern, gallery-style view of all available profiles, making it easy to find and switch between different configurations. Each profile is displayed with a visual preview and key information, allowing users to quickly identify the right profile for their needs. The interface includes powerful search and filtering capabilities, enabling users to organize profiles by game, category, or custom tags. Quick switching functionality ensures minimal interruption when changing between games or applications, while the preview system lets users verify profile contents before activation.
-
-### Key Features in Action
-
-The integration of these four core components creates a seamless user experience for managing MotionInput configurations:
-
-- **Streamlined Workflow**: Users can create, modify, and switch between profiles with just a few clicks, significantly reducing the time and technical knowledge required for configuration.
-- **AI-Enhanced Customization**: The AI-powered icon generation system provides professional-quality visuals without requiring artistic skills from users.
-- **Visual Validation**: Real-time preview and testing capabilities ensure configurations work as intended before being deployed.
-- **Community Integration**: Import/export functionality encourages sharing and collaboration within the gaming community.
-- **Accessibility Focus**: The intuitive interface makes advanced input configuration accessible to users of all technical skill levels.
-
-## Technical Stack
-
-### Frontend
-- **Framework**: WinUI 3
+- **Framework**: WinUI 3 (.NET 8.0)
 - **Architecture**: MVVM (Model-View-ViewModel)
-- **UI Components**: Custom controls and XAML templates
-- **State Management**: Observable patterns and dependency injection
+- **Hardware Acceleration**: DirectX via DirectML
+- **Machine Learning**: ONNX Runtime
+- **Dependency Injection**: Microsoft.Extensions.DependencyInjection
+- **Logging**: Microsoft.Extensions.Logging
+- **JSON Processing**: Newtonsoft.Json
+- **Image Processing**: SixLabors.ImageSharp
 
-### AI Integration
-- **Model**: Stable Diffusion
-- **Runtime**: ONNX
-- **Integration**: Custom service layer for AI operations
-- **Optimization**: Async processing and caching
+## Core Architecture
 
-### Core Features
-- Service-oriented architecture
-- Dependency injection for better testability
-- Async operations for responsive UI
-- Comprehensive error handling
-- Profile data validation
-- Performance optimizations
-
-## System Requirements
-
-### Development Environment
-- Windows 10 version 1809 or higher
-- Visual Studio 2019 or higher
-- .NET 6.0 or higher
-- Windows App SDK
-
-### Runtime Dependencies
-- ONNX Runtime
-- Windows App Runtime
-
-## Setup Instructions
-
-1. **Clone the Repository**
-   ```bash
-   git clone [repository-url]
-   cd MI_GUI_WinUI
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   dotnet restore
-   ```
-
-3. **Configure Environment**
-   - Set up required environment variables
-   - Configure AI model paths
-   - Set up development certificates
-
-4. **Build the Project**
-   ```bash
-   dotnet build
-   ```
-
-5. **Run the Application**
-   ```bash
-   dotnet run
-   ```
-
-## Project Structure
-
-```
-MI_GUI_WinUI/
-├── App.xaml/               # Application entry point
-├── Services/               # Core services
-│   ├── ProfileService/     # Profile management
-│   ├── IconService/       # Icon generation
-│   └── ActionService/     # Action configuration
-├── ViewModels/            # MVVM ViewModels
-├── Pages/                 # UI Pages
-├── Models/                # Business logic
-├── Controls/              # Custom controls
-└── Converters/           # Value converters
-```
-
-## Key Components
-
-### Profile Management
-- JSON configuration handling
-- Profile validation and verification
-- Profile data structures
-- Storage and retrieval operations
-
-### Icon Generation
-- AI model integration
-- Image processing pipeline
-- Caching mechanism
-- Error handling and fallbacks
-
-### Action Configuration
-- Input mapping system
-- Action validation
-- Testing interface
-- Configuration persistence
-
-## Architecture Overview
-
-The application follows a service-oriented architecture with MVVM pattern:
+### Main Application Flow
 
 ```mermaid
 graph TD
-    A[GUI Layer] --> B[ViewModels]
-    B --> C[Services]
-    C --> D[Core Logic]
-    E[AI Services] --> B
+    A[Main Application] --> B[Window Manager]
+    A --> C[Navigation Service]
+    
+    subgraph Services Layer
+        D[Motion Input Service]
+        E[Action Service]
+        F[Stable Diffusion Service]
+        G[Logging Service]
+    end
+    
+    subgraph UI Layer
+        H[Profile Editor]
+        I[Action Studio]
+        J[Icon Studio]
+        K[Select Profiles]
+    end
+
+    B --> UI Layer
+    C --> UI Layer
+    UI Layer --> Services Layer
 ```
 
-## Development Guidelines
+### Data Flow Architecture
 
-1. **Code Style**
-   - Follow C# coding conventions
-   - Use async/await patterns
-   - Implement proper error handling
-   - Document public APIs
+```mermaid
+graph LR
+    A[Profile Editor] --> B[Profile Service]
+    B --> C[(Profile Storage)]
+    D[Action Studio] --> E[Action Service]
+    E --> F[Motion Input Service]
+    F --> G[External Process]
+    
+    H[Icon Studio] --> I[Stable Diffusion]
+    I --> J[ONNX Runtime]
+    J --> K[DirectML/CPU]
+```
 
-2. **Testing**
-   - Write unit tests for services
-   - Implement integration tests
-   - Include UI automation tests
-   - Maintain high test coverage
+### Core Component Architecture
 
-3. **Performance**
-   - Use async operations
-   - Implement caching
-   - Optimize resource usage
-   - Profile critical paths
+```mermaid
+classDiagram
+    class Profile {
+        +Dictionary GlobalConfig
+        +List GuiElements
+        +List Poses
+        +Dictionary SpeechCommands
+    }
+    
+    class StableDiffusionService {
+        +Initialize()
+        +GenerateImages()
+        -UNet _unet
+    }
+    
+    class MotionInputService {
+        +Start()
+        +ChangeMode()
+        +Launch()
+    }
+    
+    Profile --> GuiElement
+    GuiElement --> ActionConfig
+    StableDiffusionService --> UNet
+    MotionInputService --> Profile
+```
 
-## Contributing
+## Component Details
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+### 1. Core Services
 
-## License
+#### 1.1 WindowManager
+- Manages application windows and their lifecycle
+- Handles window creation, state management, and disposal
+- Centralizes window-related operations
 
-[License details to be added]
+#### 1.2 NavigationService
+- Implements navigation between different pages
+- Manages navigation history and state
+- Supports page parameter passing
 
-## Acknowledgments
+#### 1.3 MotionInputService
+- Manages interaction with the MotionInput process
+- Handles profile configuration and mode changes
+- Maintains process lifecycle and configuration state
 
-- MotionInput Team
-- UCL Computer Science
-- [Other acknowledgments]
+#### 1.4 StableDiffusionService
+- Provides image generation capabilities via Stable Diffusion
+- Supports both DirectML (GPU) and CPU execution
+- Manages ONNX model loading and execution
+- Handles fallback scenarios for hardware compatibility
+
+### 2. Data Management
+
+#### 2.1 ProfileService
+- Manages profile data persistence
+- Implements caching mechanism for performance
+- Handles profile CRUD operations
+- Provides JSON serialization/deserialization
+
+Key data structures:
+```csharp
+public struct Profile {
+    Dictionary<string, string> GlobalConfig
+    List<GuiElement> GuiElements
+    List<PoseGuiElement> Poses
+    Dictionary<string, SpeechCommand> SpeechCommands
+}
+
+public struct GuiElement {
+    string File
+    List<int> Position
+    int Radius
+    string Skin
+    string TriggeredSkin
+    ActionConfig Action
+}
+```
+
+### 3. UI Components
+
+#### 3.1 Pages
+- **HomePage**: Application entry point and dashboard
+- **ActionStudioPage**: Action configuration interface
+- **IconStudioPage**: Icon generation and management
+- **ProfileEditorPage**: Profile creation and editing
+- **SelectProfilesPage**: Profile selection and management
+
+#### 3.2 Controls
+- **PageHeader**: Consistent header across pages
+- **ActionConfigurationDialog**: Action setup interface
+- **ResizableImage**: Image control with resize capabilities
+
+### 4. MVVM Implementation
+
+#### 4.1 ViewModels
+- Implement `ObservableObject` for property change notifications
+- Handle UI logic and state management
+- Coordinate between Views and Services
+
+Example ViewModel structure:
+```csharp
+public partial class ActionStudioViewModel : ObservableObject {
+    private readonly ILogger<ActionStudioViewModel> _logger;
+    private readonly ActionService _actionService;
+    private readonly NavigationService _navigationService;
+    
+    // Observable properties and commands
+    // Business logic methods
+}
+```
+
+### 5. Error Handling & Logging
+
+- Centralized logging through LoggingService
+- Structured logging with different severity levels
+- Exception handling at service boundaries
+- Custom logger provider implementation
+
+### 6. Dependency Management
+
+The application uses Microsoft's dependency injection container with the following registration pattern:
+
+```csharp
+services.AddSingleton<LoggingService>();
+services.AddSingleton<WindowManager>();
+services.AddSingleton<INavigationService, NavigationService>();
+services.AddTransient<StableDiffusionService>();
+// etc.
+```
+
+### 7. Hardware Integration
+
+#### 7.1 DirectX Integration
+- DirectML support for hardware acceleration
+- Automatic fallback to CPU when DirectX is unavailable
+- Hardware capability detection and adaptation
+- Dynamic GPU device selection
+- Performance monitoring and optimization
+
+#### 7.2 ONNX Runtime Integration
+- Model loading and execution with configurable parameters:
+  - Inference steps (default: 75)
+  - Guidance scale (default: 8.5)
+  - DirectML/CPU execution provider selection
+  - GPU device ID configuration
+- Support for multiple ONNX model components:
+  - Text encoder
+  - UNet
+  - VAE decoder
+  - Safety checker
+- Automatic model initialization and resource management
+- Progress tracking and performance metrics
+- Fallback mechanisms for hardware compatibility
+
+#### 7.3 Stable Diffusion Pipeline
+- Text-to-image generation capabilities
+- Model configuration and initialization
+- Performance monitoring:
+  - Iterations per second tracking
+  - Execution time measurement
+  - Progress percentage updates
+- Error handling and safety checks
+- Resource cleanup and memory management
+
+## Performance Considerations
+
+1. **Caching**
+   - Profile data caching
+   - Image caching
+   - Resource pooling
+
+2. **Async Operations**
+   - Asynchronous file operations
+   - Background processing for heavy computations
+   - UI responsiveness preservation
+
+3. **Resource Management**
+   - Proper disposal of unmanaged resources
+   - Memory optimization
+   - Hardware resource coordination
+
+## Security Considerations
+
+1. **File Operations**
+   - Secure file handling
+   - Path validation
+   - Access control
+
+2. **Process Management**
+   - Controlled process spawning
+   - Resource cleanup
+   - Error containment
+
+## Configuration Management
+
+- Profile-based configuration
+- Environment-specific settings
+- Hardware-dependent optimizations
+- Logging configuration
+- Service configuration
+
+## Advanced Technical Architecture
+
+### 1. Threading Model and Concurrency
+```mermaid
+sequenceDiagram
+    participant UI as UI Thread
+    participant DQ as Dispatcher Queue
+    participant BG as Background Thread
+    participant HW as Hardware Layer
+
+    UI->>DQ: Queue UI Update
+    BG->>HW: Process Operation
+    HW-->>BG: Hardware Result
+    BG->>DQ: Queue Update
+    DQ-->>UI: Update UI
+```
+- Dispatcher queue management for UI updates
+- Background thread processing for heavy computations
+- Hardware interface threading model
+- Synchronization mechanisms
+- Thread-safe resource access
+
+### 2. Action System Architecture
+```mermaid
+classDiagram
+    class ActionService {
+        -Dictionary _actionsCache
+        +LoadActionsAsync()
+        +SaveActionAsync()
+        +DeleteActionAsync()
+    }
+    class ActionData {
+        +String Name
+        +String Id
+        +String Class
+        +String Method
+        +List Sequence
+    }
+    class ActionJsonConverter {
+        +WriteJson()
+        +ReadJson()
+    }
+    
+    ActionService --> ActionData
+    ActionData --> ActionJsonConverter
+```
+
+### 3. Stable Diffusion Pipeline
+```mermaid
+graph TD
+    A[Input Text] --> B[Text Encoder]
+    B --> C[UNet]
+    D[Initial Noise] --> C
+    C --> E[Noise Predictor]
+    E --> F[Scheduler]
+    F --> G[Denoised Image]
+    
+    subgraph Scheduler
+        H[EulerAncestralDiscrete]
+        I[LMSDiscrete]
+    end
+```
+
+### 4. Type System and Value Conversion
+#### Type Safety Implementation
+```csharp
+public class TypedConverter<T> {
+    private readonly Func<object, T> _converter;
+    private readonly T _defaultValue;
+    // Implementation details
+}
+```
+
+#### Conversion Pipelines
+- Action JSON ⟶ Model Objects
+- UI Values ⟶ System Types
+- System Types ⟶ Hardware Instructions
+
+### 5. Scheduler Mathematical Model
+```typescript
+interface SchedulerConfig {
+    num_train_timesteps: 1000
+    beta_start: 0.00085
+    beta_end: 0.012
+    beta_schedule: "scaled_linear"
+    training_betas?: number[]
+}
+
+// Mathematical Models:
+// 1. Linear Beta Schedule:
+β_t = β_start + (β_end - β_start) * t/(T-1)
+
+// 2. Scaled Linear Schedule:
+β_t = (√β_start + t/(T-1) * (√β_end - √β_start))²
+
+// 3. Alpha Products:
+ᾱ_t = ∏(1 - β_t)
+
+// 4. Sigma Calculation:
+σ_t = √((1 - α_t)/α_t)
+```
+
+### 6. Performance Optimization System
+```mermaid
+graph TD
+    subgraph Memory Management
+        A[Resource Pooling]
+        B[Cache Management]
+        C[Unmanaged Resources]
+    end
+    
+    subgraph Threading Model
+        D[UI Thread]
+        E[Background Workers]
+        F[Hardware Interface]
+    end
+    
+    subgraph Hardware Acceleration
+        G[DirectML Pipeline]
+        H[ONNX Optimization]
+        I[GPU Memory Management]
+    end
+```
+
+### 7. Component Interaction Model
+```mermaid
+sequenceDiagram
+    participant UI as UI Layer
+    participant VM as ViewModel
+    participant SVC as Services
+    participant HW as Hardware
+    
+    UI->>VM: User Action
+    VM->>SVC: Process Request
+    SVC->>HW: Hardware Operation
+    HW-->>SVC: Operation Result
+    SVC-->>VM: Updated State
+    VM-->>UI: UI Update
+```
+
+### 8. Error Handling and Recovery System
+```mermaid
+graph TD
+    A[Error Detection] --> B{Error Type}
+    B -->|Hardware| C[Hardware Recovery]
+    B -->|Data| D[Data Recovery]
+    B -->|State| E[State Recovery]
+    
+    C --> F[Fallback System]
+    D --> G[Data Validation]
+    E --> H[State Reconstruction]
+```
+
+#### Hardware Error Recovery
+- GPU initialization failures
+- DirectML compatibility issues
+- Memory allocation errors
+- Device loss handling
+
+#### Data Error Recovery
+- JSON parsing errors
+- File system errors
+- Network failures
+- Cache corruption
+
+#### State Recovery
+- View model state reconstruction
+- Service state recovery
+- Configuration fallbacks
+- Session recovery mechanisms
