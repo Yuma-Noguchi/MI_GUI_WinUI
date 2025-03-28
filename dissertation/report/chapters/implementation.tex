@@ -1,115 +1,1403 @@
-\chapter{Implementation}
+\chapter{Design and Implementation}
 
-\section{System Architecture}
+\section{System Architecture Overview}
+The Configuration GUI implements a modern application architecture designed for flexibility, maintainability, and performance. The system is built on a multi-layered architecture that separates concerns while facilitating communication between components through well-defined interfaces.
+
+\subsection{Architectural Approach}
+The application follows a layered architecture with clear separation between presentation, business logic, and data persistence. This separation provides several advantages:
+
+\begin{figure}[h]
+\centering
+% Insert your architecture diagram here
+\caption{High-level application architecture showing the relationship between UI, service, and data layers}
+\label{fig:app_architecture}
+\end{figure}
+
+At the highest level, the application is organized into three primary layers:
+
+\begin{itemize}
+    \item \textbf{Presentation Layer}: Implements the user interface through WinUI 3 pages and controls, translating user interactions into service calls.
+    \item \textbf{Service Layer}: Contains the business logic and coordinates between the UI and data models, implementing core functionality like profile management and AI integration.
+    \item \textbf{Data Layer}: Manages data persistence and communication with external systems, including the core MotionInput application.
+\end{itemize}
+
+This layered approach addresses the maintainability requirements identified in Chapter 3, while providing a foundation for the accessibility and performance requirements through clear separation of concerns.
+
 \subsection{MVVM Implementation}
-Description of the MVVM pattern implementation:
+The presentation layer implements the Model-View-ViewModel (MVVM) architectural pattern, which is particularly well-suited for WinUI applications. This pattern provides a clean separation between the user interface (View), the presentation logic (ViewModel), and the data (Model).
+
+\begin{figure}[h]
+\centering
+% Insert MVVM diagram here
+\caption{MVVM pattern implementation showing data flow between components}
+\label{fig:mvvm_diagram}
+\end{figure}
+
+The ViewModels serve as an abstraction of the View, exposing properties and commands that the View binds to. This approach offers several key advantages:
+
 \begin{itemize}
-    \item Model layer design
-    \item ViewModel implementation
-    \item View bindings and interactions
-    \item Service layer architecture
+    \item \textbf{Testability}: ViewModels can be tested independently of the UI, enabling automated testing of business logic.
+    \item \textbf{Separation of Concerns}: UI designers can focus on the View while developers work on the ViewModel and Model, facilitating parallel development.
+    \item \textbf{Accessibility Support}: The separation allows for alternative views for different accessibility needs while maintaining the same underlying logic.
 \end{itemize}
 
-\subsection{Core Components}
-Key system modules:
+A typical ViewModel implementation follows this pattern:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public partial class ProfileEditorViewModel : ObservableObject
+{
+    private readonly IProfileService _profileService;
+    private readonly INavigationService _navigationService;
+    private readonly ILogger<ProfileEditorViewModel> _logger;
+    
+    [ObservableProperty]
+    private Profile _currentProfile;
+    
+    [ObservableProperty]
+    private bool _isSaving;
+    
+    [RelayCommand]
+    private async Task SaveProfileAsync()
+    {
+        try
+        {
+            IsSaving = true;
+            await _profileService.SaveProfileAsync(CurrentProfile);
+            _navigationService.NavigateTo(typeof(ProfileListPage));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving profile");
+            // Handle error
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}
+\end{minted}
+
+This implementation leverages source generators from the CommunityToolkit.Mvvm package to reduce boilerplate code while maintaining the MVVM pattern. The \texttt{[ObservableProperty]} attribute automatically generates the property change notification code, while \texttt{[RelayCommand]} generates command implementations that the View can bind to.
+
+\subsection{Dependency Injection System}
+To maintain loose coupling between components, the application implements a comprehensive dependency injection system using Microsoft's standard DI container. This approach allows components to depend on abstractions rather than concrete implementations, facilitating testing and future extensions.
+
+The service registration occurs during application startup:
+
+\begin{minted}[frame=single,linenos]{csharp}
+services.AddSingleton<IWindowManager, WindowManager>();
+services.AddSingleton<INavigationService, NavigationService>();
+services.AddSingleton<IProfileService, ProfileService>();
+services.AddSingleton<IActionService, ActionService>();
+services.AddTransient<IStableDiffusionService, StableDiffusionService>();
+services.AddTransient<ProfileEditorViewModel>();
+\end{minted}
+
+This registration pattern follows several design principles:
+
 \begin{itemize}
-    \item Visual Profile Engine
-    \item Configuration Manager
-    \item AI Integration Service
-    \item Input Processing Pipeline
+    \item Services with application-wide state are registered as singletons to ensure consistent state
+    \item Resource-intensive services (like AI components) are registered as transient to control resource usage
+    \item ViewModels are registered as transient to ensure fresh state for each navigation
 \end{itemize}
 
-\section{User Interface Development}
-\subsection{WinUI 3 Framework}
-Details of UI implementation:
+The dependency injection approach directly supports the maintainability requirements identified in Chapter 3, allowing components to be replaced or modified without affecting other parts of the system.
+
+\section{Core Service Components}
+The service layer contains the primary business logic of the application, organized into focused services with clear responsibilities. Each service addresses specific requirements identified in Chapter 3.
+
+\subsection{Profile Management Service}
+The ProfileService component manages the creation, retrieval, updating, and deletion of configuration profiles. This service directly addresses the core functional requirement (FR1) by providing a programmatic interface to profile management that abstracts away the complexities of the underlying JSON format.
+
+The service implements several key responsibilities:
+
 \begin{itemize}
-    \item XAML-based interface design
-    \item Custom control development
-    \item Navigation system
-    \item Accessibility features
+    \item \textbf{Profile Validation}: Ensures profiles meet the required schema before saving
+    \item \textbf{JSON Serialization/Deserialization}: Converts between object models and the JSON format required by MotionInput
+    \item \textbf{Profile Organization}: Implements tagging and categorization of profiles
+    \item \textbf{Change Tracking}: Monitors changes to facilitate undo/redo functionality
 \end{itemize}
 
-\subsection{Profile Editor Interface}
-Implementation of core UI features:
+The implementation employs a repository pattern to abstract the storage mechanism:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class ProfileService : IProfileService
+{
+    private readonly IProfileRepository _repository;
+    private readonly IValidator<Profile> _validator;
+    private readonly ILogger<ProfileService> _logger;
+    
+    public async Task<Result<Profile>> SaveProfileAsync(Profile profile)
+    {
+        var validationResult = _validator.Validate(profile);
+        if (!validationResult.IsValid)
+        {
+            return Result<Profile>.Failure(validationResult.Errors);
+        }
+        
+        try
+        {
+            var savedProfile = await _repository.SaveAsync(profile);
+            return Result<Profile>.Success(savedProfile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save profile {ProfileName}", profile.Name);
+            return Result<Profile>.Failure("Failed to save profile: " + ex.Message);
+        }
+    }
+}
+\end{minted}
+
+This implementation pattern includes several notable design decisions:
+
 \begin{itemize}
-    \item Visual profile creation tools
-    \item Real-time configuration preview
-    \item Drag-and-drop functionality
-    \item Interactive feedback system
+    \item \textbf{Result Pattern}: Returns a Result object rather than throwing exceptions, providing more structured error handling
+    \item \textbf{Validation Separation}: Uses a separate validator component for profile validation, allowing validation rules to evolve independently
+    \item \textbf{Repository Abstraction}: Isolates storage concerns, enabling future changes to storage mechanisms without affecting business logic
 \end{itemize}
 
-\section{AI Integration}
-\subsection{ONNX Runtime Integration}
-Implementation of pose estimation:
+The service layer implements comprehensive error handling and logging, addressing the robustness requirements identified in Chapter 3. All operations that might fail (such as file operations or external service calls) are wrapped in appropriate exception handling with detailed logging for troubleshooting.
+
+\subsection{Stable Diffusion Service}
+The StableDiffusionService component implements the AI-powered icon generation capability (FR6) through integration with the ONNX Runtime and DirectML. This service enables users to generate contextually relevant icons from text descriptions, enhancing the visual distinctiveness of profiles and actions.
+
+\begin{figure}[h]
+\centering
+% Insert Stable Diffusion pipeline diagram here
+\caption{Stable Diffusion pipeline architecture showing processing stages and data flow}
+\label{fig:stable_diffusion_pipeline}
+\end{figure}
+
+The service implementation addresses several technical challenges:
+
 \begin{itemize}
-    \item Model optimization techniques
-    \item Real-time inference pipeline
-    \item Performance monitoring
-    \item Error handling strategies
+    \item \textbf{Hardware Acceleration}: Leverages DirectML for GPU acceleration when available
+    \item \textbf{Fallback Mechanism}: Gracefully degrades to CPU execution when suitable GPU is unavailable
+    \item \textbf{Memory Management}: Carefully manages unmanaged resources to prevent memory leaks
+    \item \textbf{Progress Reporting}: Provides realtime generation progress for responsive UI feedback
 \end{itemize}
 
-\subsection{Stable Diffusion Features}
-Visual asset generation system:
+The implementation follows a pipeline architecture, with distinct stages for text encoding, image generation, and post-processing:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class StableDiffusionService : IStableDiffusionService, IDisposable
+{
+    private InferenceSession _textEncoder;
+    private InferenceSession _unet;
+    private InferenceSession _vaeDecoder;
+    private readonly ILogger<StableDiffusionService> _logger;
+    
+    public async Task<Result<byte[]>> GenerateImageAsync(
+        string prompt, 
+        GenerationOptions options,
+        IProgress<GenerationProgress> progress = null)
+    {
+        try
+        {
+            // 1. Encode text prompt to embedding
+            var textEmbedding = EncodeText(prompt);
+            
+            // 2. Initialize random noise
+            var latents = GenerateInitialNoise(options.Seed);
+            
+            // 3. Run diffusion process
+            for (int i = 0; i < options.Steps; i++)
+            {
+                // Report progress
+                progress?.Report(new GenerationProgress 
+                { 
+                    CurrentStep = i, 
+                    TotalSteps = options.Steps 
+                });
+                
+                // Perform denoising step
+                latents = PerformDenoisingStep(latents, textEmbedding, i, options);
+            }
+            
+            // 4. Decode latents to image
+            var imageData = DecodeLatentsToImage(latents);
+            
+            return Result<byte[]>.Success(imageData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Image generation failed");
+            return Result<byte[]>.Failure("Image generation failed: " + ex.Message);
+        }
+    }
+}
+\end{minted}
+
+This implementation addresses the performance requirements (NF6-NF8) through careful optimization of the inference process. The service uses a streaming approach to generation, allowing the UI to display progress and provide feedback during the generation process.
+
+\section{Data Model and Storage}
+The data model design balances compatibility with the existing MotionInput JSON schema while extending it to support the enhanced visual management capabilities of the Configuration GUI.
+
+\subsection{Core Data Entities}
+The data model centers around several key entities that represent the configuration components:
+
+\begin{figure}[h]
+\centering
+% Insert Entity Relationship Diagram here
+\caption{Data model showing relationships between key entities}
+\label{fig:data_model}
+\end{figure}
+
+The Profile entity serves as the root object, containing metadata and collections of related entities:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class Profile
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Category { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
+    public DateTime ModifiedDate { get; set; } = DateTime.Now;
+    public List<string> Tags { get; set; } = new();
+    
+    // Core configuration elements
+    public Dictionary<string, string> GlobalConfig { get; set; } = new();
+    public List<GuiElement> GuiElements { get; set; } = new();
+    public List<PoseElement> Poses { get; set; } = new();
+    public Dictionary<string, SpeechCommand> SpeechCommands { get; set; } = new();
+    
+    // GUI-specific metadata (not in original JSON)
+    public string IconPath { get; set; }
+    public bool IsFavorite { get; set; }
+    public Dictionary<string, object> ExtendedProperties { get; set; } = new();
+}
+\end{minted}
+
+This model design reflects several key decisions:
+
 \begin{itemize}
-    \item Asset creation workflow
-    \item Style transfer implementation
-    \item Performance optimizations
-    \item Resource management
+    \item \textbf{Backwards Compatibility}: Maintains the core structure required by MotionInput
+    \item \textbf{Extended Metadata}: Adds GUI-specific properties to enhance the management experience
+    \item \textbf{Flexible Extension}: Uses a dictionary for ExtendedProperties to allow future expansion without model changes
 \end{itemize}
 
-\section{Performance Optimization}
-\subsection{Threading Model}
-Concurrency implementation:
+\subsection{JSON Processing and Validation}
+The application requires sophisticated JSON handling to ensure compatibility with the MotionInput system while supporting the enhanced metadata needed for visual management. The implementation uses a combination of Newtonsoft.Json for serialization and custom JsonConverter classes to handle the complex mapping between the object model and JSON format.
+
+A custom JsonConverter implementation handles the specific requirements of action configuration serialization:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class ActionConfigConverter : JsonConverter<ActionConfig>
+{
+    public override ActionConfig ReadJson(JsonReader reader, Type objectType, 
+        ActionConfig existingValue, bool hasExistingValue, JsonSerializer serializer)
+    {
+        // Read the JSON object
+        var jObject = JObject.Load(reader);
+        
+        // Extract the action type
+        var actionType = jObject["action_type"]?.ToString();
+        if (string.IsNullOrEmpty(actionType))
+        {
+            throw new JsonSerializationException("Missing action_type property");
+        }
+        
+        // Create the appropriate action config based on type
+        ActionConfig result = actionType switch
+        {
+            "keyboard" => new KeyboardActionConfig(),
+            "mouse" => new MouseActionConfig(),
+            "gamepad" => new GamepadActionConfig(),
+            _ => throw new JsonSerializationException($"Unknown action type: {actionType}")
+        };
+        
+        // Populate the common properties
+        serializer.Populate(jObject.CreateReader(), result);
+        
+        return result;
+    }
+}
+\end{minted}
+
+This approach allows the application to handle polymorphic data structures while maintaining type safety and validation. The custom converters ensure that the data model correctly reflects the underlying JSON structure while providing a strongly-typed programming model for the application.
+
+\section{User Interface Implementation}
+The user interface implementation focuses on creating an intuitive, accessible experience that addresses the usability challenges identified in the requirements analysis. The UI layer is built on WinUI 3, leveraging its modern design language and comprehensive accessibility features.
+
+\subsection{Page Architecture and Navigation}
+The application implements a page-based navigation model with distinct pages for different functional areas:
+
 \begin{itemize}
-    \item Async/await patterns
-    \item Background processing
-    \item UI thread management
-    \item Task coordination
+    \item \textbf{HomePage}: Entry point providing access to key features
+    \item \textbf{ProfileListPage}: Displays and manages available profiles
+    \item \textbf{ProfileEditorPage}: Creates and edits profile settings
+    \item \textbf{ActionStudioPage}: Configures action mappings visually
+    \item \textbf{IconStudioPage}: Generates and manages visual assets
 \end{itemize}
 
-\subsection{Resource Management}
-Performance considerations:
+Navigation between pages is managed by a central NavigationService that maintains navigation history and state:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class NavigationService : INavigationService
+{
+    private readonly IWindowManager _windowManager;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly Dictionary<Type, Type> _viewModelToViewMappings = new();
+    
+    public void NavigateTo<TViewModel>(object parameter = null) where TViewModel : class
+    {
+        var viewModelType = typeof(TViewModel);
+        if (!_viewModelToViewMappings.TryGetValue(viewModelType, out var pageType))
+        {
+            throw new InvalidOperationException($"No view registered for {viewModelType.Name}");
+        }
+        
+        var frame = _windowManager.GetMainFrame();
+        var viewModel = _serviceProvider.GetRequiredService<TViewModel>();
+        
+        // Set navigation parameter if available
+        if (viewModel is INavigationAware navigationAware && parameter != null)
+        {
+            navigationAware.OnNavigatedTo(parameter);
+        }
+        
+        // Navigate to the page
+        frame.Navigate(pageType, viewModel);
+    }
+}
+\end{minted}
+
+This implementation follows several design principles:
+
 \begin{itemize}
-    \item Memory optimization
-    \item GPU utilization
-    \item Cache management
-    \item Load balancing
+    \item \textbf{Separation of Concerns}: Pages handle visual presentation while ViewModels manage state and logic
+    \item \textbf{Dependency Injection}: ViewModels are resolved from the service container, ensuring proper initialization
+    \item \textbf{State Management}: Navigation parameters pass data between pages while maintaining separation
 \end{itemize}
+
+\subsection{Visual Profile Editor}
+The ProfileEditorPage implements a visual interface for profile creation and editing, addressing the core requirement for non-technical configuration (FR1). The page is structured into functional sections that progressively disclose complexity:
+
+\begin{figure}[h]
+\centering
+% Insert Profile Editor screenshot here
+\caption{Profile Editor interface showing the visual configuration approach}
+\label{fig:profile_editor}
+\end{figure}
+
+The XAML implementation leverages data templates and binding to create a dynamic interface that adapts to different profile types:
+
+\begin{minted}[frame=single,linenos]{xml}
+<Page x:Class="MotionInput.ConfigurationGUI.Views.ProfileEditorPage">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header with profile metadata -->
+        <StackPanel Grid.Row="0" Margin="20">
+            <TextBox 
+                Text="{x:Bind ViewModel.CurrentProfile.Name, Mode=TwoWay}"
+                PlaceholderText="Profile Name" 
+                HorizontalAlignment="Stretch"/>
+            <TextBox 
+                Text="{x:Bind ViewModel.CurrentProfile.Description, Mode=TwoWay}"
+                PlaceholderText="Description"
+                TextWrapping="Wrap"
+                Height="60"/>
+        </StackPanel>
+        
+        <!-- Main configuration area with tabs -->
+        <TabView Grid.Row="1">
+            <TabViewItem Header="General Settings">
+                <local:GeneralSettingsControl 
+                    Profile="{x:Bind ViewModel.CurrentProfile, Mode=TwoWay}"/>
+            </TabViewItem>
+            <TabViewItem Header="Input Actions">
+                <local:ActionMappingControl 
+                    Actions="{x:Bind ViewModel.CurrentProfile.GuiElements, Mode=TwoWay}"/>
+            </TabViewItem>
+            <TabViewItem Header="Pose Recognition">
+                <local:PoseConfigurationControl 
+                    Poses="{x:Bind ViewModel.CurrentProfile.Poses, Mode=TwoWay}"/>
+            </TabViewItem>
+        </TabView>
+    </Grid>
+</Page>
+\end{minted}
+
+This implementation addresses several key design considerations:
+
+\begin{itemize}
+    \item \textbf{Progressive Disclosure}: Organizes complexity into tabbed sections that users can navigate as needed
+    \item \textbf{Two-Way Binding}: Enables real-time updates between the UI and data model
+    \item \textbf{Component-Based Design}: Uses specialized controls for different configuration aspects, facilitating maintenance
+\end{itemize}
+
+\subsection{Action Studio Implementation}
+The ActionStudioPage provides a visual interface for defining input-to-action mappings, addressing the requirement for visual representation of mappings (FR3). The interface uses a spatial layout that represents the relationship between physical movements and resulting actions:
+
+\begin{figure}[h]
+\centering
+% Insert Action Studio screenshot here
+\caption{Action Studio interface showing the visual mapping between inputs and actions}
+\label{fig:action_studio}
+\end{figure}
+
+The implementation leverages the Canvas control for spatial positioning combined with custom visual elements for the mapping representation:
+
+\begin{minted}[frame=single,linenos]{xml}
+<Page x:Class="MotionInput.ConfigurationGUI.Views.ActionStudioPage">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Action palette sidebar -->
+        <ScrollViewer Grid.Column="0">
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.AvailableActions}">
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="models:ActionDefinition">
+                        <local:ActionPaletteItem 
+                            Definition="{x:Bind}"
+                            DragStarting="OnActionDragStarting"/>
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+        </ScrollViewer>
+        
+        <!-- Canvas for visual mapping -->
+        <Grid Grid.Column="1">
+            <Canvas x:Name="MappingCanvas" 
+                    AllowDrop="True"
+                    Drop="OnCanvasDrop"
+                    DragOver="OnCanvasDragOver">
+                
+                <!-- Action nodes are added dynamically -->
+                
+                <!-- Background body outline -->
+                <Image Source="ms-appx:///Assets/BodyOutline.png" 
+                       Canvas.Left="50" Canvas.Top="50" 
+                       Width="300" Height="500"
+                       Opacity="0.5"/>
+            </Canvas>
+        </Grid>
+    </Grid>
+</Page>
+\end{minted}
+
+This implementation demonstrates several key design decisions:
+
+\begin{itemize}
+    \item \textbf{Drag-and-Drop Interaction}: Enables intuitive placement of actions within the spatial context
+    \item \textbf{Visual Feedback}: Provides immediate visual representation of the mapping relationship
+    \item \textbf{Spatial Context}: Uses a body outline as reference to help users visualize physical movements
+\end{itemize}
+
+The code-behind implements the drag-and-drop functionality using WinUI's built-in drag operation system, with custom logic to translate between screen coordinates and saved position values:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private void OnCanvasDrop(object sender, DragEventArgs e)
+{
+    if (e.DataView.Contains(StandardDataFormats.Text))
+    {
+        var actionId = await e.DataView.GetTextAsync();
+        var position = e.GetPosition(MappingCanvas);
+        
+        // Add the action at the drop position
+        await ViewModel.AddActionAtPositionAsync(actionId, position.X, position.Y);
+    }
+}
+\end{minted}
+
+\section{AI Integration Implementation}
+The AI integration features leverage the ONNX Runtime to provide intelligent capabilities while maintaining performance on consumer hardware. The implementation focuses on two primary areas: icon generation through Stable Diffusion and pose preview through MediaPipe.
+
+\subsection{Stable Diffusion Implementation}
+The Stable Diffusion integration addresses the requirement for AI-generated visual elements (FR6). The implementation uses ONNX Runtime with DirectML to execute the diffusion model efficiently on consumer GPUs.
+
+The implementation follows several steps:
+
+\begin{enumerate}
+    \item \textbf{Model Loading}: Pre-trained ONNX models are loaded at initialization time
+    \item \textbf{Text Encoding}: User prompts are encoded into embeddings using the text encoder
+    \item \textbf{Diffusion Process}: The UNet model progressively denoises random latents guided by the text embedding
+    \item \textbf{Image Decoding}: The VAE decoder converts the final latents into an RGB image
+\end{enumerate}
+
+The core diffusion process is implemented using the scheduler algorithm:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private Tensor<float> PerformDenoisingStep(
+    Tensor<float> latents, 
+    Tensor<float> textEmbedding,
+    int step, 
+    GenerationOptions options)
+{
+    // Calculate timestep for this step
+    float timestep = _scheduler.Timesteps[step];
+    
+    // Create input dictionary for model
+    var inputs = new Dictionary<string, OrtValue>
+    {
+        { "sample", latents.ToOrtValue() },
+        { "encoder_hidden_states", textEmbedding.ToOrtValue() },
+        { "timestep", timestep.ToOrtValue() }
+    };
+    
+    // Run UNet inference
+    using var outputs = _unet.Run(inputs);
+    var noisePredictor = outputs["out_sample"].ToTensor<float>();
+    
+    // Apply scheduler step
+    latents = _scheduler.Step(noisePredictor, timestep, latents, options.GuidanceScale);
+    
+    return latents;
+}
+\end{minted}
+
+This implementation required several design decisions to balance quality and performance:
+
+\begin{itemize}
+    \item \textbf{Model Selection}: Choosing the appropriate model size for consumer hardware
+    \item \textbf{Memory Optimization}: Carefully managing tensor operations to minimize memory usage
+    \item \textbf{Scheduler Algorithm}: Implementing the EulerAncestralDiscrete scheduler for optimal quality/speed balance
+\end{itemize}
+
+The system includes fallback mechanisms for devices without DirectML support or with limited memory, addressing the requirement to function on modest hardware (NF6).
+
+\subsection{Hardware Acceleration Strategy}
+The application implements a sophisticated approach to hardware acceleration, with automatic detection and configuration of available hardware resources. This strategy addresses performance requirements while ensuring compatibility across diverse hardware configurations.
+
+The implementation detects available hardware capabilities at startup:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private ExecutionProvider SelectOptimalExecutionProvider()
+{
+    try
+    {
+        // Check for DirectML support
+        if (IsDirectMLSupported())
+        {
+            _logger.LogInformation("Using DirectML for hardware acceleration");
+            return new DirectMLExecutionProvider(new DirectMLExecutionProviderOptions
+            {
+                DeviceId = 0,
+                MemoryLimit = CalculateOptimalMemoryLimit()
+            });
+        }
+    }
+    catch (Exception ex)
+    {
+        _logger.LogWarning(ex, "DirectML initialization failed, falling back to CPU");
+    }
+    
+    // Fall back to CPU
+    _logger.LogInformation("Using CPU execution provider");
+    return new CPUExecutionProvider();
+}
+\end{minted}
+
+This approach ensures that the application leverages available hardware acceleration when possible while gracefully degrading to CPU execution when necessary. The implementation also includes memory limit calculations based on available system resources to prevent out-of-memory conditions during model execution.
 
 \section{Integration with MotionInput}
-\subsection{Core System Integration}
-Connection with main application:
+The Configuration GUI integrates with the core MotionInput system through a well-defined interface that maintains compatibility while enhancing the user experience. This integration addresses the requirement for seamless compatibility with the existing ecosystem.
+
+\subsection{Configuration File Management}
+The ProfileService component manages configuration files in a format compatible with the core MotionInput system. The implementation includes special handling for the JSON schema to ensure backward compatibility:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<bool> SaveProfileAsync(Profile profile)
+{
+    try
+    {
+        // Convert to JSON with specific formatting for MotionInput compatibility
+        var settings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+            NullValueHandling = NullValueHandling.Ignore,
+            Converters = { new ActionConfigConverter(), new PoseConfigConverter() }
+        };
+        
+        var json = JsonConvert.SerializeObject(profile, settings);
+        
+        // Ensure the profiles directory exists
+        Directory.CreateDirectory(_profilesDirectory);
+        
+        // Save the file
+        var filePath = Path.Combine(_profilesDirectory, $"{profile.Id}.json");
+        await File.WriteAllTextAsync(filePath, json);
+        
+        return true;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to save profile {ProfileId}", profile.Id);
+        return false;
+    }
+}
+\end{minted}
+
+This implementation ensures that profiles created or edited through the GUI remain compatible with the core MotionInput system, addressing the integration requirement while enhancing the user experience.
+
+\subsection{Live Profile Testing}
+The application implements a live testing feature that allows users to verify configurations in real-time before applying them. This functionality addresses the requirement for real-time preview of configured actions (FR5).
+
+The implementation uses interprocess communication to coordinate with the MotionInput application:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<bool> TestProfileAsync(Profile profile)
+{
+    try
+    {
+        // Save to temporary location
+        var tempPath = Path.Combine(Path.GetTempPath(), $"{profile.Id}_temp.json");
+        await File.WriteAllTextAsync(tempPath, JsonConvert.SerializeObject(profile));
+        
+        // Launch MotionInput in test mode
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _motionInputPath,
+            Arguments = $"--test-profile \"{tempPath}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        
+        _testProcess = Process.Start(startInfo);
+        _isInTestMode = true;
+        
+        return true;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to start test mode");
+        return false;
+    }
+}
+\end{minted}
+
+This implementation enables users to validate their configurations with real input before finalizing them, significantly improving the usability of the configuration process and reducing errors.
+
+\section{Performance Optimization}
+The application implements several performance optimization strategies to ensure responsive operation across diverse hardware configurations, addressing the non-functional requirements related to performance (NF1, NF6-NF8).
+
+\subsection{Asynchronous Programming Model}
+The implementation uses a comprehensive asynchronous programming model to maintain UI responsiveness during potentially blocking operations:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<IEnumerable<Profile>> GetAllProfilesAsync()
+{
+    return await Task.Run(() =>
+    {
+        return Directory.GetFiles(_profilesDirectory, "*.json")
+            .AsParallel()
+            .Select(async filePath =>
+            % filepath: /Users/yuma/Desktop/UCL/FYP/MI_GUI_WinUI/dissertation/report/chapters/implementation.tex
+\chapter{Design and Implementation}
+
+\section{System Architecture Overview}
+The Configuration GUI implements a modern application architecture designed for flexibility, maintainability, and performance. The system is built on a multi-layered architecture that separates concerns while facilitating communication between components through well-defined interfaces.
+
+\subsection{Architectural Approach}
+The application follows a layered architecture with clear separation between presentation, business logic, and data persistence. This separation provides several advantages:
+
+\begin{figure}[h]
+\centering
+% Insert your architecture diagram here
+\caption{High-level application architecture showing the relationship between UI, service, and data layers}
+\label{fig:app_architecture}
+\end{figure}
+
+At the highest level, the application is organized into three primary layers:
+
 \begin{itemize}
-    \item Communication protocols
-    \item Event handling system
-    \item Profile synchronization
-    \item Error recovery mechanisms
+    \item \textbf{Presentation Layer}: Implements the user interface through WinUI 3 pages and controls, translating user interactions into service calls.
+    \item \textbf{Service Layer}: Contains the business logic and coordinates between the UI and data models, implementing core functionality like profile management and AI integration.
+    \item \textbf{Data Layer}: Manages data persistence and communication with external systems, including the core MotionInput application.
 \end{itemize}
 
-\subsection{Profile Deployment}
-Configuration deployment process:
+This layered approach addresses the maintainability requirements identified in Chapter 3, while providing a foundation for the accessibility and performance requirements through clear separation of concerns.
+
+\subsection{MVVM Implementation}
+The presentation layer implements the Model-View-ViewModel (MVVM) architectural pattern, which is particularly well-suited for WinUI applications. This pattern provides a clean separation between the user interface (View), the presentation logic (ViewModel), and the data (Model).
+
+\begin{figure}[h]
+\centering
+% Insert MVVM diagram here
+\caption{MVVM pattern implementation showing data flow between components}
+\label{fig:mvvm_diagram}
+\end{figure}
+
+The ViewModels serve as an abstraction of the View, exposing properties and commands that the View binds to. This approach offers several key advantages:
+
 \begin{itemize}
-    \item Validation procedures
-    \item Hot-reload implementation
-    \item Rollback capabilities
-    \item Status monitoring
+    \item \textbf{Testability}: ViewModels can be tested independently of the UI, enabling automated testing of business logic.
+    \item \textbf{Separation of Concerns}: UI designers can focus on the View while developers work on the ViewModel and Model, facilitating parallel development.
+    \item \textbf{Accessibility Support}: The separation allows for alternative views for different accessibility needs while maintaining the same underlying logic.
 \end{itemize}
 
-\section{Development Workflow}
-\subsection{Version Control}
-Development process:
+A typical ViewModel implementation follows this pattern:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public partial class ProfileEditorViewModel : ObservableObject
+{
+    private readonly IProfileService _profileService;
+    private readonly INavigationService _navigationService;
+    private readonly ILogger<ProfileEditorViewModel> _logger;
+    
+    [ObservableProperty]
+    private Profile _currentProfile;
+    
+    [ObservableProperty]
+    private bool _isSaving;
+    
+    [RelayCommand]
+    private async Task SaveProfileAsync()
+    {
+        try
+        {
+            IsSaving = true;
+            await _profileService.SaveProfileAsync(CurrentProfile);
+            _navigationService.NavigateTo(typeof(ProfileListPage));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving profile");
+            // Handle error
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}
+\end{minted}
+
+This implementation leverages source generators from the CommunityToolkit.Mvvm package to reduce boilerplate code while maintaining the MVVM pattern. The \texttt{[ObservableProperty]} attribute automatically generates the property change notification code, while \texttt{[RelayCommand]} generates command implementations that the View can bind to.
+
+\subsection{Dependency Injection System}
+To maintain loose coupling between components, the application implements a comprehensive dependency injection system using Microsoft's standard DI container. This approach allows components to depend on abstractions rather than concrete implementations, facilitating testing and future extensions.
+
+The service registration occurs during application startup:
+
+\begin{minted}[frame=single,linenos]{csharp}
+services.AddSingleton<IWindowManager, WindowManager>();
+services.AddSingleton<INavigationService, NavigationService>();
+services.AddSingleton<IProfileService, ProfileService>();
+services.AddSingleton<IActionService, ActionService>();
+services.AddTransient<IStableDiffusionService, StableDiffusionService>();
+services.AddTransient<ProfileEditorViewModel>();
+\end{minted}
+
+This registration pattern follows several design principles:
+
 \begin{itemize}
-    \item Git workflow
-    \item Code review procedures
-    \item Documentation approach
-    \item Team collaboration
+    \item Services with application-wide state are registered as singletons to ensure consistent state
+    \item Resource-intensive services (like AI components) are registered as transient to control resource usage
+    \item ViewModels are registered as transient to ensure fresh state for each navigation
 \end{itemize}
 
-\subsection{Testing Implementation}
-Testing strategy:
+The dependency injection approach directly supports the maintainability requirements identified in Chapter 3, allowing components to be replaced or modified without affecting other parts of the system.
+
+\section{Core Service Components}
+The service layer contains the primary business logic of the application, organized into focused services with clear responsibilities. Each service addresses specific requirements identified in Chapter 3.
+
+\subsection{Profile Management Service}
+The ProfileService component manages the creation, retrieval, updating, and deletion of configuration profiles. This service directly addresses the core functional requirement (FR1) by providing a programmatic interface to profile management that abstracts away the complexities of the underlying JSON format.
+
+The service implements several key responsibilities:
+
 \begin{itemize}
-    \item Unit testing approach
-    \item Integration testing
-    \item UI automation
-    \item Performance testing
+    \item \textbf{Profile Validation}: Ensures profiles meet the required schema before saving
+    \item \textbf{JSON Serialization/Deserialization}: Converts between object models and the JSON format required by MotionInput
+    \item \textbf{Profile Organization}: Implements tagging and categorization of profiles
+    \item \textbf{Change Tracking}: Monitors changes to facilitate undo/redo functionality
 \end{itemize}
+
+The implementation employs a repository pattern to abstract the storage mechanism:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class ProfileService : IProfileService
+{
+    private readonly IProfileRepository _repository;
+    private readonly IValidator<Profile> _validator;
+    private readonly ILogger<ProfileService> _logger;
+    
+    public async Task<Result<Profile>> SaveProfileAsync(Profile profile)
+    {
+        var validationResult = _validator.Validate(profile);
+        if (!validationResult.IsValid)
+        {
+            return Result<Profile>.Failure(validationResult.Errors);
+        }
+        
+        try
+        {
+            var savedProfile = await _repository.SaveAsync(profile);
+            return Result<Profile>.Success(savedProfile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save profile {ProfileName}", profile.Name);
+            return Result<Profile>.Failure("Failed to save profile: " + ex.Message);
+        }
+    }
+}
+\end{minted}
+
+This implementation pattern includes several notable design decisions:
+
+\begin{itemize}
+    \item \textbf{Result Pattern}: Returns a Result object rather than throwing exceptions, providing more structured error handling
+    \item \textbf{Validation Separation}: Uses a separate validator component for profile validation, allowing validation rules to evolve independently
+    \item \textbf{Repository Abstraction}: Isolates storage concerns, enabling future changes to storage mechanisms without affecting business logic
+\end{itemize}
+
+The service layer implements comprehensive error handling and logging, addressing the robustness requirements identified in Chapter 3. All operations that might fail (such as file operations or external service calls) are wrapped in appropriate exception handling with detailed logging for troubleshooting.
+
+\subsection{Stable Diffusion Service}
+The StableDiffusionService component implements the AI-powered icon generation capability (FR6) through integration with the ONNX Runtime and DirectML. This service enables users to generate contextually relevant icons from text descriptions, enhancing the visual distinctiveness of profiles and actions.
+
+\begin{figure}[h]
+\centering
+% Insert Stable Diffusion pipeline diagram here
+\caption{Stable Diffusion pipeline architecture showing processing stages and data flow}
+\label{fig:stable_diffusion_pipeline}
+\end{figure}
+
+The service implementation addresses several technical challenges:
+
+\begin{itemize}
+    \item \textbf{Hardware Acceleration}: Leverages DirectML for GPU acceleration when available
+    \item \textbf{Fallback Mechanism}: Gracefully degrades to CPU execution when suitable GPU is unavailable
+    \item \textbf{Memory Management}: Carefully manages unmanaged resources to prevent memory leaks
+    \item \textbf{Progress Reporting}: Provides realtime generation progress for responsive UI feedback
+\end{itemize}
+
+The implementation follows a pipeline architecture, with distinct stages for text encoding, image generation, and post-processing:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class StableDiffusionService : IStableDiffusionService, IDisposable
+{
+    private InferenceSession _textEncoder;
+    private InferenceSession _unet;
+    private InferenceSession _vaeDecoder;
+    private readonly ILogger<StableDiffusionService> _logger;
+    
+    public async Task<Result<byte[]>> GenerateImageAsync(
+        string prompt, 
+        GenerationOptions options,
+        IProgress<GenerationProgress> progress = null)
+    {
+        try
+        {
+            // 1. Encode text prompt to embedding
+            var textEmbedding = EncodeText(prompt);
+            
+            // 2. Initialize random noise
+            var latents = GenerateInitialNoise(options.Seed);
+            
+            // 3. Run diffusion process
+            for (int i = 0; i < options.Steps; i++)
+            {
+                // Report progress
+                progress?.Report(new GenerationProgress 
+                { 
+                    CurrentStep = i, 
+                    TotalSteps = options.Steps 
+                });
+                
+                // Perform denoising step
+                latents = PerformDenoisingStep(latents, textEmbedding, i, options);
+            }
+            
+            // 4. Decode latents to image
+            var imageData = DecodeLatentsToImage(latents);
+            
+            return Result<byte[]>.Success(imageData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Image generation failed");
+            return Result<byte[]>.Failure("Image generation failed: " + ex.Message);
+        }
+    }
+}
+\end{minted}
+
+This implementation addresses the performance requirements (NF6-NF8) through careful optimization of the inference process. The service uses a streaming approach to generation, allowing the UI to display progress and provide feedback during the generation process.
+
+\section{Data Model and Storage}
+The data model design balances compatibility with the existing MotionInput JSON schema while extending it to support the enhanced visual management capabilities of the Configuration GUI.
+
+\subsection{Core Data Entities}
+The data model centers around several key entities that represent the configuration components:
+
+\begin{figure}[h]
+\centering
+% Insert Entity Relationship Diagram here
+\caption{Data model showing relationships between key entities}
+\label{fig:data_model}
+\end{figure}
+
+The Profile entity serves as the root object, containing metadata and collections of related entities:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class Profile
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Category { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.Now;
+    public DateTime ModifiedDate { get; set; } = DateTime.Now;
+    public List<string> Tags { get; set; } = new();
+    
+    // Core configuration elements
+    public Dictionary<string, string> GlobalConfig { get; set; } = new();
+    public List<GuiElement> GuiElements { get; set; } = new();
+    public List<PoseElement> Poses { get; set; } = new();
+    public Dictionary<string, SpeechCommand> SpeechCommands { get; set; } = new();
+    
+    // GUI-specific metadata (not in original JSON)
+    public string IconPath { get; set; }
+    public bool IsFavorite { get; set; }
+    public Dictionary<string, object> ExtendedProperties { get; set; } = new();
+}
+\end{minted}
+
+This model design reflects several key decisions:
+
+\begin{itemize}
+    \item \textbf{Backwards Compatibility}: Maintains the core structure required by MotionInput
+    \item \textbf{Extended Metadata}: Adds GUI-specific properties to enhance the management experience
+    \item \textbf{Flexible Extension}: Uses a dictionary for ExtendedProperties to allow future expansion without model changes
+\end{itemize}
+
+\subsection{JSON Processing and Validation}
+The application requires sophisticated JSON handling to ensure compatibility with the MotionInput system while supporting the enhanced metadata needed for visual management. The implementation uses a combination of Newtonsoft.Json for serialization and custom JsonConverter classes to handle the complex mapping between the object model and JSON format.
+
+A custom JsonConverter implementation handles the specific requirements of action configuration serialization:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class ActionConfigConverter : JsonConverter<ActionConfig>
+{
+    public override ActionConfig ReadJson(JsonReader reader, Type objectType, 
+        ActionConfig existingValue, bool hasExistingValue, JsonSerializer serializer)
+    {
+        // Read the JSON object
+        var jObject = JObject.Load(reader);
+        
+        // Extract the action type
+        var actionType = jObject["action_type"]?.ToString();
+        if (string.IsNullOrEmpty(actionType))
+        {
+            throw new JsonSerializationException("Missing action_type property");
+        }
+        
+        // Create the appropriate action config based on type
+        ActionConfig result = actionType switch
+        {
+            "keyboard" => new KeyboardActionConfig(),
+            "mouse" => new MouseActionConfig(),
+            "gamepad" => new GamepadActionConfig(),
+            _ => throw new JsonSerializationException($"Unknown action type: {actionType}")
+        };
+        
+        // Populate the common properties
+        serializer.Populate(jObject.CreateReader(), result);
+        
+        return result;
+    }
+}
+\end{minted}
+
+This approach allows the application to handle polymorphic data structures while maintaining type safety and validation. The custom converters ensure that the data model correctly reflects the underlying JSON structure while providing a strongly-typed programming model for the application.
+
+\section{User Interface Implementation}
+The user interface implementation focuses on creating an intuitive, accessible experience that addresses the usability challenges identified in the requirements analysis. The UI layer is built on WinUI 3, leveraging its modern design language and comprehensive accessibility features.
+
+\subsection{Page Architecture and Navigation}
+The application implements a page-based navigation model with distinct pages for different functional areas:
+
+\begin{itemize}
+    \item \textbf{HomePage}: Entry point providing access to key features
+    \item \textbf{ProfileListPage}: Displays and manages available profiles
+    \item \textbf{ProfileEditorPage}: Creates and edits profile settings
+    \item \textbf{ActionStudioPage}: Configures action mappings visually
+    \item \textbf{IconStudioPage}: Generates and manages visual assets
+\end{itemize}
+
+Navigation between pages is managed by a central NavigationService that maintains navigation history and state:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public class NavigationService : INavigationService
+{
+    private readonly IWindowManager _windowManager;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly Dictionary<Type, Type> _viewModelToViewMappings = new();
+    
+    public void NavigateTo<TViewModel>(object parameter = null) where TViewModel : class
+    {
+        var viewModelType = typeof(TViewModel);
+        if (!_viewModelToViewMappings.TryGetValue(viewModelType, out var pageType))
+        {
+            throw new InvalidOperationException($"No view registered for {viewModelType.Name}");
+        }
+        
+        var frame = _windowManager.GetMainFrame();
+        var viewModel = _serviceProvider.GetRequiredService<TViewModel>();
+        
+        // Set navigation parameter if available
+        if (viewModel is INavigationAware navigationAware && parameter != null)
+        {
+            navigationAware.OnNavigatedTo(parameter);
+        }
+        
+        // Navigate to the page
+        frame.Navigate(pageType, viewModel);
+    }
+}
+\end{minted}
+
+This implementation follows several design principles:
+
+\begin{itemize}
+    \item \textbf{Separation of Concerns}: Pages handle visual presentation while ViewModels manage state and logic
+    \item \textbf{Dependency Injection}: ViewModels are resolved from the service container, ensuring proper initialization
+    \item \textbf{State Management}: Navigation parameters pass data between pages while maintaining separation
+\end{itemize}
+
+\subsection{Visual Profile Editor}
+The ProfileEditorPage implements a visual interface for profile creation and editing, addressing the core requirement for non-technical configuration (FR1). The page is structured into functional sections that progressively disclose complexity:
+
+\begin{figure}[h]
+\centering
+% Insert Profile Editor screenshot here
+\caption{Profile Editor interface showing the visual configuration approach}
+\label{fig:profile_editor}
+\end{figure}
+
+The XAML implementation leverages data templates and binding to create a dynamic interface that adapts to different profile types:
+
+\begin{minted}[frame=single,linenos]{xml}
+<Page x:Class="MotionInput.ConfigurationGUI.Views.ProfileEditorPage">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header with profile metadata -->
+        <StackPanel Grid.Row="0" Margin="20">
+            <TextBox 
+                Text="{x:Bind ViewModel.CurrentProfile.Name, Mode=TwoWay}"
+                PlaceholderText="Profile Name" 
+                HorizontalAlignment="Stretch"/>
+            <TextBox 
+                Text="{x:Bind ViewModel.CurrentProfile.Description, Mode=TwoWay}"
+                PlaceholderText="Description"
+                TextWrapping="Wrap"
+                Height="60"/>
+        </StackPanel>
+        
+        <!-- Main configuration area with tabs -->
+        <TabView Grid.Row="1">
+            <TabViewItem Header="General Settings">
+                <local:GeneralSettingsControl 
+                    Profile="{x:Bind ViewModel.CurrentProfile, Mode=TwoWay}"/>
+            </TabViewItem>
+            <TabViewItem Header="Input Actions">
+                <local:ActionMappingControl 
+                    Actions="{x:Bind ViewModel.CurrentProfile.GuiElements, Mode=TwoWay}"/>
+            </TabViewItem>
+            <TabViewItem Header="Pose Recognition">
+                <local:PoseConfigurationControl 
+                    Poses="{x:Bind ViewModel.CurrentProfile.Poses, Mode=TwoWay}"/>
+            </TabViewItem>
+        </TabView>
+    </Grid>
+</Page>
+\end{minted}
+
+This implementation addresses several key design considerations:
+
+\begin{itemize}
+    \item \textbf{Progressive Disclosure}: Organizes complexity into tabbed sections that users can navigate as needed
+    \item \textbf{Two-Way Binding}: Enables real-time updates between the UI and data model
+    \item \textbf{Component-Based Design}: Uses specialized controls for different configuration aspects, facilitating maintenance
+\end{itemize}
+
+\subsection{Action Studio Implementation}
+The ActionStudioPage provides a visual interface for defining input-to-action mappings, addressing the requirement for visual representation of mappings (FR3). The interface uses a spatial layout that represents the relationship between physical movements and resulting actions:
+
+\begin{figure}[h]
+\centering
+% Insert Action Studio screenshot here
+\caption{Action Studio interface showing the visual mapping between inputs and actions}
+\label{fig:action_studio}
+\end{figure}
+
+The implementation leverages the Canvas control for spatial positioning combined with custom visual elements for the mapping representation:
+
+\begin{minted}[frame=single,linenos]{xml}
+<Page x:Class="MotionInput.ConfigurationGUI.Views.ActionStudioPage">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Action palette sidebar -->
+        <ScrollViewer Grid.Column="0">
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.AvailableActions}">
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="models:ActionDefinition">
+                        <local:ActionPaletteItem 
+                            Definition="{x:Bind}"
+                            DragStarting="OnActionDragStarting"/>
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+        </ScrollViewer>
+        
+        <!-- Canvas for visual mapping -->
+        <Grid Grid.Column="1">
+            <Canvas x:Name="MappingCanvas" 
+                    AllowDrop="True"
+                    Drop="OnCanvasDrop"
+                    DragOver="OnCanvasDragOver">
+                
+                <!-- Action nodes are added dynamically -->
+                
+                <!-- Background body outline -->
+                <Image Source="ms-appx:///Assets/BodyOutline.png" 
+                       Canvas.Left="50" Canvas.Top="50" 
+                       Width="300" Height="500"
+                       Opacity="0.5"/>
+            </Canvas>
+        </Grid>
+    </Grid>
+</Page>
+\end{minted}
+
+This implementation demonstrates several key design decisions:
+
+\begin{itemize}
+    \item \textbf{Drag-and-Drop Interaction}: Enables intuitive placement of actions within the spatial context
+    \item \textbf{Visual Feedback}: Provides immediate visual representation of the mapping relationship
+    \item \textbf{Spatial Context}: Uses a body outline as reference to help users visualize physical movements
+\end{itemize}
+
+The code-behind implements the drag-and-drop functionality using WinUI's built-in drag operation system, with custom logic to translate between screen coordinates and saved position values:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private void OnCanvasDrop(object sender, DragEventArgs e)
+{
+    if (e.DataView.Contains(StandardDataFormats.Text))
+    {
+        var actionId = await e.DataView.GetTextAsync();
+        var position = e.GetPosition(MappingCanvas);
+        
+        // Add the action at the drop position
+        await ViewModel.AddActionAtPositionAsync(actionId, position.X, position.Y);
+    }
+}
+\end{minted}
+
+\section{AI Integration Implementation}
+The AI integration features leverage the ONNX Runtime to provide intelligent capabilities while maintaining performance on consumer hardware. The implementation focuses on two primary areas: icon generation through Stable Diffusion and pose preview through MediaPipe.
+
+\subsection{Stable Diffusion Implementation}
+The Stable Diffusion integration addresses the requirement for AI-generated visual elements (FR6). The implementation uses ONNX Runtime with DirectML to execute the diffusion model efficiently on consumer GPUs.
+
+The implementation follows several steps:
+
+\begin{enumerate}
+    \item \textbf{Model Loading}: Pre-trained ONNX models are loaded at initialization time
+    \item \textbf{Text Encoding}: User prompts are encoded into embeddings using the text encoder
+    \item \textbf{Diffusion Process}: The UNet model progressively denoises random latents guided by the text embedding
+    \item \textbf{Image Decoding}: The VAE decoder converts the final latents into an RGB image
+\end{enumerate}
+
+The core diffusion process is implemented using the scheduler algorithm:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private Tensor<float> PerformDenoisingStep(
+    Tensor<float> latents, 
+    Tensor<float> textEmbedding,
+    int step, 
+    GenerationOptions options)
+{
+    // Calculate timestep for this step
+    float timestep = _scheduler.Timesteps[step];
+    
+    // Create input dictionary for model
+    var inputs = new Dictionary<string, OrtValue>
+    {
+        { "sample", latents.ToOrtValue() },
+        { "encoder_hidden_states", textEmbedding.ToOrtValue() },
+        { "timestep", timestep.ToOrtValue() }
+    };
+    
+    // Run UNet inference
+    using var outputs = _unet.Run(inputs);
+    var noisePredictor = outputs["out_sample"].ToTensor<float>();
+    
+    // Apply scheduler step
+    latents = _scheduler.Step(noisePredictor, timestep, latents, options.GuidanceScale);
+    
+    return latents;
+}
+\end{minted}
+
+This implementation required several design decisions to balance quality and performance:
+
+\begin{itemize}
+    \item \textbf{Model Selection}: Choosing the appropriate model size for consumer hardware
+    \item \textbf{Memory Optimization}: Carefully managing tensor operations to minimize memory usage
+    \item \textbf{Scheduler Algorithm}: Implementing the EulerAncestralDiscrete scheduler for optimal quality/speed balance
+\end{itemize}
+
+The system includes fallback mechanisms for devices without DirectML support or with limited memory, addressing the requirement to function on modest hardware (NF6).
+
+\subsection{Hardware Acceleration Strategy}
+The application implements a sophisticated approach to hardware acceleration, with automatic detection and configuration of available hardware resources. This strategy addresses performance requirements while ensuring compatibility across diverse hardware configurations.
+
+The implementation detects available hardware capabilities at startup:
+
+\begin{minted}[frame=single,linenos]{csharp}
+private ExecutionProvider SelectOptimalExecutionProvider()
+{
+    try
+    {
+        // Check for DirectML support
+        if (IsDirectMLSupported())
+        {
+            _logger.LogInformation("Using DirectML for hardware acceleration");
+            return new DirectMLExecutionProvider(new DirectMLExecutionProviderOptions
+            {
+                DeviceId = 0,
+                MemoryLimit = CalculateOptimalMemoryLimit()
+            });
+        }
+    }
+    catch (Exception ex)
+    {
+        _logger.LogWarning(ex, "DirectML initialization failed, falling back to CPU");
+    }
+    
+    // Fall back to CPU
+    _logger.LogInformation("Using CPU execution provider");
+    return new CPUExecutionProvider();
+}
+\end{minted}
+
+This approach ensures that the application leverages available hardware acceleration when possible while gracefully degrading to CPU execution when necessary. The implementation also includes memory limit calculations based on available system resources to prevent out-of-memory conditions during model execution.
+
+\section{Integration with MotionInput}
+The Configuration GUI integrates with the core MotionInput system through a well-defined interface that maintains compatibility while enhancing the user experience. This integration addresses the requirement for seamless compatibility with the existing ecosystem.
+
+\subsection{Configuration File Management}
+The ProfileService component manages configuration files in a format compatible with the core MotionInput system. The implementation includes special handling for the JSON schema to ensure backward compatibility:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<bool> SaveProfileAsync(Profile profile)
+{
+    try
+    {
+        // Convert to JSON with specific formatting for MotionInput compatibility
+        var settings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+            NullValueHandling = NullValueHandling.Ignore,
+            Converters = { new ActionConfigConverter(), new PoseConfigConverter() }
+        };
+        
+        var json = JsonConvert.SerializeObject(profile, settings);
+        
+        // Ensure the profiles directory exists
+        Directory.CreateDirectory(_profilesDirectory);
+        
+        // Save the file
+        var filePath = Path.Combine(_profilesDirectory, $"{profile.Id}.json");
+        await File.WriteAllTextAsync(filePath, json);
+        
+        return true;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to save profile {ProfileId}", profile.Id);
+        return false;
+    }
+}
+\end{minted}
+
+This implementation ensures that profiles created or edited through the GUI remain compatible with the core MotionInput system, addressing the integration requirement while enhancing the user experience.
+
+\subsection{Live Profile Testing}
+The application implements a live testing feature that allows users to verify configurations in real-time before applying them. This functionality addresses the requirement for real-time preview of configured actions (FR5).
+
+The implementation uses interprocess communication to coordinate with the MotionInput application:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<bool> TestProfileAsync(Profile profile)
+{
+    try
+    {
+        // Save to temporary location
+        var tempPath = Path.Combine(Path.GetTempPath(), $"{profile.Id}_temp.json");
+        await File.WriteAllTextAsync(tempPath, JsonConvert.SerializeObject(profile));
+        
+        // Launch MotionInput in test mode
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _motionInputPath,
+            Arguments = $"--test-profile \"{tempPath}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        
+        _testProcess = Process.Start(startInfo);
+        _isInTestMode = true;
+        
+        return true;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to start test mode");
+        return false;
+    }
+}
+\end{minted}
+
+This implementation enables users to validate their configurations with real input before finalizing them, significantly improving the usability of the configuration process and reducing errors.
+
+\section{Performance Optimization}
+The application implements several performance optimization strategies to ensure responsive operation across diverse hardware configurations, addressing the non-functional requirements related to performance (NF1, NF6-NF8).
+
+\subsection{Asynchronous Programming Model}
+The implementation uses a comprehensive asynchronous programming model to maintain UI responsiveness during potentially blocking operations:
+
+\begin{minted}[frame=single,linenos]{csharp}
+public async Task<IEnumerable<Profile>> GetAllProfilesAsync()
+{
+    return await Task.Run(() =>
+    {
+        return Directory.GetFiles(_profilesDirectory, "*.json")
+            .AsParallel()
+            .Select(async filePath =>
+            {
+                var json = await File.ReadAllTextAsync(filePath);
+                return JsonConvert.DeserializeObject<Profile>(json);
+            })
+            .ToList();
+    });
+}
+\end{minted}
+
+This implementation uses the \texttt{AsParallel} LINQ extension to parallelize file reading and deserialization, significantly improving performance when loading multiple profiles.
+
+The use of \texttt{async/await} ensures that the UI remains responsive during these operations, addressing the performance requirements while maintaining a smooth user experience.
