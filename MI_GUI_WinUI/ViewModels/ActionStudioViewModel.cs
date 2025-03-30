@@ -22,6 +22,7 @@ namespace MI_GUI_WinUI.ViewModels
         private ObservableCollection<ActionData> _actions;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsActionSelected))]
         private ActionData? _selectedAction;
 
         [ObservableProperty]
@@ -127,7 +128,13 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         private async Task SaveSequence()
         {
-            if (SelectedAction == null || string.IsNullOrWhiteSpace(SelectedAction.Name))
+            if (SelectedAction == null)
+            {
+                ErrorMessage = "No action selected";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedAction.Name))
             {
                 ErrorMessage = "Please enter an action name";
                 if (XamlRoot != null)
@@ -149,20 +156,24 @@ namespace MI_GUI_WinUI.ViewModels
 
             try
             {
-                await _actionService.SaveActionAsync(SelectedAction);
+                var actionToSave = SelectedAction;
+                await _actionService.SaveActionAsync(actionToSave);
+
+                // Update or add the action in the list
+                var existingIndex = Actions.ToList().FindIndex(a => a.Name == actionToSave.Name);
+                if (existingIndex >= 0)
+                {
+                    Actions[existingIndex] = actionToSave;
+                }
+                else if (!Actions.Contains(actionToSave))
+                {
+                    Actions.Add(actionToSave);
+                }
 
                 ErrorMessage = null;
                 if (XamlRoot != null)
                 {
-                    await DialogHelper.ShowMessage($"Action '{SelectedAction.Name}' saved successfully.", "Success", XamlRoot);
-                }
-            }
-            catch (ActionNameExistsException)
-            {
-                ErrorMessage = "An action with this name already exists";
-                if (XamlRoot != null)
-                {
-                    await DialogHelper.ShowError("An action with this name already exists. Please choose a different name.", XamlRoot);
+                    await DialogHelper.ShowMessage($"Action '{actionToSave.Name}' saved successfully.", "Success", XamlRoot);
                 }
             }
             catch (Exception ex)
@@ -194,7 +205,7 @@ namespace MI_GUI_WinUI.ViewModels
                     if (!result) return;
                 }
 
-                await _actionService.DeleteActionAsync(action.Name);
+                await _actionService.DeleteActionAsync(action.Id);
                 Actions.Remove(action);
 
                 if (SelectedAction == action)
@@ -214,11 +225,6 @@ namespace MI_GUI_WinUI.ViewModels
                     await DialogHelper.ShowError("Failed to delete action. Please try again.", XamlRoot);
                 }
             }
-        }
-
-        partial void OnSelectedActionChanged(ActionData? value)
-        {
-            OnPropertyChanged(nameof(IsActionSelected));
         }
     }
 }

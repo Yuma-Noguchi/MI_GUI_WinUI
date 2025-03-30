@@ -14,25 +14,6 @@ namespace MI_GUI_WinUI.Services
         private readonly ILogger<ActionService> _logger;
         private readonly string ACTIONS_FILE;
         private Dictionary<string, ActionData> _actions = new();
-        private Dictionary<string, string> _nameToIdMap = new();
-
-        private class ActionFileData
-        {
-            [JsonProperty("actions")]
-            public Dictionary<string, ActionData> Actions { get; set; } = new();
-
-            [JsonProperty("metadata")]
-            public ActionMetadata Metadata { get; set; } = new();
-        }
-
-        private class ActionMetadata
-        {
-            [JsonProperty("version")]
-            public string Version { get; set; } = "2.0";
-
-            [JsonProperty("nameToId")]
-            public Dictionary<string, string> NameToId { get; set; } = new();
-        }
 
         public ActionService(ILogger<ActionService> logger)
         {
@@ -53,75 +34,26 @@ namespace MI_GUI_WinUI.Services
             }
         }
 
-        private async Task<ActionFileData> LoadFileDataAsync()
-        {
-            if (!File.Exists(ACTIONS_FILE))
-            {
-                _logger.LogInformation("Actions file not found, creating new one");
-                var fileData = new ActionFileData();
-                await SaveActionsToFileAsync(fileData);
-                return fileData;
-            }
-
-            var json = await File.ReadAllTextAsync(ACTIONS_FILE);
-            var settings = new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                Formatting = Formatting.Indented
-            };
-
-            try
-            {
-                // Try loading new format first
-                var fileData = JsonConvert.DeserializeObject<ActionFileData>(json, settings);
-                if (fileData?.Actions != null)
-                {
-                    return fileData;
-                }
-            }
-            catch
-            {
-                _logger.LogInformation("Failed to load new format, attempting migration from old format");
-            }
-
-            // Try migrating from old format
-            return await MigrateFromOldFormatAsync(json);
-        }
-
-        private async Task<ActionFileData> MigrateFromOldFormatAsync(string json)
-        {
-            try
-            {
-                var oldData = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(json);
-                var fileData = new ActionFileData();
-
-                foreach (var kvp in oldData)
-                {
-                    var action = ActionData.FromLegacyFormat(kvp.Value);
-                    fileData.Actions[action.Id] = action;
-                    fileData.Metadata.NameToId[action.Name] = action.Id;
-                }
-
-                // Save migrated data
-                await SaveActionsToFileAsync(fileData);
-                _logger.LogInformation("Successfully migrated from old format");
-
-                return fileData;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error migrating from old format");
-                throw new InvalidActionException("Failed to migrate from old format: " + ex.Message);
-            }
-        }
-
         public async Task<List<ActionData>> LoadActionsAsync()
         {
             try
             {
-                var fileData = await LoadFileDataAsync();
-                _actions = fileData.Actions;
-                _nameToIdMap = fileData.Metadata.NameToId;
+                if (!File.Exists(ACTIONS_FILE))
+                {
+                    _logger.LogInformation("Actions file not found, creating new one");
+                    await SaveActionsToFileAsync();
+                    return new List<ActionData>();
+                }
+
+                var json = await File.ReadAllTextAsync(ACTIONS_FILE);
+                var settings = new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                    Formatting = Formatting.Indented
+                };
+
+                _actions = JsonConvert.DeserializeObject<Dictionary<string, ActionData>>(json, settings) 
+                    ?? new Dictionary<string, ActionData>();
 
                 return _actions.Values.ToList();
             }
@@ -132,26 +64,17 @@ namespace MI_GUI_WinUI.Services
             }
         }
 
-        private async Task SaveActionsToFileAsync(ActionFileData fileData = null)
+        private async Task SaveActionsToFileAsync()
         {
             try
             {
-                fileData ??= new ActionFileData
-                {
-                    Actions = _actions,
-                    Metadata = new ActionMetadata
-                    {
-                        NameToId = _nameToIdMap
-                    }
-                };
-
                 var settings = new JsonSerializerSettings
                 {
                     NullValueHandling = NullValueHandling.Ignore,
                     Formatting = Formatting.Indented
                 };
 
-                var json = JsonConvert.SerializeObject(fileData, settings);
+                var json = JsonConvert.SerializeObject(_actions, settings);
                 await File.WriteAllTextAsync(ACTIONS_FILE, json);
             }
             catch (Exception ex)
@@ -173,89 +96,69 @@ namespace MI_GUI_WinUI.Services
                 throw new InvalidActionException("Action name cannot be empty");
             }
 
-            if (string.IsNullOrWhiteSpace(action.Id))
-            {
-                throw new InvalidActionException("Action ID cannot be empty");
-            }
-
             if (action.Args == null)
             {
                 throw new InvalidActionException("Action arguments cannot be null");
             }
         }
 
-        public async Task<bool> IsNameAvailable(string name, string currentActionId = null)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return false;
-            }
-
-            if (!_nameToIdMap.TryGetValue(name, out var existingId))
-            {
-                return true;
-            }
-
-            // If checking for an existing action's current name
-            return currentActionId != null && existingId == currentActionId;
-        }
-
         public async Task SaveActionAsync(ActionData action)
         {
             ValidateAction(action);
 
-            // For new actions or renamed actions
-            if (_actions.TryGetValue(action.Id, out var existingAction))
+            // Check if an action with this name already exists
+            var existingAction = _actions.Values.FirstOrDefault(a => a.Name == action.Name);
+            if (existingAction != null)
             {
-                // If trying to rename to a name that's already taken
-                if (existingAction.Name != action.Name && !await IsNameAvailable(action.Name, action.Id))
-                {
-                    throw new ActionNameExistsException(action.Name);
-                }
-
-                // Remove the old name mapping if it's being renamed
-                if (existingAction.Name != action.Name)
-                {
-                    _nameToIdMap.Remove(existingAction.Name);
-                    _logger.LogInformation($"Renamed action from {existingAction.Name} to {action.Name}");
-                }
-            }
-            else
-            {
-                // For completely new actions
-                if (!await IsNameAvailable(action.Name))
-                {
-                    throw new ActionNameExistsException(action.Name);
-                }
+                // Update the existing action's sequence
+                existingAction.Args = action.Args;
+                action.Id = existingAction.Id; // Make sure we're using the existing ID
             }
 
-            // Update both dictionaries
+            // Save/Update the action using its ID
             _actions[action.Id] = action;
-            _nameToIdMap[action.Name] = action.Id;
-
             await SaveActionsToFileAsync();
+
             _logger.LogInformation($"Action saved: {action.Name} with ID: {action.Id}");
         }
 
-        public async Task DeleteActionAsync(string actionName)
+        public async Task DeleteActionAsync(string actionId)
         {
-            if (_nameToIdMap.TryGetValue(actionName, out var id))
+            if (_actions.ContainsKey(actionId))
             {
-                _actions.Remove(id);
-                _nameToIdMap.Remove(actionName);
+                var actionName = _actions[actionId].Name;
+                _actions.Remove(actionId);
                 await SaveActionsToFileAsync();
                 _logger.LogInformation($"Action deleted: {actionName}");
             }
             else
             {
-                throw new ActionNotFoundException(actionName);
+                throw new ActionNotFoundException($"Action with ID {actionId} not found");
             }
+        }
+
+        public async Task<ActionData> GetActionByIdAsync(string id)
+        {
+            if (_actions.TryGetValue(id, out var action))
+            {
+                return action;
+            }
+            throw new ActionNotFoundException($"Action with ID {id} not found");
+        }
+
+        public async Task<ActionData> GetActionByNameAsync(string name)
+        {
+            var action = _actions.Values.FirstOrDefault(a => a.Name == name);
+            if (action != null)
+            {
+                return action;
+            }
+            throw new ActionNotFoundException($"Action with name '{name}' not found");
         }
 
         public void ClearCache()
         {
             _actions.Clear();
-            _nameToIdMap.Clear();
         }
     }
 }
