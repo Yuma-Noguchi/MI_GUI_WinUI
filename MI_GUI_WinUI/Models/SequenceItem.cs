@@ -1,43 +1,82 @@
 using System;
-using CommunityToolkit.Mvvm.ComponentModel;
-using MI_GUI_WinUI.Converters;
+using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace MI_GUI_WinUI.Models
 {
-    [JsonConverter(typeof(SequenceItemJsonConverter))]
-    public partial class SequenceItem : ObservableObject
+    public class SequenceItem
     {
-        [ObservableProperty]
-        private string _type = string.Empty;
+        [JsonProperty("type")]
+        public string Type { get; set; }
 
-        [ObservableProperty]
-        private string _value = string.Empty;
+        [JsonProperty("value")]
+        public string Value { get; set; }
 
-        // Helper properties for XAML binding
+        [JsonIgnore]
         public bool IsPress => Type == "press";
+
+        [JsonIgnore]
         public bool IsSleep => Type == "sleep";
 
         public double SleepDuration => IsSleep && double.TryParse(Value, out double result) ? result : 0;
         public string ButtonName => IsPress ? Value : string.Empty;
 
+        public static SequenceItem CreateButtonPress(string button)
+        {
+            return new SequenceItem 
+            { 
+                Type = "press",
+                Value = button.ToLower()
+            };
+        }
+
+        public static SequenceItem CreateSleep(double seconds)
+        {
+            return new SequenceItem
+            {
+                Type = "sleep",
+                Value = seconds.ToString()
+            };
+        }
+
+        public Dictionary<string, object> ToDictionary()
+        {
+            object valueArray;
+            if (IsSleep)
+            {
+                valueArray = new[] { Convert.ToDouble(Value) };
+            }
+            else
+            {
+                valueArray = new[] { Value };
+            }
+
+            return new Dictionary<string, object>
+            {
+                { Type, valueArray }
+            };
+        }
+
+        public static SequenceItem FromDictionary(Dictionary<string, object> dict)
+        {
+            var pair = dict.FirstOrDefault();
+            if (pair.Key == null) return CreateSleep(1.0);
+
+            var type = pair.Key;
+            var values = pair.Value as object[];
+            var value = values?.FirstOrDefault()?.ToString() ?? "1.0";
+
+            return new SequenceItem
+            {
+                Type = type,
+                Value = value
+            };
+        }
+
         public override string ToString()
         {
-            return IsPress ? $"Press {ButtonName}" : $"Sleep {SleepDuration:F1}s";
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is SequenceItem other)
-            {
-                return Type == other.Type && Value == other.Value;
-            }
-            return false;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Type, Value);
+            return IsSleep ? $"Sleep: {Value}s" : $"Press: {Value}";
         }
     }
 }

@@ -48,14 +48,21 @@ namespace MI_GUI_WinUI.Converters
             {
                 writer.WritePropertyName("press");
                 writer.WriteStartArray();
-                writer.WriteValue(value.Value.ToLower());
+                writer.WriteValue(value.Value.ToLowerInvariant());
                 writer.WriteEndArray();
             }
             else if (value.IsSleep)
             {
                 writer.WritePropertyName("sleep");
                 writer.WriteStartArray();
-                writer.WriteValue(Convert.ToDouble(value.Value));
+                if (double.TryParse(value.Value, out double sleepValue))
+                {
+                    writer.WriteValue(sleepValue);
+                }
+                else
+                {
+                    writer.WriteValue(1.0); // Default sleep value
+                }
                 writer.WriteEndArray();
             }
 

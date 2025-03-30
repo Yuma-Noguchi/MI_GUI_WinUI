@@ -87,8 +87,7 @@ namespace MI_GUI_WinUI.ViewModels
         {
             var newAction = new ActionData
             {
-                Name = $"New Action {Actions.Count + 1}",
-                Sequence = new ObservableCollection<SequenceItem>()
+                Name = $"New Action {Actions.Count + 1}"
             };
             
             Actions.Add(newAction);
@@ -102,7 +101,7 @@ namespace MI_GUI_WinUI.ViewModels
             if (string.IsNullOrEmpty(SelectedButton) || SelectedAction == null) 
                 return;
 
-            SelectedAction.Sequence.Add(ActionData.CreateButtonPress(SelectedButton));
+            SelectedAction.Sequence.Add(SequenceItem.CreateButtonPress(SelectedButton));
             ErrorMessage = null;
         }
 
@@ -111,7 +110,7 @@ namespace MI_GUI_WinUI.ViewModels
         {
             if (SelectedAction == null) return;
 
-            SelectedAction.Sequence.Add(ActionData.CreateSleep(SleepDuration));
+            SelectedAction.Sequence.Add(SequenceItem.CreateSleep(SleepDuration));
             ErrorMessage = null;
         }
 
@@ -138,17 +137,6 @@ namespace MI_GUI_WinUI.ViewModels
                 return;
             }
 
-            // Check for duplicate name
-            if (Actions.Any(a => a != SelectedAction && a.Name.Equals(SelectedAction.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                ErrorMessage = "An action with this name already exists";
-                if (XamlRoot != null)
-                {
-                    await DialogHelper.ShowError("An action with this name already exists. Please choose a different name.", XamlRoot);
-                }
-                return;
-            }
-
             if (!SelectedAction.Sequence.Any())
             {
                 ErrorMessage = "Please add at least one button to the sequence";
@@ -167,6 +155,14 @@ namespace MI_GUI_WinUI.ViewModels
                 if (XamlRoot != null)
                 {
                     await DialogHelper.ShowMessage($"Action '{SelectedAction.Name}' saved successfully.", "Success", XamlRoot);
+                }
+            }
+            catch (ActionNameExistsException)
+            {
+                ErrorMessage = "An action with this name already exists";
+                if (XamlRoot != null)
+                {
+                    await DialogHelper.ShowError("An action with this name already exists. Please choose a different name.", XamlRoot);
                 }
             }
             catch (Exception ex)
