@@ -47,7 +47,7 @@
         </Style>
     </Page.Resources>
 
-    <Grid x:Name="RootGrid">
+    <Grid x:Name="RootGrid" Margin="36">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -58,7 +58,7 @@
                           HomeButtonEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
 
         <!-- Main content -->
-        <Grid Grid.Row="1" Margin="20">
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="320"/>
                 <ColumnDefinition Width="*"/>
@@ -117,7 +117,7 @@
                         BorderThickness="1"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         CornerRadius="4"
-                        PlaceholderText="Describe your icon, e.g. 'A minimalist gamepad icon in flat design style'..."
+                        PlaceholderText="Describe your icon, e.g. 'game icon, tiger'..."
                         IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
 
                 <!-- Generate Button -->
@@ -218,7 +218,7 @@
             </StackPanel>
 
             <!-- Preview Panel -->
-            <Grid Grid.Column="1" Margin="20,0">
+            <Grid Grid.Column="1" Margin="20,0,0,0">
                 <Border
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
