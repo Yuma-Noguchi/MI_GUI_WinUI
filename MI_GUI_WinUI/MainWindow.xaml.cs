@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using CommunityToolkit.Mvvm.DependencyInjection;
-using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 using MI_GUI_WinUI.Pages;
 using System.Collections.Generic;
 using System;

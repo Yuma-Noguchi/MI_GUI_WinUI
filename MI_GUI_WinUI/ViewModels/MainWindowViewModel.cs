@@ -8,7 +8,7 @@ namespace MI_GUI_WinUI.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
-        private readonly INavigationService _navigationService;
+        private readonly NavigationService _navigationService;
         private string _selectedMenuItem;
 
         [ObservableProperty]
@@ -28,7 +28,7 @@ namespace MI_GUI_WinUI.ViewModels
 
         public ICommand NavigateCommand { get; }
 
-        public MainWindowViewModel(INavigationService navigationService)
+        public MainWindowViewModel(NavigationService navigationService)
         {
             _navigationService = navigationService;
             NavigateCommand = new RelayCommand<string>(HandleNavigation);

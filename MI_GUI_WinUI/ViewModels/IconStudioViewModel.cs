@@ -3,10 +3,12 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Windows.Storage;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -20,7 +22,7 @@ namespace MI_GUI_WinUI.ViewModels
         private XamlRoot? _xamlRoot;
         private readonly ILogger<IconStudioViewModel> _logger;
         private readonly INavigationService _navigationService;
-        private readonly StableDiffusionService _sdService;
+        private readonly IStableDiffusionService _sdService;
         private bool _executingInference;
         private string[] _currentImagePaths = Array.Empty<string>();
 
@@ -81,10 +83,10 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        public double ProgressPercentage => _sdService.Percentage;
+        public double ProgressPercentage => _sdService?.Percentage ?? 0;
 
         public IconStudioViewModel(
-            StableDiffusionService sdService,
+            IStableDiffusionService sdService,
             ILogger<IconStudioViewModel> logger,
             INavigationService navigationService)
         {
@@ -92,14 +94,187 @@ namespace MI_GUI_WinUI.ViewModels
             _logger = logger;
             _navigationService = navigationService;
 
-            // Subscribe to service's percentage changes
-            _sdService.PropertyChanged += (s, e) =>
+            if (_sdService is INotifyPropertyChanged npc)
             {
-                if (e.PropertyName == nameof(StableDiffusionService.Percentage))
+                npc.PropertyChanged += (s, e) =>
                 {
-                    OnPropertyChanged(nameof(ProgressPercentage));
+                    if (e.PropertyName == nameof(IStableDiffusionService.Percentage))
+                    {
+                        OnPropertyChanged(nameof(ProgressPercentage));
+                    }
+                };
+            }
+        }
+
+        public bool IsNotGenerating => !IsGenerating;
+        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
+
+        partial void OnIsGeneratingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsNotGenerating));
+            OnPropertyChanged(nameof(CanGenerate));
+            if (!value)
+            {
+                StatusMessage = string.Empty;
+            }
+        }
+
+        partial void OnIsInitializingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsReady));
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
+        partial void OnInputDescriptionChanged(string value)
+        {
+            OnPropertyChanged(nameof(CanGenerate));
+        }
+
+        private string helperPrompt = "{}";
+
+        private string BuildFinalPrompt(string prompt)
+        {
+            return helperPrompt.Replace("{}", prompt);
+        }
+
+        [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
+        private async Task GenerateAsync()
+        {
+            try
+            {
+                _executingInference = true;
+                StatusString = "Generating...";
+                IsGenerating = true;
+
+                // If we're using CPU, warn the user about slower performance
+                if (_sdService.UsingCpuFallback)
+                {
+                    StatusMessage = "Running on CPU - generation may take longer";
                 }
-            };
+
+                var prompt = BuildFinalPrompt(InputDescription);
+                _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
+
+                StatusString = "Generation complete";
+                await LoadImagesAsync(_currentImagePaths);
+                IsImageGenerated = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating images");
+                StatusString = "Error generating images";
+            }
+            finally
+            {
+                _executingInference = false;
+                IsGenerating = false;
+            }
+        }
+
+        private bool CanGenerateExecute() => !_executingInference;
+
+        private async Task LoadImagesAsync(IEnumerable<string> imagePaths)
+        {
+            var imageSources = new ObservableCollection<ImageSource>();
+            
+            foreach (string imagePath in imagePaths)
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    var uri = new Uri(imagePath);
+                    
+                    if (uri.Scheme == "file")
+                    {
+                        var file = await StorageFile.GetFileFromPathAsync(imagePath);
+                        using (var stream = await file.OpenReadAsync())
+                        {
+                            await bitmap.SetSourceAsync(stream);
+                        }
+                    }
+                    else
+                    {
+                        bitmap.UriSource = uri;
+                    }
+                    
+                    imageSources.Add(bitmap);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error loading image: {imagePath}");
+                }
+            }
+
+            Images = imageSources;
+        }
+
+        [RelayCommand]
+        private async Task SaveAsync()
+        {
+            if (string.IsNullOrWhiteSpace(IconName))
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+                }
+                return;
+            }
+
+            if (!Utils.FileNameHelper.IsValidFileName(IconName))
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("The icon name contains invalid characters.", XamlRoot);
+                }
+                return;
+            }
+
+            if (_currentImagePaths == null || !_currentImagePaths.Any())
+            {
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
+                }
+                return;
+            }
+
+            try
+            {
+                var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
+                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
+                Directory.CreateDirectory(iconPath);
+
+                var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
+
+                if (File.Exists(fileName))
+                {
+                    if (XamlRoot != null)
+                    {
+                        var result = await Utils.DialogHelper.ShowConfirmation(
+                            $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
+                            "Replace Existing Icon?",
+                            XamlRoot);
+
+                        if (!result) return;
+                    }
+                }
+
+                await Utils.ImageHelper.SaveImageAsync(_currentImagePaths.First(), fileName);
+
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving icon");
+                if (XamlRoot != null)
+                {
+                    await Utils.DialogHelper.ShowError("Failed to save icon.", XamlRoot);
+                }
+            }
         }
 
         public async Task InitializeAsync()
@@ -180,187 +355,6 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public bool IsNotGenerating => !IsGenerating;
-        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
-        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
-
-        partial void OnIsGeneratingChanged(bool value)
-        {
-            OnPropertyChanged(nameof(IsNotGenerating));
-            OnPropertyChanged(nameof(CanGenerate));
-            if (!value)
-            {
-                StatusMessage = string.Empty;
-            }
-        }
-
-        partial void OnIsInitializingChanged(bool value)
-        {
-            OnPropertyChanged(nameof(IsReady));
-            OnPropertyChanged(nameof(CanGenerate));
-        }
-
-        partial void OnInputDescriptionChanged(string value)
-        {
-            OnPropertyChanged(nameof(CanGenerate));
-        }
-
-        //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
-        //private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
-        //private string helperPrompt = "single clean vector icon representing {}, modern material design, minimal UI/UX style, perfect pixel grid alignment, scalable vector graphics, professional app icon quality, crisp edges";
-        private string helperPrompt = "{}";
-
-        private string BuildFinalPrompt(string prompt)
-        {
-            return helperPrompt.Replace("{}", prompt);
-        }
-
-        [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
-        private async Task GenerateAsync()
-        {
-            try
-            {
-                _executingInference = true;
-                StatusString = "Generating...";
-                IsGenerating = true;
-
-                // If we're using CPU, warn the user about slower performance
-                if (_sdService.UsingCpuFallback)
-                {
-                    StatusMessage = "Running on CPU - generation may take longer";
-                }
-
-                var prompt = BuildFinalPrompt(InputDescription);
-
-                _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
-
-                StatusString = $"{_sdService.NumInferenceSteps} iterations ({_sdService.IterationsPerSecond:F1} it/sec); {_sdService.LastTimeMilliseconds / 1000.0:F1} sec total";
-                await LoadImagesAsync(_currentImagePaths);
-                IsImageGenerated = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating images");
-                StatusString = "Error generating images";
-            }
-            finally
-            {
-                _executingInference = false;
-                IsGenerating = false;
-            }
-        }
-
-        private bool CanGenerateExecute() => !_executingInference;
-
-        private async Task LoadImagesAsync(IEnumerable<string> imagePaths)
-        {
-            var imageSources = new ObservableCollection<ImageSource>();
-            
-            foreach (string imagePath in imagePaths)
-            {
-                try
-                {
-                    var bitmap = new BitmapImage();
-                    var uri = new Uri(imagePath);
-                    
-                    if (uri.Scheme == "file")
-                    {
-                        var file = await StorageFile.GetFileFromPathAsync(imagePath);
-                        using (var stream = await file.OpenReadAsync())
-                        {
-                            await bitmap.SetSourceAsync(stream);
-                        }
-                    }
-                    else
-                    {
-                        bitmap.UriSource = uri;
-                    }
-                    
-                    imageSources.Add(bitmap);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error loading image: {imagePath}");
-                }
-            }
-
-            Images = imageSources;
-        }
-
-        [RelayCommand]
-        private async Task SaveAsync()
-        {
-            if (string.IsNullOrWhiteSpace(IconName))
-            {
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
-                }
-                return;
-            }
-
-            if (!Utils.FileNameHelper.IsValidFileName(IconName))
-            {
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("The icon name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
-                }
-                return;
-            }
-
-            if (_currentImagePaths == null || !_currentImagePaths.Any())
-            {
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
-                }
-                return;
-            }
-
-            try
-            {
-                var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
-                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
-                Directory.CreateDirectory(iconPath);
-
-                var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
-
-                // Check if file exists
-                if (File.Exists(fileName))
-                {
-                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
-                        $"An icon named '{sanitizedName}.png' already exists.\nDo you want to replace it?",
-                        "Replace Existing Icon?",
-                        XamlRoot);
-
-                    // If user chooses not to replace, return to page
-                    if (!overwrite)
-                    {
-                        return;
-                    }
-                }
-
-                // Create directory if it doesn't exist
-                Directory.CreateDirectory(Path.GetDirectoryName(fileName));
-
-                // Save the first generated image
-                await Utils.ImageHelper.SaveImageAsync(_currentImagePaths.First(), fileName);
-
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error saving icon");
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Failed to save icon. Please try again.", XamlRoot);
-                }
-            }
-        }
-
         [RelayCommand]
         private async Task RetryInitialization()
         {
@@ -381,7 +375,7 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     try
                     {
-                        Directory.Delete(dir, true);  // recursive delete
+                        Directory.Delete(dir, true);
                     }
                     catch (Exception ex)
                     {

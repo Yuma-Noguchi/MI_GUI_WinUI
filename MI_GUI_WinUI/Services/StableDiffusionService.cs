@@ -10,22 +10,27 @@ using Microsoft.UI.Xaml.Media;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.UI.Dispatching;
-using Microsoft.ML.OnnxRuntime;
+using MI_GUI_WinUI.Services.Interfaces;
 
 namespace MI_GUI_WinUI.Services
 {
-    public partial class StableDiffusionService : ObservableObject, IDisposable
+    public partial class StableDiffusionService : ObservableObject, IStableDiffusionService
     {
+        private readonly ILogger<StableDiffusionService> _logger;
+        private readonly DispatcherQueue _dispatcherQueue;
+        private readonly object _initLock = new();
+
         private StableDiffusionConfig _config;
         private UNet _unet;
-        private readonly ILogger<StableDiffusionService> _logger;
-        private readonly object _initLock = new();
-        private readonly DispatcherQueue _dispatcherQueue;
         private bool _usingCpuFallback;
+        private string _modelsPath;
+        private string _outputPath;
 
         public bool IsInitialized => _unet != null && _config != null;
         public bool UsingCpuFallback => _usingCpuFallback;
+        public long NumInferenceSteps => _config.NumInferenceSteps;
 
         [ObservableProperty]
         private double _percentage;
@@ -36,40 +41,44 @@ namespace MI_GUI_WinUI.Services
         [ObservableProperty]
         private double _iterationsPerSecond;
 
-        public long NumInferenceSteps => _config.NumInferenceSteps;
-
-        public StableDiffusionService(ILogger<StableDiffusionService> logger)
+        public StableDiffusionService(
+            ILogger<StableDiffusionService> logger)
         {
+            _logger = logger;
             _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
-            var modelsPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "Onnx", "fp16");
 
+            var basePath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+            _modelsPath = Path.Combine(basePath, "Onnx", "fp16");
+            _outputPath = Path.Combine(basePath);
+
+            InitializeConfig();
+        }
+
+        private void InitializeConfig()
+        {
             _config = new StableDiffusionConfig
             {
                 NumInferenceSteps = 75,
                 GuidanceScale = 8.5,
                 ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.DirectML,
                 DeviceId = 1,
-                TokenizerOnnxPath = $@"{modelsPath}\cliptokenizer.onnx",
-                TextEncoderOnnxPath = $@"{modelsPath}\text_encoder\model.onnx",
-                UnetOnnxPath = $@"{modelsPath}\unet\model.onnx",
-                VaeDecoderOnnxPath = $@"{modelsPath}\vae_decoder\model.onnx",
-                SafetyModelPath = $@"{modelsPath}\safety_checker\model.onnx",
+                TokenizerOnnxPath = $@"{_modelsPath}\cliptokenizer.onnx",
+                TextEncoderOnnxPath = $@"{_modelsPath}\text_encoder\model.onnx",
+                UnetOnnxPath = $@"{_modelsPath}\unet\model.onnx",
+                VaeDecoderOnnxPath = $@"{_modelsPath}\vae_decoder\model.onnx",
+                SafetyModelPath = $@"{_modelsPath}\safety_checker\model.onnx",
                 ImageOutputPath = "NONE",
             };
-
-            _logger = logger;
         }
 
         public async Task Initialize(bool useGpu)
         {
-            // Ensure we're not already initialized
             if (IsInitialized)
             {
                 _logger.LogInformation("Service already initialized");
                 return;
             }
 
-            // Use lock to prevent multiple simultaneous initialization attempts
             lock (_initLock)
             {
                 if (IsInitialized)
@@ -78,12 +87,13 @@ namespace MI_GUI_WinUI.Services
 
             try
             {
-                _config.ExecutionProviderTarget = useGpu 
+                _config.ExecutionProviderTarget = useGpu
                     ? StableDiffusionConfig.ExecutionProvider.DirectML
                     : StableDiffusionConfig.ExecutionProvider.Cpu;
 
-                _logger.LogInformation("Starting initialization with execution provider: {provider}", _config.ExecutionProviderTarget);
-                
+                _logger.LogInformation("Starting initialization with execution provider: {provider}",
+                    _config.ExecutionProviderTarget);
+
                 try
                 {
                     await Task.Run(() => {
@@ -91,15 +101,14 @@ namespace MI_GUI_WinUI.Services
                     });
                     _usingCpuFallback = !useGpu;
                 }
-                catch (Exception ex) when (useGpu && 
-                    (ex.Message.Contains("DirectML") || 
-                     ex.Message.Contains("GPU") || 
+                catch (Exception ex) when (useGpu &&
+                    (ex.Message.Contains("DirectML") ||
+                     ex.Message.Contains("GPU") ||
                      ex.Message.Contains("DML") ||
                      ex.GetType().Name.Contains("Dml")))
                 {
                     _logger.LogWarning(ex, "DirectML initialization failed, falling back to CPU");
-                    
-                    // Fall back to CPU
+
                     _config.ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.Cpu;
                     await Task.Run(() => {
                         _unet = new UNet(_config);
@@ -125,6 +134,7 @@ namespace MI_GUI_WinUI.Services
         {
             lock (_initLock)
             {
+                _unet?.Dispose();
                 _unet = null;
                 _config = null;
             }
@@ -132,8 +142,12 @@ namespace MI_GUI_WinUI.Services
 
         public ObservableCollection<ImageSource> GenerateFakeData(string description, int numberOfImages)
         {
+            _logger.LogInformation("Generating fake data: {count} images with description: {desc}",
+                numberOfImages, description);
+
             string imagePath = "pack://application:,,,/Assets/biaafpwi.png";
             var tempImages = new ObservableCollection<ImageSource>();
+            
             for (int i = 0; i < numberOfImages; i++)
             {
                 var bitmapImage = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
@@ -149,30 +163,36 @@ namespace MI_GUI_WinUI.Services
             
             if (numberOfImages == 0)
             {
+                _logger.LogWarning("Requested to generate 0 images");
                 return Array.Empty<string>();
             }
+
+            _logger.LogInformation("Starting image generation: {count} images with description: {desc}",
+                numberOfImages, description);
 
             var result = await Task.Run(() =>
             {
                 var timer = new Stopwatch();
                 timer.Start();
 
-                var imageDestination = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, $"Images-{DateTime.Now.Ticks}");
-                var config = _config;
-                config.ImageOutputPath = imageDestination;
-                var totalSteps = numberOfImages * config.NumInferenceSteps;
+                var imageDestination = Path.Combine(_outputPath, $"Images-{DateTime.Now.Ticks}");
+                _config.ImageOutputPath = imageDestination;
+                var totalSteps = numberOfImages * _config.NumInferenceSteps;
 
                 Directory.CreateDirectory(imageDestination);
 
-                for (int i = 1; i <= numberOfImages; i++) 
+                for (int i = 1; i <= numberOfImages; i++)
                 {
+                    _logger.LogDebug("Generating image {current} of {total}", i, numberOfImages);
+
                     var output = _unet.Inference(
-                        description, 
-                        config, 
-                        (stepIndex) => 
-                        { 
-                            var percentage = ((double)((stepIndex + 1) + (i - 1) * config.NumInferenceSteps) / (double)totalSteps) * 100.0;
+                        description,
+                        _config,
+                        (stepIndex) =>
+                        {
+                            var percentage = ((double)((stepIndex + 1) + (i - 1) * _config.NumInferenceSteps) / (double)totalSteps) * 100.0;
                             _dispatcherQueue.TryEnqueue(() => Percentage = percentage);
+                            stepCallback?.Invoke(stepIndex);
                         }
                     );
 
@@ -185,12 +205,15 @@ namespace MI_GUI_WinUI.Services
                 }
 
                 var imagePaths = Directory.GetFiles(imageDestination, "*.*", SearchOption.AllDirectories)
-                                        .Where(path => new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" }
-                                        .Contains(Path.GetExtension(path).ToLower()))
-                                        .ToArray();
+                    .Where(path => new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" }
+                    .Contains(Path.GetExtension(path).ToLower()))
+                    .ToArray();
 
                 timer.Stop();
                 _dispatcherQueue.TryEnqueue(() => LastTimeMilliseconds = timer.ElapsedMilliseconds);
+
+                _logger.LogInformation("Generated {count} images in {time}ms",
+                    imagePaths.Length, timer.ElapsedMilliseconds);
 
                 return imagePaths;
             });
@@ -210,6 +233,7 @@ namespace MI_GUI_WinUI.Services
             {
                 lock (_initLock)
                 {
+                    _logger.LogInformation("Disposing Stable Diffusion service");
                     _unet?.Dispose();
                     _unet = null;
                     _config = null;

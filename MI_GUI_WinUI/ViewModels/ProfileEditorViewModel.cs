@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Controls;
+using MI_GUI_WinUI.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System;
@@ -18,8 +19,8 @@ namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ProfileEditorViewModel : ObservableObject
     {
-        private readonly ProfileService _profileService;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IProfileService _profileService;
+        private readonly ActionConfigurationDialog _actionConfigurationDialog;
         private const float DROPPED_IMAGE_SIZE = 80;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
 
@@ -46,10 +47,10 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
 
-        public ProfileEditorViewModel(ProfileService profileService, IServiceProvider serviceProvider)
+        public ProfileEditorViewModel(IProfileService profileService, ActionConfigurationDialog actionConfigurationDialog)
         {
             _profileService = profileService;
-            _serviceProvider = serviceProvider;
+            _actionConfigurationDialog = actionConfigurationDialog;
             InitializeDefaultButtons();
             LoadCustomButtons();
         }
@@ -147,15 +148,14 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     foreach (var pose in profile.Poses)
                     {
-                        // if skin is set, add element with skin
                         if (!string.IsNullOrEmpty(pose.Skin))
                         {
                             var unifiedElement = UnifiedGuiElement.FromPoseElement(pose);
                             AddElementToCanvas(ElementAddRequest.FromExisting(
-                            unifiedElement,
-                            new Point(pose.Position[0], pose.Position[1])
+                                unifiedElement,
+                                new Point(pose.Position[0], pose.Position[1])
                             ));
-                        }   
+                        }
                     }
                 }
 
@@ -175,19 +175,16 @@ namespace MI_GUI_WinUI.ViewModels
 
         public void AddElementToCanvas(ElementAddRequest request)
         {
-            // Request already contains element with correct position and skin
             var element = request.Element;
 
-            // Ensure the skin path is updated if we have a button
             if (request.Button?.FileName != null)
             {
                 element = element.WithSkin(request.Button.FileName);
             }
 
-            // Request position is assumed to be center position
             var info = new UnifiedPositionInfo(
                 element,
-                request.Position, // Already in center coordinates
+                request.Position,
                 new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
             );
 
@@ -242,28 +239,7 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                if (!Directory.Exists(PROFILES_DIR))
-                {
-                    Directory.CreateDirectory(PROFILES_DIR);
-                }
-
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(ProfileName);
-                var filePath = Path.Combine(PROFILES_DIR, $"{sanitizedName}.json");
-
-                // Check if file exists
-                if (File.Exists(filePath) && XamlRoot != null)
-                {
-                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
-                        $"A profile named '{sanitizedName}.json' already exists. Do you want to replace it?",
-                        "Replace Existing Profile?",
-                        XamlRoot);
-
-                    if (!overwrite)
-                    {
-                        return;
-                    }
-                }
-
                 var profile = new Profile
                 {
                     Name = sanitizedName,
@@ -276,7 +252,6 @@ namespace MI_GUI_WinUI.ViewModels
                 // Split elements into GUI and Pose arrays
                 foreach (var element in CanvasElements)
                 {
-                    // Update the element's position before converting
                     var elementWithPosition = element.Element.WithPosition(
                         (int)element.Position.X,
                         (int)element.Position.Y
@@ -292,11 +267,7 @@ namespace MI_GUI_WinUI.ViewModels
                     }
                 }
 
-                var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
-                await File.WriteAllTextAsync(filePath, json);
-
-                // Clear profile cache to ensure fresh data on next load
-                _profileService.ClearCache();
+                await _profileService.SaveProfileAsync(profile, PROFILES_DIR);
 
                 ValidationMessage = "Profile saved successfully";
                 if (XamlRoot != null)
@@ -326,45 +297,17 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                var filePath = Path.Combine(PROFILES_DIR, $"{ProfileName}.json");
-                if (!File.Exists(filePath))
+                var profiles = await _profileService.ReadProfilesFromJsonAsync(PROFILES_DIR);
+                var profile = profiles.FirstOrDefault(p => p.Name == ProfileName);
+
+                if (profile.Equals(default(Profile)))
                 {
                     ValidationMessage = "Profile not found";
                     return;
                 }
 
-                var json = await File.ReadAllTextAsync(filePath);
-                var profile = JsonConvert.DeserializeObject<Profile>(json);
 
-                PrepareForEdit();
-
-                // Load GUI elements
-                if (profile.GuiElements != null)
-                {
-                    foreach (var element in profile.GuiElements)
-                    {
-                        var unifiedElement = UnifiedGuiElement.FromGuiElement(element);
-                        AddElementToCanvas(ElementAddRequest.FromExisting(
-                            unifiedElement, 
-                            new Point(element.Position[0], element.Position[1])
-                        ));
-                    }
-                }
-
-                // Load poses
-                if (profile.Poses != null)
-                {
-                    foreach (var pose in profile.Poses)
-                    {
-                        var unifiedElement = UnifiedGuiElement.FromPoseElement(pose);
-                        AddElementToCanvas(ElementAddRequest.FromExisting(
-                            unifiedElement,
-                            new Point(pose.Position[0], pose.Position[1])
-                        ));
-                    }
-                }
-
-                ValidationMessage = "Profile loaded successfully";
+                await LoadExistingProfile(profile);
             }
             catch (Exception ex)
             {
@@ -376,13 +319,11 @@ namespace MI_GUI_WinUI.ViewModels
         {
             if (XamlRoot == null) return;
 
-            var dialog = _serviceProvider.GetRequiredService<ActionConfigurationDialog>();
-            dialog.XamlRoot = XamlRoot;
+            _actionConfigurationDialog.XamlRoot = XamlRoot;
             var index = CanvasElements.IndexOf(elementInfo);
 
-            dialog.Configure(elementInfo.Element, element => 
+            _actionConfigurationDialog.Configure(elementInfo.Element, element => 
             {
-                // Create updated element and maintain position and size
                 var updatedInfo = elementInfo.With(
                     element: element.WithPosition(
                         (int)elementInfo.Position.X,
@@ -390,16 +331,14 @@ namespace MI_GUI_WinUI.ViewModels
                     )
                 );
                 
-                // Update both the collection and UI
                 if (index >= 0 && index < CanvasElements.Count)
                 {
                     CanvasElements[index] = updatedInfo;
-                    image.Tag = updatedInfo; // Update the UI element's Tag
-                    System.Diagnostics.Debug.WriteLine($"Updated element at index {index} with action: {element.Action.ClassName}.{element.Action.MethodName}");
+                    image.Tag = updatedInfo;
                 }
             });
 
-            await dialog.ShowAsync();
+            await _actionConfigurationDialog.ShowAsync();
         }
     }
 }

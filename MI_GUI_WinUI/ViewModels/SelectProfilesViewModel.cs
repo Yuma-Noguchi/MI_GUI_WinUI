@@ -1,11 +1,10 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
-using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -13,6 +12,7 @@ using Newtonsoft.Json;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Pages;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -24,11 +24,12 @@ using System.Threading;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class SelectProfilesViewModel : ObservableObject, INotifyPropertyChanged
+    public partial class SelectProfilesViewModel : ObservableObject
     {
         private readonly ILogger<SelectProfilesViewModel> _logger;
         private readonly INavigationService _navigationService;
-        private readonly MotionInputService _motionInputService;
+        private readonly IMotionInputService _motionInputService;
+        private readonly IProfileService _profileService;
         private readonly Dictionary<string, ProfilePreview> _previewCache = new();
         private readonly SemaphoreSlim _previewLock = new(1, 1);
 
@@ -65,16 +66,87 @@ namespace MI_GUI_WinUI.ViewModels
         private List<Profile> _profiles = new();
         private List<Profile> _filteredProfiles = new();
 
+        public class ProfilePreview
+        {
+            public required Canvas Canvas { get; set; }
+            public required string ProfileName { get; set; }
+
+            private ProfilePreview() { }
+
+            public static ProfilePreview Create(Canvas canvas, string profileName)
+            {
+                return new ProfilePreview
+                {
+                    Canvas = canvas,
+                    ProfileName = profileName
+                };
+            }
+
+            public ProfilePreview Clone()
+            {
+                return ProfilePreview.Create(CloneCanvas(this.Canvas), this.ProfileName);
+            }
+
+            private static Canvas CloneCanvas(Canvas original)
+            {
+                double popupScaleFactor = GAME_HEIGHT / TARGET_HEIGHT;
+
+                Canvas clone = new Canvas
+                {
+                    Width = GAME_WIDTH,
+                    Height = GAME_HEIGHT,
+                    Background = original.Background,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                foreach (UIElement child in original.Children)
+                {
+                    if (child is Image originalImage)
+                    {
+                        Image clonedImage = new Image
+                        {
+                            Source = originalImage.Source,
+                            Width = originalImage.Width * popupScaleFactor,
+                            Height = originalImage.Height * popupScaleFactor,
+                            Stretch = originalImage.Stretch
+                        };
+
+                        Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage) * popupScaleFactor);
+                        Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage) * popupScaleFactor);
+
+                        clone.Children.Add(clonedImage);
+                    }
+                }
+
+                return clone;
+            }
+        }
+
+        public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
+
+        private const double GAME_HEIGHT = 480.0;
+        private const double GAME_WIDTH = 640.0;
+        private const double TARGET_HEIGHT = 240.0;
+        private const double TARGET_WIDTH = (TARGET_HEIGHT * GAME_WIDTH) / GAME_HEIGHT;
+        private const double SCALE_FACTOR = TARGET_HEIGHT / GAME_HEIGHT;
+
+        private string profilesFolderPath = "MotionInput\\data\\profiles";
+        private string guiElementsFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\assets");
+
         public SelectProfilesViewModel(
-            ProfileService profileService, 
-            ILogger<SelectProfilesViewModel> logger, 
+            IProfileService profileService,
+            ILogger<SelectProfilesViewModel> logger,
             INavigationService navigationService,
-            MotionInputService motionInputService)
+            IMotionInputService motionInputService)
         {
             _logger = logger;
             _profileService = profileService;
             _navigationService = navigationService;
             _motionInputService = motionInputService;
+            _profiles = new List<Profile>();
+
+            InitializeAsync();
         }
 
         private Profile? GetProfileByName(string name)
@@ -106,85 +178,26 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public class ProfilePreview
+        private void ClosePopup()
         {
-            public required Canvas Canvas { get; set; }
-            public required string ProfileName { get; set; }
-
-            private ProfilePreview() { } // Private constructor to enforce using the initialization syntax
-
-            public static ProfilePreview Create(Canvas canvas, string profileName)
+            try
             {
-                return new ProfilePreview
-                {
-                    Canvas = canvas,
-                    ProfileName = profileName
-                };
+                IsPopupOpen = false;
+                SelectedProfilePreview = null;
             }
-
-            public ProfilePreview Clone()
+            catch (Exception ex)
             {
-                return ProfilePreview.Create(CloneCanvas(this.Canvas), this.ProfileName);
-            }
-
-            private static Canvas CloneCanvas(Canvas original)
-            {
-                // For popup view, scale up to full game resolution
-                double popupScaleFactor = GAME_HEIGHT / TARGET_HEIGHT;
-
-                Canvas clone = new Canvas
-                {
-                    Width = GAME_WIDTH,
-                    Height = GAME_HEIGHT,
-                    Background = original.Background,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                foreach (UIElement child in original.Children)
-                {
-                    if (child is Image originalImage)
-                    {
-                        // Scale up the image for the popup view
-                        Image clonedImage = new Image
-                        {
-                            Source = originalImage.Source,
-                            Width = originalImage.Width * popupScaleFactor,
-                            Height = originalImage.Height * popupScaleFactor,
-                            Stretch = originalImage.Stretch
-                        };
-
-                        // Scale up the position for the popup view
-                        Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage) * popupScaleFactor);
-                        Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage) * popupScaleFactor);
-
-                        clone.Children.Add(clonedImage);
-                    }
-                }
-
-                return clone;
+                _logger.LogError(ex, "Error closing popup");
+                ErrorMessage = "Error closing popup.";
             }
         }
-
-        public ObservableCollection<ProfilePreview> previews { get; } = new ObservableCollection<ProfilePreview>();
-
-        private readonly ProfileService _profileService;
-        private const double GAME_HEIGHT = 480.0; // Original game window height
-        private const double GAME_WIDTH = 640.0;  // Original game window width
-        private const double TARGET_HEIGHT = 240.0; // Preview canvas height
-        private const double TARGET_WIDTH = (TARGET_HEIGHT * GAME_WIDTH) / GAME_HEIGHT;
-        private const double SCALE_FACTOR = TARGET_HEIGHT / GAME_HEIGHT;
-
-        private string profilesFolderPath = "MotionInput\\data\\profiles";
-
-        private string guiElementsFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\assets");
 
         public async Task InitializeAsync()
         {
             try
             {
                 IsLoading = true;
-                
+
                 // Reset state
                 IsPopupOpen = false;
                 SelectedProfilePreview = null;
@@ -194,7 +207,7 @@ namespace MI_GUI_WinUI.ViewModels
 
                 // Load profiles
                 await LoadProfilesAsync();
-                
+
                 // Generate previews after loading
                 if (_profiles.Count > 0)
                 {
@@ -210,20 +223,6 @@ namespace MI_GUI_WinUI.ViewModels
             finally
             {
                 IsLoading = false;
-            }
-        }
-
-        private void ClosePopup()
-        {
-            try
-            {
-                IsPopupOpen = false;
-                SelectedProfilePreview = null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error closing popup");
-                ErrorMessage = "Error closing popup.";
             }
         }
 
@@ -256,7 +255,7 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 // Reset any existing state
                 ClosePopup();
-                    
+
                 // Set new state
                 SelectedProfilePreview = preview.Clone();
                 IsPopupOpen = true;
@@ -292,7 +291,7 @@ namespace MI_GUI_WinUI.ViewModels
             try
             {
                 ErrorMessage = null;
-                _previewCache.Clear();  // Clear cache first
+                _previewCache.Clear();
                 previews.Clear();
 
                 if (_filteredProfiles == null || _filteredProfiles.Count == 0)
@@ -301,7 +300,6 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Generate fresh previews for all filtered profiles
                 foreach (var profile in _filteredProfiles)
                 {
                     var preview = await GeneratePreviewForProfileAsync(profile);
@@ -311,7 +309,7 @@ namespace MI_GUI_WinUI.ViewModels
                         previews.Add(preview);
                     }
                 }
-                
+
                 _logger.LogInformation($"Generated {previews.Count} previews");
             }
             catch (Exception ex)
@@ -340,19 +338,17 @@ namespace MI_GUI_WinUI.ViewModels
                     DataContext = new { ProfileName = profile.Name }
                 };
 
-                // Add GUI elements to preview
                 if (profile.GuiElements != null)
                 {
                     foreach (GuiElement guiElement in profile.GuiElements)
                     {
                         try
                         {
-                            string guiElementFilePath = Path.Combine(guiElementsFolderPath, guiElement.Skin);
+                            string guiElementFilePath = Path.Combine(guiElementsFolderPath, guiElement.Skin ?? string.Empty);
                             var image = await LoadImageAsync(guiElementFilePath, guiElement);
-                            
-                            if (image != null)
+
+                            if (image != null && guiElement.Position.Count >= 2)
                             {
-                                // Scale positions and offset by scaled radius
                                 Canvas.SetLeft(image, guiElement.Position[0] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 Canvas.SetTop(image, guiElement.Position[1] * SCALE_FACTOR - (guiElement.Radius * SCALE_FACTOR));
                                 preview.Children.Add(image);
@@ -365,27 +361,22 @@ namespace MI_GUI_WinUI.ViewModels
                     }
                 }
 
-                // Add poses to preview
                 if (profile.Poses != null)
                 {
                     foreach (PoseGuiElement pose in profile.Poses)
                     {
                         try
                         {
-                            string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin);
-                            // Create a GuiElement-like structure for loading the image
-                            var poseAsGuiElement = new GuiElement
+                            string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin ?? string.Empty);
+                            var image = await LoadImageAsync(poseFilePath, new GuiElement 
                             {
                                 Position = pose.Position,
                                 Radius = pose.Radius,
                                 Skin = pose.Skin
-                            };
-                            
-                            var image = await LoadImageAsync(poseFilePath, poseAsGuiElement);
-                            
-                            if (image != null)
+                            });
+
+                            if (image != null && pose.Position.Count >= 2)
                             {
-                                // Scale positions and offset by scaled radius
                                 Canvas.SetLeft(image, pose.Position[0] * SCALE_FACTOR - (pose.Radius * SCALE_FACTOR));
                                 Canvas.SetTop(image, pose.Position[1] * SCALE_FACTOR - (pose.Radius * SCALE_FACTOR));
                                 preview.Children.Add(image);
@@ -419,7 +410,7 @@ namespace MI_GUI_WinUI.ViewModels
                 var randomAccessStream = memoryStream.AsRandomAccessStream();
                 await bitmap.SetSourceAsync(randomAccessStream);
 
-                double scaledSize = element.Radius * 2 * SCALE_FACTOR; // Diameter is 2 * radius
+                double scaledSize = element.Radius * 2 * SCALE_FACTOR;
                 return new Image
                 {
                     Source = bitmap,
@@ -434,7 +425,6 @@ namespace MI_GUI_WinUI.ViewModels
                 return null;
             }
         }
-
         public async Task EditProfileAsync(string profileName)
         {
             try
@@ -519,48 +509,23 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        internal void Home()
-        {
-            if (_window != null)
-            {
-                var mainWindow = new MainWindow();
-                mainWindow.Activate();
-                
-                if (_window.AppWindow != null)
-                {
-                    _window.AppWindow.Hide();
-                }
-            }
-        }
-
-        internal void Help()
-        {
-            // TODO: Implement help functionality
-        }
-
         [RelayCommand]
         private async Task SelectProfileAsync()
         {
             if (SelectedProfilePreview == null) return;
-            
+
             try
             {
-                // replace white spaces with underscores
-                var _profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
-                                    // copy the selected profile file to MotionInput/data/modes
-                    string sourcePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, profilesFolderPath, $"{_profileName}.json");
-                    string destPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "modes", $"{_profileName}.json");
-                    File.Copy(sourcePath, destPath, true);
-                // Start Motion Input with selected profile
-                bool success = await _motionInputService.Start(_profileName);
-                
+                var profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
+                string sourcePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, profilesFolderPath, $"{profileName}.json");
+                string destPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "modes", $"{profileName}.json");
+                File.Copy(sourcePath, destPath, true);
+
+                bool success = await _motionInputService.StartAsync(profileName);
+
                 if (success)
                 {
-  
-
-                    
                     await ClosePopupAsync();
-                    
                 }
                 else
                 {
@@ -572,6 +537,25 @@ namespace MI_GUI_WinUI.ViewModels
                 _logger.LogError(ex, "Error selecting profile");
                 ErrorMessage = "Error launching MotionInput.";
             }
+        }
+
+        internal void Home()
+        {
+            if (_window != null)
+            {
+                var mainWindow = new MainWindow();
+                mainWindow.Activate();
+
+                if (_window.AppWindow != null)
+                {
+                    _window.AppWindow.Hide();
+                }
+            }
+        }
+
+        internal void Help()
+        {
+            // TODO: Implement help functionality
         }
     }
 }

@@ -2,36 +2,32 @@
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 using MI_GUI_WinUI.Pages;
 using MI_GUI_WinUI.Converters;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System;
+using System.IO;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MI_GUI_WinUI
 {
-    /// <summary>
-    /// Provides application-specific behavior to supplement the default Application class.
-    /// </summary>
     public partial class App : Application
     {
-        private readonly WindowManager _windowManager;
+        private readonly IWindowManager _windowManager;
         private bool _isClosing;
         private readonly IServiceProvider _serviceProvider;
 
         public static new App Current => (App)Application.Current;
         public IServiceProvider Services => _serviceProvider;
 
-        /// <summary>
-        /// Initializes the singleton application object. This is the first line of authored code
-        /// executed, and as such is the logical equivalent of main() or WinMain().
-        /// </summary>
         public App()
         {
-            this.InitializeComponent();
-            _windowManager = new WindowManager();
-
             // Configure services
             var services = new ServiceCollection();
 
@@ -45,25 +41,25 @@ namespace MI_GUI_WinUI
                     new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
             });
 
-            // Register window management first as other services might depend on it
-            services.AddSingleton<WindowManager>(_windowManager);
+            // Register window management
+            services.AddSingleton<IWindowManager, WindowManager>();
 
             // Register navigation
             services.AddSingleton<INavigationService, NavigationService>();
 
             // Register services
-            services.AddSingleton<ProfileService>();
-            services.AddSingleton<ActionService>();
-            services.AddTransient<StableDiffusionService>();
-            services.AddTransient<MotionInputService>();
+            services.AddSingleton<IActionService, ActionService>();
+            services.AddSingleton<IMotionInputService, MotionInputService>();
+            services.AddSingleton<ILoggingService, LoggingService>();
+            services.AddSingleton<IStableDiffusionService, StableDiffusionService>();
+            services.AddSingleton<IProfileService, ProfileService>();
 
             // Register view models
             services.AddSingleton<MainWindowViewModel>();
-            services.AddSingleton<SelectProfilesViewModel>();
-            services.AddSingleton<ActionStudioViewModel>();
-            services.AddSingleton<IconStudioViewModel>();
-            services.AddTransient<ProfileEditorViewModel>(sp =>
-                new ProfileEditorViewModel(sp.GetRequiredService<ProfileService>(), sp));
+            services.AddTransient<SelectProfilesViewModel>();
+            services.AddTransient<ActionStudioViewModel>();
+            services.AddTransient<IconStudioViewModel>();
+            services.AddTransient<ProfileEditorViewModel>();
             services.AddTransient<ActionConfigurationDialogViewModel>();
 
             // Register converters
@@ -84,20 +80,16 @@ namespace MI_GUI_WinUI
 
             // Register controls
             services.AddTransient<Controls.PageHeader>();
-            services.AddTransient<Controls.ActionConfigurationDialog>(sp =>
-                new Controls.ActionConfigurationDialog(sp.GetRequiredService<ActionConfigurationDialogViewModel>()));
+            services.AddTransient<Controls.ActionConfigurationDialog>();
 
             // Build and configure services
             _serviceProvider = services.BuildServiceProvider();
             Ioc.Default.ConfigureServices(_serviceProvider);
 
-            UnhandledException += App_UnhandledException;
+            // Initialize window manager after service provider is built
+            _windowManager = _serviceProvider.GetRequiredService<IWindowManager>();
         }
 
-        /// <summary>
-        /// Invoked when the application is launched.
-        /// </summary>
-        /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
             // Ensure we have a window created when the app launches
@@ -105,23 +97,6 @@ namespace MI_GUI_WinUI
             {
                 _windowManager.InitializeMainWindow();
             }
-        }
-
-        private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
-        {
-            try
-            {
-                var logger = Services.GetService<LoggingService>();
-                if (logger != null)
-                {
-                    logger.LogError("Unhandled application exception", e.Exception);
-                }
-            }
-            catch
-            {
-                // Silently fail if logging fails
-            }
-            e.Handled = true;
         }
 
         public new void Exit()

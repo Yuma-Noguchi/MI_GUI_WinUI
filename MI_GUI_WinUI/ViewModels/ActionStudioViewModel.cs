@@ -10,13 +10,14 @@ using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Utils;
 using System.Collections.Generic;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ActionStudioViewModel : ObservableObject
     {
         private readonly ILogger<ActionStudioViewModel> _logger;
-        private readonly ActionService _actionService;
+        private readonly IActionService _actionService;
 
         [ObservableProperty]
         private ObservableCollection<ActionData> _actions;
@@ -49,7 +50,9 @@ namespace MI_GUI_WinUI.ViewModels
             "DPad_Up", "DPad_Down", "DPad_Left", "DPad_Right"
         };
 
-        public ActionStudioViewModel(ILogger<ActionStudioViewModel> logger, ActionService actionService)
+        public ActionStudioViewModel(
+            ILogger<ActionStudioViewModel> logger, 
+            IActionService actionService)
         {
             _logger = logger;
             _actionService = actionService;

@@ -31,11 +31,6 @@ namespace MI_GUI_WinUI.Pages
         private void SetViewModel(SelectProfilesViewModel viewModel)
         {
             _viewModel = viewModel;
-            if (Application.Current is App app)
-            {
-                var windowManager = app.Services.GetRequiredService<WindowManager>();
-                _viewModel.Window = windowManager.MainWindow;
-            }
             this.DataContext = _viewModel;
         }
 
@@ -49,13 +44,6 @@ namespace MI_GUI_WinUI.Pages
                 if (e.Parameter is SelectProfilesViewModel vm)
                 {
                     SetViewModel(vm);
-                }
-
-                // Ensure window reference is set
-                if (_viewModel != null && Application.Current is App app)
-                {
-                    var windowManager = app.Services.GetRequiredService<WindowManager>();
-                    _viewModel.Window = windowManager.MainWindow;
                 }
 
                 if (_viewModel != null)

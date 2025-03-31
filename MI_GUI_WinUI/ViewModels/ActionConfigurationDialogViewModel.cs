@@ -9,30 +9,31 @@ using System.Windows.Input;
 using System.IO;
 using Newtonsoft.Json;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class ActionConfigurationDialogViewModel : ObservableObject
     {
-    private readonly ActionService _actionService;
-    private Action<UnifiedGuiElement>? _onSave;
-    private UnifiedGuiElement _element;
+        private readonly IActionService _actionService;
+        private Action<UnifiedGuiElement>? _onSave;
+        private UnifiedGuiElement _element;
     
-    [ObservableProperty]
-    private bool isDialogOpen;
+        [ObservableProperty]
+        private bool isDialogOpen;
 
-    [ObservableProperty]
-    private bool useCustomAction;
+        [ObservableProperty]
+        private bool useCustomAction;
 
-    [ObservableProperty]
-    private ObservableCollection<ActionData> availableActions;
+        [ObservableProperty]
+        private ObservableCollection<ActionData> availableActions;
 
-    [ObservableProperty]
-    private ActionData? selectedCustomAction;
+        [ObservableProperty]
+        private ActionData? selectedCustomAction;
 
-    private bool _isLoadingActions;
-    public bool ShowBasicSettings => !UseCustomAction;
-    public bool ShowCustomSettings => UseCustomAction;
+        private bool _isLoadingActions;
+        public bool ShowBasicSettings => !UseCustomAction;
+        public bool ShowCustomSettings => UseCustomAction;
 
         [ObservableProperty]
         private string validationMessage = string.Empty;
@@ -79,7 +80,7 @@ namespace MI_GUI_WinUI.ViewModels
             "MotionInput", "data", "assets", "generated_actions"
         );
 
-        public ActionConfigurationDialogViewModel(ActionService actionService)
+        public ActionConfigurationDialogViewModel(IActionService actionService)
         {
             _actionService = actionService;
             AvailableMethods = new ObservableCollection<MethodDescription>

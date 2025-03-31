@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml;
 using CommunityToolkit.Mvvm.DependencyInjection;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
 using MI_GUI_WinUI.ViewModels;
 
 namespace MI_GUI_WinUI.Pages
