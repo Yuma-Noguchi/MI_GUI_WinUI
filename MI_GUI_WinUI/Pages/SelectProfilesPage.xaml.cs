@@ -121,11 +121,6 @@ namespace MI_GUI_WinUI.Pages
             }
         }
 
-        private void HelpButton_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.Help();
-        }
-
         private async void OpenProfilePopup_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button &&

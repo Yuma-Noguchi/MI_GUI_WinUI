@@ -562,25 +562,6 @@ namespace MI_GUI_WinUI.ViewModels
                 ErrorMessage = "Error launching MotionInput.";
             }
         }
-
-        internal void Home()
-        {
-            if (_window != null)
-            {
-                var mainWindow = new MainWindow();
-                mainWindow.Activate();
-
-                if (_window.AppWindow != null)
-                {
-                    _window.AppWindow.Hide();
-                }
-            }
-        }
-
-        internal void Help()
-        {
-            // TODO: Implement help functionality
-        }
     }
 }
 

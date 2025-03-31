@@ -67,8 +67,6 @@ namespace MI_GUI_WinUI.Services
             try
             {
                 StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
-
-                _logger.LogInformation($"Deleting profile from normalized path: {folderPath}");
                 StorageFolder profilesFolder = await installedLocation.GetFolderAsync(folderPath);
 
                 var files = await profilesFolder.GetFilesAsync();
