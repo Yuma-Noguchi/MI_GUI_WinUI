@@ -64,14 +64,31 @@ namespace MI_GUI_WinUI.Models
             if (pair.Key == null) return CreateSleep(1.0);
 
             var type = pair.Key;
-            var values = pair.Value as object[];
-            var value = values?.FirstOrDefault()?.ToString() ?? "1.0";
-
-            return new SequenceItem
+            
+            // Handle array values properly based on type
+            if (pair.Value is Newtonsoft.Json.Linq.JArray jArray)
             {
-                Type = type,
-                Value = value
-            };
+                var firstValue = jArray.FirstOrDefault()?.ToString();
+                if (type == "press" && !string.IsNullOrEmpty(firstValue))
+                {
+                    return new SequenceItem
+                    {
+                        Type = type,
+                        Value = firstValue
+                    };
+                }
+                else if (type == "sleep" && double.TryParse(firstValue, out double sleepValue))
+                {
+                    return new SequenceItem
+                    {
+                        Type = type,
+                        Value = sleepValue.ToString()
+                    };
+                }
+            }
+            
+            // Fallback to default sleep if something went wrong
+            return CreateSleep(1.0);
         }
 
         public override string ToString()
