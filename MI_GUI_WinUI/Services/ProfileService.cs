@@ -2,17 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Services.Interfaces;
 using Newtonsoft.Json;
+using Windows.Storage;
 
 namespace MI_GUI_WinUI.Services
 {
     public class ProfileService : IProfileService
     {
         private readonly Dictionary<string, Profile> _profileCache;
-        private readonly string _baseProfilePath;
         private readonly ILogger<ProfileService> _logger;
         private readonly JsonSerializerSettings _jsonSettings;
         
@@ -20,7 +21,6 @@ namespace MI_GUI_WinUI.Services
         {
             _logger = logger;
             _profileCache = new Dictionary<string, Profile>();
-            _baseProfilePath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
             _jsonSettings = new JsonSerializerSettings
             {
                 Formatting = Formatting.Indented,
@@ -36,21 +36,22 @@ namespace MI_GUI_WinUI.Services
         {
             try
             {
-                string fullPath = Path.Combine(_baseProfilePath, folderPath);
+                StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
+                StorageFolder profilesFolder = await installedLocation.GetFolderAsync(folderPath);
                 string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profileName);
-                string filePath = Path.Combine(fullPath, $"{fileName}.json");
                 
-                _logger.LogInformation($"Attempting to delete profile file: {filePath}");
+                _logger.LogInformation($"Attempting to delete profile file: {fileName}.json");
 
-                if (File.Exists(filePath))
+                try
                 {
-                    File.Delete(filePath);
+                    StorageFile file = await profilesFolder.GetFileAsync($"{fileName}.json");
+                    await file.DeleteAsync();
                     _profileCache.Remove(profileName);
-                    _logger.LogInformation($"Successfully deleted profile file: {filePath}");
+                    _logger.LogInformation($"Successfully deleted profile file: {fileName}.json");
                 }
-                else
+                catch (FileNotFoundException)
                 {
-                    _logger.LogWarning($"Profile file not found for deletion: {filePath}");
+                    _logger.LogWarning($"Profile file not found for deletion: {fileName}.json");
                 }
             }
             catch (Exception ex)
@@ -62,18 +63,16 @@ namespace MI_GUI_WinUI.Services
 
         public async Task<List<Profile>> ReadProfilesFromJsonAsync(string folderPath)
         {
-            string fullPath = Path.Combine(_baseProfilePath, folderPath);
             List<Profile> profiles = new List<Profile>();
-
-            if (!Directory.Exists(fullPath))
-            {
-                _logger.LogError($"Directory not found: {fullPath}");
-                throw new DirectoryNotFoundException($"Directory not found at path: {fullPath}");
-            }
-
             try
             {
-                foreach (var file in Directory.EnumerateFiles(fullPath, "*.json"))
+                StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
+
+                _logger.LogInformation($"Deleting profile from normalized path: {folderPath}");
+                StorageFolder profilesFolder = await installedLocation.GetFolderAsync(folderPath);
+
+                var files = await profilesFolder.GetFilesAsync();
+                foreach (var file in files.Where(f => f.FileType == ".json"))
                 {
                     if (await LoadProfileFromFileAsync(file) is Profile profile)
                     {
@@ -88,6 +87,7 @@ namespace MI_GUI_WinUI.Services
                     _profileCache[profile.Name] = profile;
                 }
 
+                _logger.LogInformation($"Successfully loaded {profiles.Count} profiles from {folderPath}");
                 return profiles;
             }
             catch (Exception ex)
@@ -101,14 +101,34 @@ namespace MI_GUI_WinUI.Services
         {
             try
             {
-                string fullPath = Path.Combine(_baseProfilePath, folderPath);
+                StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
                 
-                if (!Directory.Exists(fullPath))
+                // Ensure the folder exists
+                StorageFolder profilesFolder;
+                try
                 {
-                    Directory.CreateDirectory(fullPath);
+                    profilesFolder = await installedLocation.GetFolderAsync(folderPath);
+                }
+                catch (FileNotFoundException)
+                {
+                    string[] pathParts = folderPath.Split('/', '\\').Where(p => !string.IsNullOrEmpty(p)).ToArray();
+                    profilesFolder = installedLocation;
+                    foreach (string part in pathParts)
+                    {
+                        StorageFolder nextFolder;
+                        try
+                        {
+                            nextFolder = await profilesFolder.GetFolderAsync(part);
+                        }
+                        catch (FileNotFoundException)
+                        {
+                            nextFolder = await profilesFolder.CreateFolderAsync(part);
+                        }
+                        profilesFolder = nextFolder;
+                    }
                 }
 
-                await SaveProfileToFileAsync(profile, fullPath);
+                await SaveProfileToFileAsync(profile, profilesFolder);
                 
                 // Update cache
                 _profileCache[profile.Name] = profile;
@@ -122,19 +142,19 @@ namespace MI_GUI_WinUI.Services
             }
         }
 
-        private async Task<Profile?> LoadProfileFromFileAsync(string filePath)
+        private async Task<Profile?> LoadProfileFromFileAsync(StorageFile file)
         {
             try
             {
                 // Check cache first
-                string profileName = ProfileNameHelper.GetDisplayNameFromFileName(filePath);
+                string profileName = ProfileNameHelper.GetDisplayNameFromFileName(file.Name);
                 if (_profileCache.TryGetValue(profileName, out Profile cachedProfile))
                 {
                     return cachedProfile;
                 }
 
                 // Read and parse file
-                string jsonString = await File.ReadAllTextAsync(filePath);
+                string jsonString = await FileIO.ReadTextAsync(file);
                 var profile = JsonConvert.DeserializeObject<Profile>(jsonString, _jsonSettings);
 
                 profile.Name = profileName;
@@ -142,34 +162,35 @@ namespace MI_GUI_WinUI.Services
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, $"JSON parsing error in {filePath}");
+                _logger.LogError(ex, $"JSON parsing error in {file.Name}");
                 return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error loading profile from {filePath}");
+                _logger.LogError(ex, $"Error loading profile from {file.Name}");
                 return null;
             }
         }
 
-        private async Task SaveProfileToFileAsync(Profile profile, string folderPath)
+        private async Task SaveProfileToFileAsync(Profile profile, StorageFolder profilesFolder)
         {
             if (string.IsNullOrEmpty(profile.Name))
             {
                 throw new ArgumentException("Profile name cannot be empty", nameof(profile));
             }
 
-            string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profile.Name);
-            string filePath = Path.Combine(folderPath, $"{fileName}.json");
-
             try
             {
+                string fileName = ProfileNameHelper.GetFileNameFromDisplayName(profile.Name);
+                StorageFile file = await profilesFolder.CreateFileAsync($"{fileName}.json", CreationCollisionOption.ReplaceExisting);
                 string jsonString = JsonConvert.SerializeObject(profile, _jsonSettings);
-                await File.WriteAllTextAsync(filePath, jsonString);
+                
+                await FileIO.WriteTextAsync(file, jsonString);
+                _logger.LogInformation($"Successfully saved profile to {fileName}.json");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error saving profile to {filePath}");
+                _logger.LogError(ex, $"Error saving profile {profile.Name}");
                 throw;
             }
         }

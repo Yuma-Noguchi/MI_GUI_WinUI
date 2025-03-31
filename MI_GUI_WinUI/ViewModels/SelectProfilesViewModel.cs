@@ -132,7 +132,7 @@ namespace MI_GUI_WinUI.ViewModels
         private const double SCALE_FACTOR = TARGET_HEIGHT / GAME_HEIGHT;
 
         private string profilesFolderPath = "MotionInput\\data\\profiles";
-        private string guiElementsFolderPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\assets");
+        private readonly string guiElementsFolderPath = "MotionInput\\data\\assets";
 
         public SelectProfilesViewModel(
             IProfileService profileService,
@@ -344,7 +344,7 @@ namespace MI_GUI_WinUI.ViewModels
                     {
                         try
                         {
-                            string guiElementFilePath = Path.Combine(guiElementsFolderPath, guiElement.Skin ?? string.Empty);
+                            string guiElementFilePath = Path.Combine(guiElementsFolderPath.Replace('\\', '/'), guiElement.Skin?.Replace('\\', '/') ?? string.Empty).Replace('/', '\\');
                             var image = await LoadImageAsync(guiElementFilePath, guiElement);
 
                             if (image != null && guiElement.Position.Count >= 2)
@@ -367,7 +367,8 @@ namespace MI_GUI_WinUI.ViewModels
                     {
                         try
                         {
-                            string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin ?? string.Empty);
+                            string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin?.Replace('/', '\\') ?? string.Empty);
+                            _logger.LogInformation($"Loading pose from: {poseFilePath}");
                             var image = await LoadImageAsync(poseFilePath, new GuiElement 
                             {
                                 Position = pose.Position,
@@ -402,13 +403,26 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
+                if (string.IsNullOrEmpty(element.Skin))
+                {
+                    _logger.LogWarning($"Skipping image load - empty skin path for element");
+                    return null;
+                }
+
+                _logger.LogInformation($"Loading image from: {imagePath}");
+                StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
+                StorageFile imageFile = await installedLocation.GetFileAsync(imagePath);
+                if (imageFile == null)
+                {
+                    _logger.LogWarning($"Image file not found: {imagePath}");
+                    return null;
+                }
+
                 var bitmap = new BitmapImage();
-                using var fileStream = File.OpenRead(imagePath);
-                var memoryStream = new MemoryStream();
-                await fileStream.CopyToAsync(memoryStream);
-                memoryStream.Position = 0;
-                var randomAccessStream = memoryStream.AsRandomAccessStream();
-                await bitmap.SetSourceAsync(randomAccessStream);
+                using (IRandomAccessStream stream = await imageFile.OpenAsync(FileAccessMode.Read))
+                {
+                    await bitmap.SetSourceAsync(stream);
+                }
 
                 double scaledSize = element.Radius * 2 * SCALE_FACTOR;
                 return new Image
@@ -517,9 +531,19 @@ namespace MI_GUI_WinUI.ViewModels
             try
             {
                 var profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
-                string sourcePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, profilesFolderPath, $"{profileName}.json");
-                string destPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "modes", $"{profileName}.json");
-                File.Copy(sourcePath, destPath, true);
+                StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
+                
+                // Keep paths relative to installation directory
+                string sourcePath = Path.Combine(profilesFolderPath, $"{profileName}.json");
+                string destPath = Path.Combine("MotionInput\\data\\modes", $"{profileName}.json");
+                
+                _logger.LogInformation($"Attempting to copy from '{sourcePath}' to '{destPath}'");
+                
+                StorageFile sourceFile = await installedLocation.GetFileAsync(sourcePath);
+                StorageFile destFile = await installedLocation.CreateFileAsync(destPath, CreationCollisionOption.ReplaceExisting);
+
+                await sourceFile.CopyAndReplaceAsync(destFile);
+                _logger.LogInformation($"Copied profile from {sourcePath} to {destPath}");
 
                 bool success = await _motionInputService.StartAsync(profileName);
 
@@ -559,3 +583,4 @@ namespace MI_GUI_WinUI.ViewModels
         }
     }
 }
+

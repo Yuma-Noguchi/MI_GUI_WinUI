@@ -26,7 +26,7 @@ namespace MI_GUI_WinUI.ViewModels
         private const int MOTION_INPUT_HEIGHT = 480;
         private const int CANVAS_WIDTH = 560;
         private const int CANVAS_HEIGHT = 420;
-        private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
+        private readonly string PROFILES_DIR = Path.Combine("MotionInput", "data", "profiles");
 
         private Point ScaleToMotionInput(Point canvasPosition)
         {
