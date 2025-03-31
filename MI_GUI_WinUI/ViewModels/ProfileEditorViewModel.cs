@@ -22,7 +22,27 @@ namespace MI_GUI_WinUI.ViewModels
         private readonly IProfileService _profileService;
         private readonly ActionConfigurationDialog _actionConfigurationDialog;
         private const float DROPPED_IMAGE_SIZE = 80;
+        private const int MOTION_INPUT_WIDTH = 640;
+        private const int MOTION_INPUT_HEIGHT = 480;
+        private const int CANVAS_WIDTH = 560;
+        private const int CANVAS_HEIGHT = 420;
         private readonly string PROFILES_DIR = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "profiles");
+
+        private Point ScaleToMotionInput(Point canvasPosition)
+        {
+            return new Point(
+                canvasPosition.X * MOTION_INPUT_WIDTH / CANVAS_WIDTH,
+                canvasPosition.Y * MOTION_INPUT_HEIGHT / CANVAS_HEIGHT
+            );
+        }
+
+        private Point ScaleToCanvas(List<int> motionInputPosition)
+        {
+            return new Point(
+                motionInputPosition[0] * CANVAS_WIDTH / MOTION_INPUT_WIDTH,
+                motionInputPosition[1] * CANVAS_HEIGHT / MOTION_INPUT_HEIGHT
+            );
+        }
 
         [ObservableProperty]
         private string profileName = string.Empty;
@@ -136,9 +156,10 @@ namespace MI_GUI_WinUI.ViewModels
                     foreach (var element in profile.GuiElements)
                     {
                         var unifiedElement = UnifiedGuiElement.FromGuiElement(element);
+                        var canvasPosition = ScaleToCanvas(element.Position);
                         AddElementToCanvas(ElementAddRequest.FromExisting(
-                            unifiedElement, 
-                            new Point(element.Position[0], element.Position[1])
+                            unifiedElement,
+                            canvasPosition
                         ));
                     }
                 }
@@ -151,9 +172,10 @@ namespace MI_GUI_WinUI.ViewModels
                         if (!string.IsNullOrEmpty(pose.Skin))
                         {
                             var unifiedElement = UnifiedGuiElement.FromPoseElement(pose);
+                            var canvasPosition = ScaleToCanvas(pose.Position);
                             AddElementToCanvas(ElementAddRequest.FromExisting(
                                 unifiedElement,
-                                new Point(pose.Position[0], pose.Position[1])
+                                canvasPosition
                             ));
                         }
                     }
@@ -252,9 +274,10 @@ namespace MI_GUI_WinUI.ViewModels
                 // Split elements into GUI and Pose arrays
                 foreach (var element in CanvasElements)
                 {
+                    var scaledPosition = ScaleToMotionInput(element.Position);
                     var elementWithPosition = element.Element.WithPosition(
-                        (int)element.Position.X,
-                        (int)element.Position.Y
+                        (int)scaledPosition.X,
+                        (int)scaledPosition.Y
                     );
 
                     if (elementWithPosition.IsPose)
@@ -324,10 +347,11 @@ namespace MI_GUI_WinUI.ViewModels
 
             _actionConfigurationDialog.Configure(elementInfo.Element, element => 
             {
+                var scaledPosition = ScaleToMotionInput(elementInfo.Position);
                 var updatedInfo = elementInfo.With(
                     element: element.WithPosition(
-                        (int)elementInfo.Position.X,
-                        (int)elementInfo.Position.Y
+                        (int)scaledPosition.X,
+                        (int)scaledPosition.Y
                     )
                 );
                 

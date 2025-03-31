@@ -167,8 +167,8 @@
                             AllowDrop="True"
                             DragOver="EditorCanvas_DragOver"
                             Drop="EditorCanvas_Drop"
-                            Height="480"
-                            Width="640"
+                            Height="420"
+                            Width="560"
                             HorizontalAlignment="Center"/>
                     </Grid>
                 </Border>
