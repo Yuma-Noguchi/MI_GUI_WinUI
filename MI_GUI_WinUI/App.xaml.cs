@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -109,7 +109,18 @@ namespace MI_GUI_WinUI
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
-            // Log the exception
+            try
+            {
+                var logger = Services.GetService<LoggingService>();
+                if (logger != null)
+                {
+                    logger.LogError("Unhandled application exception", e.Exception);
+                }
+            }
+            catch
+            {
+                // Silently fail if logging fails
+            }
             e.Handled = true;
         }
 

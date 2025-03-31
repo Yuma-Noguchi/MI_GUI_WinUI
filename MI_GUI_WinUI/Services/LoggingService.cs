@@ -8,7 +8,7 @@ namespace MI_GUI_WinUI.Services;
 public class LoggingService
 {
     private readonly string _logFolder = "Logs";
-    private readonly string _logFileName = "window_management.log";
+    private readonly string _logFileName = "MotionInput_Configuration.log";
     private readonly object _logLock = new object();
 
     public async Task LogAsync(string message, Exception? exception = null)
@@ -24,7 +24,7 @@ public class LoggingService
             {
                 var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                 logMessage = $"[{timestamp}] {message}";
-            
+        
                 if (exception != null)
                 {
                     logMessage += $"\nException: {exception.GetType().Name}\nMessage: {exception.Message}\nStack Trace:\n{exception.StackTrace}";
@@ -39,10 +39,9 @@ public class LoggingService
 
             await FileIO.AppendTextAsync(logFile, logMessage);
         }
-        catch
+        catch (Exception)
         {
-            // Silently fail if logging fails
-            // We don't want logging failures to affect the application
+            // Silently fail if logging fails to prevent application disruption
         }
     }
 
