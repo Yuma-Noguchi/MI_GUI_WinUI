@@ -10,13 +10,8 @@ using MI_GUI_WinUI;
 using MI_GUI_WinUI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-// The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=234238
-
 namespace MI_GUI_WinUI.Pages
 {
-    /// <summary>
-    /// A page for selecting Motion Input profiles.
-    /// </summary>
     public sealed partial class SelectProfilesPage : Page
     {
         private SelectProfilesViewModel? _viewModel;
@@ -96,7 +91,7 @@ namespace MI_GUI_WinUI.Pages
             }
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        protected override async void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
             // Clean up event handlers and references
@@ -104,8 +99,9 @@ namespace MI_GUI_WinUI.Pages
             {
                 ViewModel.IsPopupOpen = false;
                 ViewModel.SelectedProfilePreview = null;
+                // Refresh the view model to ensure fresh data next time
+                await ViewModel.InitializeAsync();
             }
-            ViewModel = null;
         }
 
         private async void EditProfile_Click(object sender, RoutedEventArgs e)
@@ -149,24 +145,6 @@ namespace MI_GUI_WinUI.Pages
                 ViewModel != null)
             {
                 await ViewModel.OpenPopupAsync(preview);
-            }
-        }
-
-        private async void SelectProfile_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewModel?.SelectedProfilePreview != null)
-            {
-                try
-                {
-                    string selectedProfileName = ViewModel.SelectedProfilePreview.ProfileName;
-                    ViewModel.SelectedProfile = selectedProfileName;
-                    await ViewModel.ClosePopupAsync();
-                    // Additional navigation or profile loading logic can be added here
-                }
-                catch (Exception)
-                {
-                    ViewModel.ErrorMessage = "Error selecting profile.";
-                }
             }
         }
 

@@ -1,29 +1,20 @@
-using System;
-using Windows.Foundation;
-using Microsoft.UI.Xaml.Media.Imaging;
-
 namespace MI_GUI_WinUI.Models
 {
-    public class EditorButton
+    public record EditorButton
     {
-        public string Name { get; set; } = string.Empty;
-        public string IconPath { get; set; } = string.Empty;
-        public Size Size { get; set; } = new Size(60, 60);
-        public string Category { get; set; } = string.Empty;
-        public string? Action { get; set; }
-        public bool IsDefault { get; set; }
-        
-        public EditorButton Clone()
+        public string Name { get; init; } = string.Empty;
+        public string IconPath { get; init; } = string.Empty;
+        public string FileName { get; init; } = string.Empty;  // For storing relative path
+        public bool IsDefault { get; init; }
+
+        public EditorButton() { }
+
+        public EditorButton(string name, string iconPath, string fileName, bool isDefault = false)
         {
-            return new EditorButton
-            {
-                Name = this.Name,
-                IconPath = this.IconPath,
-                Size = this.Size,
-                Category = this.Category,
-                Action = this.Action,
-                IsDefault = this.IsDefault
-            };
+            Name = name;
+            IconPath = iconPath;
+            FileName = fileName;
+            IsDefault = isDefault;
         }
     }
 }

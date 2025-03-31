@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels;
 using MI_GUI_WinUI.Services;
@@ -53,18 +53,27 @@ namespace MI_GUI_WinUI
 
             // Register services
             services.AddSingleton<ProfileService>();
+            services.AddSingleton<ActionService>();
             services.AddTransient<StableDiffusionService>();
+            services.AddTransient<MotionInputService>();
 
             // Register view models
             services.AddSingleton<MainWindowViewModel>();
             services.AddSingleton<SelectProfilesViewModel>();
             services.AddSingleton<ActionStudioViewModel>();
             services.AddSingleton<IconStudioViewModel>();
-            services.AddTransient<ProfileEditorViewModel>();
+            services.AddTransient<ProfileEditorViewModel>(sp =>
+                new ProfileEditorViewModel(sp.GetRequiredService<ProfileService>(), sp));
+            services.AddTransient<ActionConfigurationDialogViewModel>();
 
             // Register converters
             services.AddSingleton<StringToBoolConverter>();
             services.AddSingleton<BoolToVisibilityInverseConverter>();
+            services.AddSingleton<BoolToVisibilityConverter>();
+            services.AddSingleton<NumberToVisibilityConverter>();
+            services.AddSingleton<NullToBoolConverter>();
+            services.AddSingleton<NumberToStringConverter>();
+            services.AddSingleton<BoolToIntConverter>();
 
             // Register pages
             services.AddTransient<HomePage>();
@@ -75,6 +84,8 @@ namespace MI_GUI_WinUI
 
             // Register controls
             services.AddTransient<Controls.PageHeader>();
+            services.AddTransient<Controls.ActionConfigurationDialog>(sp =>
+                new Controls.ActionConfigurationDialog(sp.GetRequiredService<ActionConfigurationDialogViewModel>()));
 
             // Build and configure services
             _serviceProvider = services.BuildServiceProvider();

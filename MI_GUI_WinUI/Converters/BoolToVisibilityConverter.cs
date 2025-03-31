@@ -4,20 +4,24 @@ using System;
 
 namespace MI_GUI_WinUI.Converters
 {
-    public class BoolToVisibilityInverseConverter : IValueConverter
+    public class BoolToVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            if (value is bool boolValue)
+            if (value is bool isVisible)
             {
-                return boolValue ? Visibility.Collapsed : Visibility.Visible;
+                return isVisible ? Visibility.Visible : Visibility.Collapsed;
             }
-            return Visibility.Visible;
+            return Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
-            throw new NotImplementedException();
+            if (value is Visibility visibility)
+            {
+                return visibility == Visibility.Visible;
+            }
+            return false;
         }
     }
 }

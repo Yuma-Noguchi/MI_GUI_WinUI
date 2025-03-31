@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Newtonsoft.Json;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Pages;
@@ -19,6 +20,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Windowing;
 using Windows.Storage;
 using Windows.Storage.Streams;
+using System.Threading;
 
 namespace MI_GUI_WinUI.ViewModels
 {
@@ -26,7 +28,9 @@ namespace MI_GUI_WinUI.ViewModels
     {
         private readonly ILogger<SelectProfilesViewModel> _logger;
         private readonly INavigationService _navigationService;
+        private readonly MotionInputService _motionInputService;
         private readonly Dictionary<string, ProfilePreview> _previewCache = new();
+        private readonly SemaphoreSlim _previewLock = new(1, 1);
 
         [ObservableProperty]
         private string? _selectedProfile;
@@ -61,11 +65,16 @@ namespace MI_GUI_WinUI.ViewModels
         private List<Profile> _profiles = new();
         private List<Profile> _filteredProfiles = new();
 
-        public SelectProfilesViewModel(ProfileService profileService, ILogger<SelectProfilesViewModel> logger, INavigationService navigationService)
+        public SelectProfilesViewModel(
+            ProfileService profileService, 
+            ILogger<SelectProfilesViewModel> logger, 
+            INavigationService navigationService,
+            MotionInputService motionInputService)
         {
             _logger = logger;
             _profileService = profileService;
             _navigationService = navigationService;
+            _motionInputService = motionInputService;
         }
 
         private Profile? GetProfileByName(string name)
@@ -276,11 +285,14 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public async Task GenerateGuiElementsPreviewsAsync()
+        public async Task GenerateGuiElementsPreviewsAsync(bool skipLock = false)
         {
+            if (!skipLock)
+                await _previewLock.WaitAsync();
             try
             {
                 ErrorMessage = null;
+                _previewCache.Clear();  // Clear cache first
                 previews.Clear();
 
                 if (_filteredProfiles == null || _filteredProfiles.Count == 0)
@@ -289,29 +301,13 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Remove any cached previews that no longer exist in filtered profiles
-                var filteredProfileNames = _filteredProfiles.Select(p => p.Name).ToHashSet();
-                var keysToRemove = _previewCache.Keys.Where(k => !filteredProfileNames.Contains(k)).ToList();
-                foreach (var key in keysToRemove)
-                {
-                    _previewCache.Remove(key);
-                }
-
-                // Generate previews for filtered profiles
+                // Generate fresh previews for all filtered profiles
                 foreach (var profile in _filteredProfiles)
                 {
-                    ProfilePreview? preview;
-                    if (!_previewCache.TryGetValue(profile.Name, out preview))
-                    {
-                        preview = await GeneratePreviewForProfileAsync(profile);
-                        if (preview != null)
-                        {
-                            _previewCache[profile.Name] = preview;
-                        }
-                    }
-
+                    var preview = await GeneratePreviewForProfileAsync(profile);
                     if (preview != null)
                     {
+                        _previewCache[profile.Name] = preview;
                         previews.Add(preview);
                     }
                 }
@@ -322,6 +318,11 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 _logger.LogError(ex, "Error generating previews");
                 ErrorMessage = "Failed to generate profile previews.";
+            }
+            finally
+            {
+                if (!skipLock)
+                    _previewLock.Release();
             }
         }
 
@@ -471,31 +472,29 @@ namespace MI_GUI_WinUI.ViewModels
 
         public async Task DeleteProfileAsync(string profileName)
         {
+            await _previewLock.WaitAsync();
             try
             {
                 IsLoading = true;
                 ErrorMessage = null;
                 
                 _logger.LogInformation($"Starting deletion of profile: {profileName}");
-                
-                // Remove from preview cache first
-                _previewCache.Remove(profileName);
 
-                // Delete the profile file first
+                // Clear all caches first
+                _previewCache.Clear();
+                previews.Clear();
+
+                // Delete the profile file
                 await _profileService.DeleteProfileAsync(profileName, profilesFolderPath);
                 _logger.LogInformation($"Deleted profile file for: {profileName}");
 
-                // Remove from in-memory list
-                _profiles.RemoveAll(p => p.Name == profileName);
-                _logger.LogInformation($"Removed profile from memory. Remaining profiles: {_profiles.Count}");
+                // Reload all profiles fresh
+                await LoadProfilesAsync();
+                _logger.LogInformation($"Reloaded profiles. Count: {_profiles.Count}");
 
-                // Update filtered profiles
-                UpdateFilteredProfiles();
-                
-                // Generate new previews
-                await GenerateGuiElementsPreviewsAsync();
-                
-                _logger.LogInformation($"Profile deletion completed. Preview count: {previews.Count}");
+                // Generate fresh previews - skip lock since we already have it
+                await GenerateGuiElementsPreviewsAsync(skipLock: true);
+                _logger.LogInformation($"Regenerated previews. Count: {previews.Count}");
             }
             catch (Exception ex)
             {
@@ -516,6 +515,7 @@ namespace MI_GUI_WinUI.ViewModels
             finally
             {
                 IsLoading = false;
+                _previewLock.Release();
             }
         }
 
@@ -536,6 +536,42 @@ namespace MI_GUI_WinUI.ViewModels
         internal void Help()
         {
             // TODO: Implement help functionality
+        }
+
+        [RelayCommand]
+        private async Task SelectProfileAsync()
+        {
+            if (SelectedProfilePreview == null) return;
+            
+            try
+            {
+                // replace white spaces with underscores
+                var _profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
+                                    // copy the selected profile file to MotionInput/data/modes
+                    string sourcePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, profilesFolderPath, $"{_profileName}.json");
+                    string destPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput", "data", "modes", $"{_profileName}.json");
+                    File.Copy(sourcePath, destPath, true);
+                // Start Motion Input with selected profile
+                bool success = await _motionInputService.Start(_profileName);
+                
+                if (success)
+                {
+  
+
+                    
+                    await ClosePopupAsync();
+                    
+                }
+                else
+                {
+                    ErrorMessage = "Failed to launch MotionInput.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error selecting profile");
+                ErrorMessage = "Error launching MotionInput.";
+            }
         }
     }
 }

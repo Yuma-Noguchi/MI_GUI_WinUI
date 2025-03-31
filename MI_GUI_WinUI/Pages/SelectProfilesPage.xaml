@@ -13,10 +13,11 @@
     <Page.Resources>
         <converters:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverseConverter"/>
         <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
     </Page.Resources>
 
     <Grid>
-        <Grid x:Name="MainContent" Margin="36,40">
+        <Grid x:Name="MainContent" Margin="36">
             <!-- Blur effect when popup is open -->
             <Grid.Resources>
                 <ThemeShadow x:Name="SharedShadow"/>
@@ -57,13 +58,13 @@
             <ScrollViewer Grid.Row="2"
                          HorizontalScrollBarVisibility="Disabled"
                          VerticalScrollBarVisibility="Auto"
+                         HorizontalAlignment="Center"
                          Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityInverseConverter}}">
                 <ItemsControl ItemsSource="{Binding previews}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <ItemsWrapGrid Orientation="Horizontal"
-                                     HorizontalAlignment="Center"
-                                     Width="{Binding ActualWidth}"/>
+                                     HorizontalAlignment="Center"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -75,7 +76,7 @@
                                     Background="Transparent"
                                     BorderThickness="0"
                                     CommandParameter="{Binding}">
-                                    <Border Margin="8"
+                                    <Border Margin="8,0"
                                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderThickness="1"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -91,7 +92,7 @@
                                         </Grid>
                                     </Border>
                                 </Button>
-                                <Grid Margin="20,10" Height="60">
+                                <Grid Margin="20,0,10,10" Height="60">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -104,11 +105,13 @@
                                     <Button Grid.Column="1"
                                         Margin="5,0"
                                         Click="EditProfile_Click"
+                                            Background="{StaticResource SystemFillColorCautionBackgroundBrush}"
                                         Tag="{Binding ProfileName}">
                                         <SymbolIcon Symbol="Edit"/>
                                     </Button>
                                     <Button Grid.Column="2"
                                         Click="DeleteProfile_Click"
+                                            Background="{StaticResource SystemFillColorCriticalBackgroundBrush}"
                                         Tag="{Binding ProfileName}">
                                         <SymbolIcon Symbol="Delete"/>
                                     </Button>
@@ -144,8 +147,8 @@
                         BorderThickness="1"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         CornerRadius="8"
-                        MaxWidth="640"
-                        MaxHeight="480"
+                        MaxWidth="560"
+                        MaxHeight="400"
                         Translation="0,0,8">
                         <Border.Shadow>
                             <ThemeShadow />
@@ -171,9 +174,10 @@
                                 <TextBlock Text="Back"/>
                             </StackPanel>
                         </Button>
-                        <Button Click="SelectProfile_Click"
-                                Style="{StaticResource AccentButtonStyle}"
-                                Width="120">
+                        <Button Command="{x:Bind ViewModel.SelectProfileCommand}"
+                               IsEnabled="{x:Bind ViewModel.SelectedProfilePreview, Mode=OneWay, Converter={StaticResource NullToBoolConverter}}"
+                               Style="{StaticResource AccentButtonStyle}"
+                               Width="120">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <SymbolIcon Symbol="Accept"/>
                                 <TextBlock Text="Select"/>

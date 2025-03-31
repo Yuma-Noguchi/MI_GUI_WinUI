@@ -1,23 +1,18 @@
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using System;
 
 namespace MI_GUI_WinUI.Converters
 {
-    public class BoolToVisibilityInverseConverter : IValueConverter
+    public class BoolToIntConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
-            if (value is bool boolValue)
-            {
-                return boolValue ? Visibility.Collapsed : Visibility.Visible;
-            }
-            return Visibility.Visible;
+            return value is bool b && b ? 1 : 0;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string language)
         {
-            throw new NotImplementedException();
+            return value is int i && i == 1;
         }
     }
 }

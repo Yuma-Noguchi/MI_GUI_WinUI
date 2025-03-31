@@ -1,5 +1,9 @@
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Navigation;
 using MI_GUI_WinUI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
+using System.Collections;
 
 namespace MI_GUI_WinUI.Pages
 {
@@ -9,8 +13,36 @@ namespace MI_GUI_WinUI.Pages
 
         public ActionStudioPage()
         {
-            ViewModel = new ActionStudioViewModel();
             this.InitializeComponent();
+            ViewModel = App.Current.Services.GetRequiredService<ActionStudioViewModel>();
+            DataContext = ViewModel;
+            this.Loaded += ActionStudioPage_Loaded;
+        }
+
+        private void ActionStudioPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = XamlRoot;
+            }
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = XamlRoot;
+            }
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            if (ViewModel != null)
+            {
+                ViewModel.XamlRoot = null;
+            }
         }
     }
 }

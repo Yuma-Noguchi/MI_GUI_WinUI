@@ -1,43 +1,43 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Newtonsoft.Json;
 
 namespace MI_GUI_WinUI.Models
 {
-    public enum ActionType
-    {
-        Basic,
-        Sequence,
-        Macro,
-        Custom
-    }
-
     public partial class Action : ObservableObject
     {
         [ObservableProperty]
-        private string _id;
+        private string _name = string.Empty;
 
         [ObservableProperty]
-        private string _name;
+        private string _description = string.Empty;
 
         [ObservableProperty]
-        private string _description;
+        private bool _isEnabled = true;
 
         [ObservableProperty]
-        private List<InputSequence> _sequences;
+        private ObservableCollection<SequenceItem> _sequence = new();
 
-        [ObservableProperty]
-        private ActionType _type;
-
-        [ObservableProperty]
-        private bool _isEnabled;
-
-        public Action()
+        // Used for JSON serialization
+        [JsonIgnore]
+        public ActionData AsActionData
         {
-            _id = Guid.NewGuid().ToString();
-            _sequences = new List<InputSequence>();
-            _type = ActionType.Basic;
-            _isEnabled = true;
+            get
+            {
+                var actionData = new ActionData
+                {
+                    Name = Name,
+                    Sequence = new ObservableCollection<SequenceItem>()
+                };
+
+                foreach (var item in Sequence)
+                {
+                    actionData.Sequence.Add(item);
+                }
+
+                return actionData;
+            }
         }
     }
 }
