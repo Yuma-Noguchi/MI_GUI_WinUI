@@ -25,6 +25,7 @@ namespace MI_GUI_WinUI.ViewModels
         private bool _executingInference;
         private string[] _currentImagePaths = Array.Empty<string>();
         private string helperPrompt = "{}";
+        private readonly StableDiffusionModelManager _modelManager;
 
         public XamlRoot? XamlRoot
         {
@@ -96,6 +97,7 @@ namespace MI_GUI_WinUI.ViewModels
             : base(logger, navigationService)
         {
             _sdService = sdService ?? throw new ArgumentNullException(nameof(sdService));
+            _modelManager = StableDiffusionModelManager.Instance;
 
             if (_sdService is INotifyPropertyChanged npc)
             {
@@ -224,29 +226,17 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 if (string.IsNullOrWhiteSpace(IconName))
                 {
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
-                    }
-                    return;
+                    throw new InvalidOperationException("Please enter a name for the icon.");
                 }
 
                 if (!Utils.FileNameHelper.IsValidFileName(IconName))
                 {
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("The icon name contains invalid characters.", XamlRoot);
-                    }
-                    return;
+                    throw new InvalidOperationException("The icon name contains invalid characters.");
                 }
 
                 if (_currentImagePaths == null || !_currentImagePaths.Any())
                 {
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
-                    }
-                    return;
+                    throw new InvalidOperationException("No image to save.");
                 }
 
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
@@ -255,17 +245,14 @@ namespace MI_GUI_WinUI.ViewModels
                 
                 var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
 
-                if (File.Exists(fileName))
+                if (File.Exists(fileName) && XamlRoot != null)
                 {
-                    if (XamlRoot != null)
-                    {
-                        var result = await Utils.DialogHelper.ShowConfirmation(
-                            $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
-                            "Replace Existing Icon?",
-                            XamlRoot);
+                    var result = await Utils.DialogHelper.ShowConfirmation(
+                        $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
+                        "Replace Existing Icon?",
+                        XamlRoot);
 
-                        if (!result) return;
-                    }
+                    if (!result) return;
                 }
 
                 await Utils.ImageHelper.SaveImageAsync(_currentImagePaths.First(), fileName);
@@ -285,52 +272,34 @@ namespace MI_GUI_WinUI.ViewModels
             ErrorMessage = string.Empty;
             InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
 
-            await base.InitializeAsync();
-
-            if (_sdService.IsInitialized)
-            {
-                IsPreInitialization = false;
-                return;
-            }
-
             try
             {
+                await _modelManager.EnsureInitializedAsync(UseGpu);
                 await _sdService.Initialize(UseGpu);
 
                 InitializationStatus = "Initialization complete";
                 InitializationFailed = false;
                 IsPreInitialization = false;
 
-                if (XamlRoot != null)
+                if (XamlRoot != null && UseGpu && _sdService.UsingCpuFallback)
                 {
-                    if (UseGpu && _sdService.UsingCpuFallback)
-                    {
-                        await Utils.DialogHelper.ShowMessage(
-                            "GPU acceleration was not available or failed to initialize.\n\n" +
-                            "The application will run using CPU instead, which may be significantly slower.",
-                            "Using CPU Mode",
-                            XamlRoot);
-                    }
-                    else
-                    {
-                        await Utils.DialogHelper.ShowMessage(
-                            $"Stable Diffusion initialized successfully with {(_sdService.UsingCpuFallback ? "CPU" : "GPU")} acceleration.",
-                            "Initialization Complete",
-                            XamlRoot);
-                    }
+                    await Utils.DialogHelper.ShowMessage(
+                        "GPU acceleration was not available or failed to initialize.\n\n" +
+                        "The application will run using CPU instead, which may be significantly slower.",
+                        "Using CPU Mode",
+                        XamlRoot);
                 }
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                await HandleInitializationError("AI Models directory not found. Please ensure the models are properly installed.", ex);
-            }
-            catch (FileNotFoundException ex)
-            {
-                await HandleInitializationError($"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.", ex);
+                else
+                {
+                    await Utils.DialogHelper.ShowMessage(
+                        $"Stable Diffusion initialized successfully with GPU acceleration.",
+                        "Initialization Complete",
+                        XamlRoot);
+                }
             }
             catch (Exception ex)
             {
-                await HandleInitializationError($"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}", ex);
+                await HandleInitializationError($"Failed to initialize Icon Studio: {ex.Message}", ex);
             }
             finally
             {
@@ -390,28 +359,24 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
-                // Clear collections
+                // Clear UI resources only
                 if (Images is ObservableCollection<ImageSource> collection)
                 {
                     collection.Clear();
                 }
                 Images = null;
 
-                // Dispose and clear image resources
                 PreviewImage?.Dispose();
                 PreviewImage = null;
 
-                // Clear paths and status
                 _currentImagePaths = Array.Empty<string>();
                 StatusMessage = string.Empty;
                 InitializationStatus = string.Empty;
 
-                // Clean up directories
                 CleanupTempDirectories();
-
-                // Clear UI references
                 _xamlRoot = null;
 
+                // Note: Not disposing StableDiffusionService as it's managed by ModelManager
                 base.Cleanup();
             }
             catch (Exception ex)

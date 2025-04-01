@@ -20,17 +20,12 @@ namespace MI_GUI_WinUI.Services
     {
         private readonly ILogger<StableDiffusionService> _logger;
         private readonly DispatcherQueue _dispatcherQueue;
-        private readonly object _initLock = new();
+        private readonly StableDiffusionModelManager _modelManager;
+        private readonly string _outputPath;
 
-        private StableDiffusionConfig _config;
-        private UNet _unet;
-        private bool _usingCpuFallback;
-        private string _modelsPath;
-        private string _outputPath;
-
-        public bool IsInitialized => _unet != null && _config != null;
-        public bool UsingCpuFallback => _usingCpuFallback;
-        public long NumInferenceSteps => _config.NumInferenceSteps;
+        public bool IsInitialized => _modelManager.IsInitialized;
+        public bool UsingCpuFallback => !_modelManager.UsingGpu;
+        public long NumInferenceSteps => 75; // Default value
 
         [ObservableProperty]
         private double _percentage;
@@ -41,102 +36,25 @@ namespace MI_GUI_WinUI.Services
         [ObservableProperty]
         private double _iterationsPerSecond;
 
-        public StableDiffusionService(
-            ILogger<StableDiffusionService> logger)
+        public StableDiffusionService(ILogger<StableDiffusionService> logger)
         {
             _logger = logger;
             _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
-
-            var basePath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
-            _modelsPath = Path.Combine(basePath, "Onnx", "fp16");
-            _outputPath = Path.Combine(basePath);
-
-            InitializeConfig();
-        }
-
-        private void InitializeConfig()
-        {
-            _config = new StableDiffusionConfig
-            {
-                NumInferenceSteps = 75,
-                GuidanceScale = 8.5,
-                ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.DirectML,
-                DeviceId = 1,
-                TokenizerOnnxPath = $@"{_modelsPath}\cliptokenizer.onnx",
-                TextEncoderOnnxPath = $@"{_modelsPath}\text_encoder\model.onnx",
-                UnetOnnxPath = $@"{_modelsPath}\unet\model.onnx",
-                VaeDecoderOnnxPath = $@"{_modelsPath}\vae_decoder\model.onnx",
-                SafetyModelPath = $@"{_modelsPath}\safety_checker\model.onnx",
-                ImageOutputPath = "NONE",
-            };
+            _modelManager = StableDiffusionModelManager.Instance;
+            _outputPath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
         }
 
         public async Task Initialize(bool useGpu)
         {
-            if (IsInitialized)
-            {
-                _logger.LogInformation("Service already initialized");
-                return;
-            }
-
-            lock (_initLock)
-            {
-                if (IsInitialized)
-                    return;
-            }
-
             try
             {
-                _config.ExecutionProviderTarget = useGpu
-                    ? StableDiffusionConfig.ExecutionProvider.DirectML
-                    : StableDiffusionConfig.ExecutionProvider.Cpu;
-
-                _logger.LogInformation("Starting initialization with execution provider: {provider}",
-                    _config.ExecutionProviderTarget);
-
-                try
-                {
-                    await Task.Run(() => {
-                        _unet = new UNet(_config);
-                    });
-                    _usingCpuFallback = !useGpu;
-                }
-                catch (Exception ex) when (useGpu &&
-                    (ex.Message.Contains("DirectML") ||
-                     ex.Message.Contains("GPU") ||
-                     ex.Message.Contains("DML") ||
-                     ex.GetType().Name.Contains("Dml")))
-                {
-                    _logger.LogWarning(ex, "DirectML initialization failed, falling back to CPU");
-
-                    _config.ExecutionProviderTarget = StableDiffusionConfig.ExecutionProvider.Cpu;
-                    await Task.Run(() => {
-                        _unet = new UNet(_config);
-                    });
-                    _usingCpuFallback = true;
-                }
-            }
-            catch (FileNotFoundException ex)
-            {
-                _logger.LogError(ex, "Required model file not found: {file}", ex.FileName);
-                CleanupAfterFailure();
-                throw;
+                await _modelManager.EnsureInitializedAsync(useGpu);
+                _logger.LogInformation("Service initialized successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to initialize Stable Diffusion service");
-                CleanupAfterFailure();
                 throw;
-            }
-        }
-
-        private void CleanupAfterFailure()
-        {
-            lock (_initLock)
-            {
-                _unet?.Dispose();
-                _unet = null;
-                _config = null;
             }
         }
 
@@ -159,6 +77,11 @@ namespace MI_GUI_WinUI.Services
 
         public async Task<string[]> GenerateImages(string description, int numberOfImages, Action<int>? stepCallback = null)
         {
+            if (!IsInitialized)
+            {
+                throw new InvalidOperationException("Service not initialized");
+            }
+
             _dispatcherQueue.TryEnqueue(() => Percentage = 0);
             
             if (numberOfImages == 0)
@@ -176,21 +99,22 @@ namespace MI_GUI_WinUI.Services
                 timer.Start();
 
                 var imageDestination = Path.Combine(_outputPath, $"Images-{DateTime.Now.Ticks}");
-                _config.ImageOutputPath = imageDestination;
-                var totalSteps = numberOfImages * _config.NumInferenceSteps;
-
                 Directory.CreateDirectory(imageDestination);
+
+                _modelManager.Config.ImageOutputPath = imageDestination;
+                var totalSteps = numberOfImages * NumInferenceSteps;
+                var generatedPaths = new List<string>();
 
                 for (int i = 1; i <= numberOfImages; i++)
                 {
                     _logger.LogDebug("Generating image {current} of {total}", i, numberOfImages);
 
-                    var output = _unet.Inference(
+                    var output = _modelManager.UNet.Inference(
                         description,
-                        _config,
+                        _modelManager.Config,
                         (stepIndex) =>
                         {
-                            var percentage = ((double)((stepIndex + 1) + (i - 1) * _config.NumInferenceSteps) / (double)totalSteps) * 100.0;
+                            var percentage = ((double)((stepIndex + 1) + (i - 1) * NumInferenceSteps) / (double)totalSteps) * 100.0;
                             _dispatcherQueue.TryEnqueue(() => Percentage = percentage);
                             stepCallback?.Invoke(stepIndex);
                         }
@@ -231,13 +155,8 @@ namespace MI_GUI_WinUI.Services
         {
             if (disposing)
             {
-                lock (_initLock)
-                {
-                    _logger.LogInformation("Disposing Stable Diffusion service");
-                    _unet?.Dispose();
-                    _unet = null;
-                    _config = null;
-                }
+                _logger.LogInformation("Disposing Stable Diffusion service");
+                _modelManager.ReleaseReference();
             }
         }
     }
