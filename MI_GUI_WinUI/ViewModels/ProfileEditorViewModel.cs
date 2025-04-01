@@ -230,7 +230,6 @@ namespace MI_GUI_WinUI.ViewModels
                     new { Name = "D-Pad Down", BasePath = "down" },
                     new { Name = "D-Pad Left", BasePath = "left" },
                     new { Name = "D-Pad Right", BasePath = "right" },
-                    new { Name = "Hit Trigger", BasePath = "hit_trigger" }
                 };
 
                 DefaultButtons.Clear();
