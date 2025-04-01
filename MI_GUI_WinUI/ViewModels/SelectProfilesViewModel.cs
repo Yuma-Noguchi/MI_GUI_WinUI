@@ -11,8 +11,8 @@ using CommunityToolkit.Mvvm.Input;
 using Newtonsoft.Json;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.Pages;
-using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels.Base;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -21,17 +21,17 @@ using Microsoft.UI.Windowing;
 using Windows.Storage;
 using Windows.Storage.Streams;
 using System.Threading;
+using Microsoft.UI.Dispatching;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class SelectProfilesViewModel : ObservableObject
+    public partial class SelectProfilesViewModel : ViewModelBase
     {
-        private readonly ILogger<SelectProfilesViewModel> _logger;
-        private readonly INavigationService _navigationService;
         private readonly IMotionInputService _motionInputService;
         private readonly IProfileService _profileService;
         private readonly Dictionary<string, ProfilePreview> _previewCache = new();
         private readonly SemaphoreSlim _previewLock = new(1, 1);
+        private AppWindow? _appWindow;
 
         [ObservableProperty]
         private string? _selectedProfile;
@@ -51,20 +51,14 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string? _errorMessage;
 
-        private Window? _window;
-        public Window? Window
-        {
-            get => _window;
-            set
-            {
-                _window = value;
-                _appWindow = _window?.AppWindow;
-            }
-        }
-
-        private AppWindow? _appWindow;
         private List<Profile> _profiles = new();
         private List<Profile> _filteredProfiles = new();
+
+        protected override void OnWindowChanged()
+        {
+            base.OnWindowChanged();
+            _appWindow = Window?.AppWindow;
+        }
 
         public class ProfilePreview
         {
@@ -139,14 +133,81 @@ namespace MI_GUI_WinUI.ViewModels
             ILogger<SelectProfilesViewModel> logger,
             INavigationService navigationService,
             IMotionInputService motionInputService)
+            : base(logger, navigationService)
         {
-            _logger = logger;
-            _profileService = profileService;
-            _navigationService = navigationService;
-            _motionInputService = motionInputService;
+            _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
+            _motionInputService = motionInputService ?? throw new ArgumentNullException(nameof(motionInputService));
             _profiles = new List<Profile>();
+        }
 
-            InitializeAsync();
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            await LoadProfilesAsync();
+            if (_profiles.Count > 0)
+            {
+                await GenerateGuiElementsPreviewsAsync();
+            }
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                // Get the dispatcher for the UI thread
+                var dispatcher = DispatcherQueue.GetForCurrentThread();
+                
+                // If we're on the UI thread, clear directly
+                if (dispatcher != null)
+                {
+                    SafelyClearProfiles();
+                }
+                // Otherwise queue it to the UI thread if Window is available
+                else if (Window != null && Window.DispatcherQueue != null)
+                {
+                    Window.DispatcherQueue.TryEnqueue(() => 
+                    {
+                        SafelyClearProfiles();
+                    });
+                }
+                
+                // Clear other resources safely
+                _previewCache.Clear();
+                _previewLock.Dispose();
+                foreach (var preview in previews)
+                {
+                    preview.Canvas.Children.Clear();
+                }
+                previews.Clear();
+                
+                base.Cleanup();
+                _logger.LogInformation("SelectProfilesViewModel cleaned up successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up SelectProfilesViewModel");
+            }
+        }
+        
+        private void SafelyClearProfiles()
+        {
+            try
+            {
+                // Clear the preview collection safely
+                if (previews != null)
+                {
+                    previews.Clear();
+                }
+                
+                // Clear the private lists
+                _profiles?.Clear();
+                _filteredProfiles?.Clear();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing profile collections");
+                // Suppress the exception - we don't want cleanup to throw
+            }
         }
 
         private Profile? GetProfileByName(string name)
@@ -178,110 +239,44 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        private void ClosePopup()
-        {
-            try
-            {
-                IsPopupOpen = false;
-                SelectedProfilePreview = null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error closing popup");
-                ErrorMessage = "Error closing popup.";
-            }
-        }
-
-        public async Task InitializeAsync()
-        {
-            try
-            {
-                IsLoading = true;
-
-                // Reset state
-                IsPopupOpen = false;
-                SelectedProfilePreview = null;
-                ErrorMessage = null;
-                previews.Clear();
-                _previewCache.Clear();
-
-                // Load profiles
-                await LoadProfilesAsync();
-
-                // Generate previews after loading
-                if (_profiles.Count > 0)
-                {
-                    await GenerateGuiElementsPreviewsAsync();
-                    _logger.LogInformation($"Initialization complete. Profile count: {_profiles.Count}, Preview count: {previews.Count}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in InitializeAsync");
-                ErrorMessage = "Failed to initialize. Please try again.";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
         public async Task ClosePopupAsync()
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 IsPopupOpen = false;
                 SelectedProfilePreview = null;
                 ErrorMessage = null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error closing popup");
-                ErrorMessage = "Error closing popup.";
-            }
+            }, nameof(ClosePopupAsync));
         }
 
         public void HandleBackNavigation()
         {
             if (IsPopupOpen)
             {
-                ClosePopup();
+                _ = ClosePopupAsync();
             }
         }
 
         public async Task OpenPopupAsync(ProfilePreview preview)
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                // Reset any existing state
-                ClosePopup();
-
-                // Set new state
+                await ClosePopupAsync();
                 SelectedProfilePreview = preview.Clone();
                 IsPopupOpen = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error opening popup");
-                ErrorMessage = "Error opening profile preview.";
-            }
+            }, nameof(OpenPopupAsync));
         }
 
         private async Task LoadProfilesAsync()
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
+                IsLoading = true;
                 _profiles = await _profileService.ReadProfilesFromJsonAsync(profilesFolderPath);
                 _logger.LogInformation($"Loaded {_profiles?.Count ?? 0} profiles from {profilesFolderPath}");
                 UpdateFilteredProfiles();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading profiles");
-                ErrorMessage = "Failed to load profiles. Please try again.";
-                _profiles = new List<Profile>();
-                _filteredProfiles = new List<Profile>();
-            }
+            }, nameof(LoadProfilesAsync));
+            IsLoading = false;
         }
 
         public async Task GenerateGuiElementsPreviewsAsync(bool skipLock = false)
@@ -368,8 +363,7 @@ namespace MI_GUI_WinUI.ViewModels
                         try
                         {
                             string poseFilePath = Path.Combine(guiElementsFolderPath, pose.Skin?.Replace('/', '\\') ?? string.Empty);
-                            _logger.LogInformation($"Loading pose from: {poseFilePath}");
-                            var image = await LoadImageAsync(poseFilePath, new GuiElement 
+                            var image = await LoadImageAsync(poseFilePath, new GuiElement
                             {
                                 Position = pose.Position,
                                 Radius = pose.Radius,
@@ -439,9 +433,10 @@ namespace MI_GUI_WinUI.ViewModels
                 return null;
             }
         }
+
         public async Task EditProfileAsync(string profileName)
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 _logger.LogInformation($"Starting edit of profile: {profileName}");
 
@@ -451,7 +446,6 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Load the full profile data
                 var profile = GetProfileByName(profileName);
                 if (profile == null)
                 {
@@ -460,18 +454,10 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Log the profile data
                 _logger.LogInformation($"Found profile with {profile?.GuiElements?.Count ?? 0} GUI elements and {profile?.Poses?.Count ?? 0} poses");
-
-                // Navigate to editor with the profile
                 _navigationService.Navigate<ProfileEditorPage>(profile);
                 _logger.LogInformation($"Navigated to editor for profile: {profileName}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error editing profile: {profileName}");
-                ErrorMessage = "Failed to open profile editor.";
-            }
+            }, nameof(EditProfileAsync));
         }
 
         public async Task DeleteProfileAsync(string profileName)
@@ -479,42 +465,25 @@ namespace MI_GUI_WinUI.ViewModels
             await _previewLock.WaitAsync();
             try
             {
-                IsLoading = true;
-                ErrorMessage = null;
-                
-                _logger.LogInformation($"Starting deletion of profile: {profileName}");
-
-                // Clear all caches first
-                _previewCache.Clear();
-                previews.Clear();
-
-                // Delete the profile file
-                await _profileService.DeleteProfileAsync(profileName, profilesFolderPath);
-                _logger.LogInformation($"Deleted profile file for: {profileName}");
-
-                // Reload all profiles fresh
-                await LoadProfilesAsync();
-                _logger.LogInformation($"Reloaded profiles. Count: {_profiles.Count}");
-
-                // Generate fresh previews - skip lock since we already have it
-                await GenerateGuiElementsPreviewsAsync(skipLock: true);
-                _logger.LogInformation($"Regenerated previews. Count: {previews.Count}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error deleting profile: {profileName}");
-                ErrorMessage = "Failed to delete profile.";
-                
-                // Try to reload profiles in case of error to ensure UI consistency
-                try
+                await ExecuteWithErrorHandlingAsync(async () =>
                 {
+                    IsLoading = true;
+                    ErrorMessage = null;
+                    
+                    _logger.LogInformation($"Starting deletion of profile: {profileName}");
+
+                    _previewCache.Clear();
+                    previews.Clear();
+
+                    await _profileService.DeleteProfileAsync(profileName, profilesFolderPath);
+                    _logger.LogInformation($"Deleted profile file for: {profileName}");
+
                     await LoadProfilesAsync();
-                    await GenerateGuiElementsPreviewsAsync();
-                }
-                catch (Exception reloadEx)
-                {
-                    _logger.LogError(reloadEx, "Error reloading profiles after delete error");
-                }
+                    _logger.LogInformation($"Reloaded profiles. Count: {_profiles.Count}");
+
+                    await GenerateGuiElementsPreviewsAsync(skipLock: true);
+                    _logger.LogInformation($"Regenerated previews. Count: {previews.Count}");
+                }, nameof(DeleteProfileAsync));
             }
             finally
             {
@@ -528,12 +497,11 @@ namespace MI_GUI_WinUI.ViewModels
         {
             if (SelectedProfilePreview == null) return;
 
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 var profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
                 StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
                 
-                // Keep paths relative to installation directory
                 string sourcePath = Path.Combine(profilesFolderPath, $"{profileName}.json");
                 string destPath = Path.Combine("MotionInput\\data\\modes", $"{profileName}.json");
                 
@@ -555,13 +523,13 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     ErrorMessage = "Failed to launch MotionInput.";
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error selecting profile");
-                ErrorMessage = "Error launching MotionInput.";
-            }
+            }, nameof(SelectProfileAsync));
+        }
+
+        protected override async Task ShowErrorAsync(string message)
+        {
+            ErrorMessage = message;
+            await Task.CompletedTask;
         }
     }
 }
-

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MI_GUI_WinUI.Models;
+using MI_GUI_WinUI.ViewModels.Base;
 using MI_GUI_WinUI.Controls;
 using MI_GUI_WinUI.Services.Interfaces;
 using System.Collections.ObjectModel;
@@ -12,12 +13,11 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Windows.Foundation;
 using Newtonsoft.Json;
-using CommunityToolkit.Mvvm.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class ProfileEditorViewModel : ObservableObject
+    public partial class ProfileEditorViewModel : ViewModelBase
     {
         private readonly IProfileService _profileService;
         private readonly ActionConfigurationDialog _actionConfigurationDialog;
@@ -27,6 +27,51 @@ namespace MI_GUI_WinUI.ViewModels
         private const int CANVAS_WIDTH = 560;
         private const int CANVAS_HEIGHT = 420;
         private readonly string PROFILES_DIR = Path.Combine("MotionInput", "data", "profiles");
+
+        [ObservableProperty]
+        private string profileName = string.Empty;
+
+        [ObservableProperty]
+        private string validationMessage = string.Empty;
+
+        [ObservableProperty]
+        private XamlRoot? xamlRoot;
+
+        [ObservableProperty]
+        private bool shouldClearCanvas;
+
+        public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
+
+        public ObservableCollection<UnifiedPositionInfo> CanvasElements { get; } = new();
+        public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
+        public ObservableCollection<EditorButton> CustomButtons { get; } = new();
+
+        public ProfileEditorViewModel(
+            IProfileService profileService,
+            ActionConfigurationDialog actionConfigurationDialog,
+            ILogger<ProfileEditorViewModel> logger,
+            INavigationService navigationService)
+            : base(logger, navigationService)
+        {
+            _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
+            _actionConfigurationDialog = actionConfigurationDialog ?? throw new ArgumentNullException(nameof(actionConfigurationDialog));
+
+            InitializeDefaultButtons();
+            LoadCustomButtons();
+        }
+
+        protected override void OnWindowChanged()
+        {
+            base.OnWindowChanged();
+            if (Window != null)
+            {
+                XamlRoot = Window.Content?.XamlRoot;
+            }
+            else
+            {
+                XamlRoot = null;
+            }
+        }
 
         private Point ScaleToMotionInput(Point canvasPosition)
         {
@@ -44,75 +89,60 @@ namespace MI_GUI_WinUI.ViewModels
             );
         }
 
-        [ObservableProperty]
-        private string profileName = string.Empty;
-
-        [ObservableProperty]
-        private string validationMessage = string.Empty;
-
-        [ObservableProperty]
-        private XamlRoot? xamlRoot;
-
-        [ObservableProperty]
-        private bool shouldClearCanvas;
-
-        public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
-
         partial void OnValidationMessageChanged(string value)
         {
             OnPropertyChanged(nameof(HasValidationMessage));
         }
 
-        public ObservableCollection<UnifiedPositionInfo> CanvasElements { get; } = new();
-        public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
-        public ObservableCollection<EditorButton> CustomButtons { get; } = new();
-
-        public ProfileEditorViewModel(IProfileService profileService, ActionConfigurationDialog actionConfigurationDialog)
-        {
-            _profileService = profileService;
-            _actionConfigurationDialog = actionConfigurationDialog;
-            InitializeDefaultButtons();
-            LoadCustomButtons();
-        }
-
         private void InitializeDefaultButtons()
         {
-            var defaultButtons = new[]
+            try
             {
-                new { Name = "A Button", BasePath = "a" },
-                new { Name = "B Button", BasePath = "b" },
-                new { Name = "X Button", BasePath = "x" },
-                new { Name = "Y Button", BasePath = "y" },
-                new { Name = "D-Pad Up", BasePath = "up" },
-                new { Name = "D-Pad Down", BasePath = "down" },
-                new { Name = "D-Pad Left", BasePath = "left" },
-                new { Name = "D-Pad Right", BasePath = "right" },
-                new { Name = "Hit Trigger", BasePath = "hit_trigger" }
-            };
-
-            foreach (var button in defaultButtons)
-            {
-                string relativePath = $"gamepad/{button.BasePath}.png";
-                string displayPath = Utils.FileNameHelper.GetFullAssetPath(relativePath);
-
-                DefaultButtons.Add(new EditorButton
+                var defaultButtons = new[]
                 {
-                    Name = button.Name,
-                    IconPath = displayPath,
-                    FileName = relativePath,
-                    IsDefault = true
-                });
+                    new { Name = "A Button", BasePath = "a" },
+                    new { Name = "B Button", BasePath = "b" },
+                    new { Name = "X Button", BasePath = "x" },
+                    new { Name = "Y Button", BasePath = "y" },
+                    new { Name = "D-Pad Up", BasePath = "up" },
+                    new { Name = "D-Pad Down", BasePath = "down" },
+                    new { Name = "D-Pad Left", BasePath = "left" },
+                    new { Name = "D-Pad Right", BasePath = "right" },
+                    new { Name = "Hit Trigger", BasePath = "hit_trigger" }
+                };
+
+                DefaultButtons.Clear();
+                foreach (var button in defaultButtons)
+                {
+                    string relativePath = $"gamepad/{button.BasePath}.png";
+                    string displayPath = Utils.FileNameHelper.GetFullAssetPath(relativePath);
+
+                    DefaultButtons.Add(new EditorButton
+                    {
+                        Name = button.Name,
+                        IconPath = displayPath,
+                        FileName = relativePath,
+                        IsDefault = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing default buttons");
             }
         }
 
         private void LoadCustomButtons()
         {
-            var iconsPath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, 
-                                       "MotionInput", "data", "assets", "generated_icons");
-
-            if (Directory.Exists(iconsPath))
+            try
             {
-                try
+                var iconsPath = Path.Combine(
+                    Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
+                    "MotionInput", "data", "assets", "generated_icons"
+                );
+
+                CustomButtons.Clear();
+                if (Directory.Exists(iconsPath))
                 {
                     var files = Directory.GetFiles(iconsPath);
                     foreach (var file in files)
@@ -129,10 +159,10 @@ namespace MI_GUI_WinUI.ViewModels
                         ));
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error loading custom buttons: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading custom buttons");
             }
         }
 
@@ -144,7 +174,7 @@ namespace MI_GUI_WinUI.ViewModels
 
         public async Task LoadExistingProfile(Profile profile)
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 ShouldClearCanvas = true;
                 PrepareForEdit();
@@ -182,83 +212,113 @@ namespace MI_GUI_WinUI.ViewModels
                 }
 
                 ValidationMessage = "Profile loaded successfully";
-            }
-            catch (Exception ex)
-            {
-                ValidationMessage = $"Error loading profile: {ex.Message}";
-            }
+            }, nameof(LoadExistingProfile));
         }
 
         [RelayCommand]
         public void AddButtonToCanvas(UnifiedPositionInfo buttonInfo)
         {
-            CanvasElements.Add(buttonInfo);
+            try
+            {
+                CanvasElements.Add(buttonInfo);
+                ValidationMessage = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding button to canvas");
+                ValidationMessage = "Error adding button";
+            }
         }
 
         public void AddElementToCanvas(ElementAddRequest request)
         {
-            var element = request.Element;
-
-            if (request.Button?.FileName != null)
+            try
             {
-                element = element.WithSkin(request.Button.FileName);
+                var element = request.Element;
+
+                if (request.Button?.FileName != null)
+                {
+                    element = element.WithSkin(request.Button.FileName);
+                }
+
+                var info = new UnifiedPositionInfo(
+                    element,
+                    request.Position,
+                    new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
+                );
+
+                CanvasElements.Add(info);
+                ValidationMessage = string.Empty;
             }
-
-            var info = new UnifiedPositionInfo(
-                element,
-                request.Position,
-                new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
-            );
-
-            CanvasElements.Add(info);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding element to canvas");
+                ValidationMessage = "Error adding element";
+            }
         }
 
         public void UpdateElementPosition(UnifiedPositionInfo info, int index)
         {
-            if (index >= 0 && index < CanvasElements.Count)
+            try
             {
-                CanvasElements[index] = info;
+                if (index >= 0 && index < CanvasElements.Count)
+                {
+                    CanvasElements[index] = info;
+                    ValidationMessage = string.Empty;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating element position");
+                ValidationMessage = "Error updating position";
             }
         }
 
         [RelayCommand]
         public void NewProfile()
         {
-            ShouldClearCanvas = true;
-            ProfileName = string.Empty;
-            ValidationMessage = string.Empty;
+            try
+            {
+                ShouldClearCanvas = true;
+                ProfileName = string.Empty;
+                ValidationMessage = string.Empty;
+                CanvasElements.Clear();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating new profile");
+                ValidationMessage = "Error creating profile";
+            }
         }
 
         [RelayCommand]
         public void ClearCanvas()
         {
-            CanvasElements.Clear();
-            ValidationMessage = string.Empty;
+            try
+            {
+                CanvasElements.Clear();
+                ValidationMessage = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing canvas");
+                ValidationMessage = "Error clearing canvas";
+            }
         }
 
         [RelayCommand]
         public async Task SaveProfile()
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 if (string.IsNullOrWhiteSpace(ProfileName))
                 {
-                    ValidationMessage = "Please enter a profile name";
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("Please enter a name for the profile.", XamlRoot);
-                    }
-                    return;
+                    throw new InvalidOperationException("Please enter a profile name");
                 }
 
                 if (!Utils.FileNameHelper.IsValidFileName(ProfileName))
                 {
-                    ValidationMessage = "The profile name contains invalid characters";
-                    if (XamlRoot != null)
-                    {
-                        await Utils.DialogHelper.ShowError("The profile name contains invalid characters.", XamlRoot);
-                    }
-                    return;
+                    throw new InvalidOperationException("The profile name contains invalid characters");
                 }
 
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(ProfileName);
@@ -291,33 +351,28 @@ namespace MI_GUI_WinUI.ViewModels
                 }
 
                 await _profileService.SaveProfileAsync(profile, PROFILES_DIR);
-
                 ValidationMessage = "Profile saved successfully";
+
                 if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowMessage($"Profile saved as {sanitizedName}.json", "Success", XamlRoot);
+                    await Utils.DialogHelper.ShowMessage(
+                        $"Profile saved as {sanitizedName}.json",
+                        "Success",
+                        XamlRoot
+                    );
                 }
-            }
-            catch (Exception ex)
-            {
-                ValidationMessage = $"Error saving profile: {ex.Message}";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Failed to save profile. Please try again.", XamlRoot);
-                }
-            }
+            }, nameof(SaveProfile));
         }
 
         [RelayCommand]
         public async Task LoadProfile()
         {
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 ShouldClearCanvas = true;
                 if (string.IsNullOrWhiteSpace(ProfileName))
                 {
-                    ValidationMessage = "Please enter a profile name to load";
-                    return;
+                    throw new InvalidOperationException("Please enter a profile name to load");
                 }
 
                 var profiles = await _profileService.ReadProfilesFromJsonAsync(PROFILES_DIR);
@@ -325,44 +380,71 @@ namespace MI_GUI_WinUI.ViewModels
 
                 if (profile.Equals(default(Profile)))
                 {
-                    ValidationMessage = "Profile not found";
-                    return;
+                    throw new InvalidOperationException("Profile not found");
                 }
 
-
                 await LoadExistingProfile(profile);
-            }
-            catch (Exception ex)
-            {
-                ValidationMessage = $"Error loading profile: {ex.Message}";
-            }
+            }, nameof(LoadProfile));
         }
 
         public async Task ConfigureAction(UnifiedPositionInfo elementInfo, ResizableImage image)
         {
-            if (XamlRoot == null) return;
-
-            _actionConfigurationDialog.XamlRoot = XamlRoot;
-            var index = CanvasElements.IndexOf(elementInfo);
-
-            _actionConfigurationDialog.Configure(elementInfo.Element, element => 
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                var scaledPosition = ScaleToMotionInput(elementInfo.Position);
-                var updatedInfo = elementInfo.With(
-                    element: element.WithPosition(
-                        (int)scaledPosition.X,
-                        (int)scaledPosition.Y
-                    )
-                );
-                
-                if (index >= 0 && index < CanvasElements.Count)
+                if (XamlRoot == null)
                 {
-                    CanvasElements[index] = updatedInfo;
-                    image.Tag = updatedInfo;
+                    throw new InvalidOperationException("XamlRoot is not available");
                 }
-            });
 
-            await _actionConfigurationDialog.ShowAsync();
+                _actionConfigurationDialog.XamlRoot = XamlRoot;
+                var index = CanvasElements.IndexOf(elementInfo);
+
+                _actionConfigurationDialog.Configure(elementInfo.Element, element =>
+                {
+                    var scaledPosition = ScaleToMotionInput(elementInfo.Position);
+                    var updatedInfo = elementInfo.With(
+                        element: element.WithPosition(
+                            (int)scaledPosition.X,
+                            (int)scaledPosition.Y
+                        )
+                    );
+                    
+                    if (index >= 0 && index < CanvasElements.Count)
+                    {
+                        CanvasElements[index] = updatedInfo;
+                        image.Tag = updatedInfo;
+                    }
+                });
+
+                await _actionConfigurationDialog.ShowAsync();
+            }, nameof(ConfigureAction));
+        }
+
+        protected override async Task ShowErrorAsync(string message)
+        {
+            ValidationMessage = message;
+            if (XamlRoot != null)
+            {
+                await Utils.DialogHelper.ShowError(message, XamlRoot);
+            }
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                CanvasElements.Clear();
+                DefaultButtons.Clear();
+                CustomButtons.Clear();
+                XamlRoot = null;
+                ValidationMessage = string.Empty;
+
+                base.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
         }
     }
 }

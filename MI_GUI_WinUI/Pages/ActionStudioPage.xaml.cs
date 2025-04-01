@@ -1,29 +1,47 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using MI_GUI_WinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.UI.Xaml;
-using System.Collections;
+using MI_GUI_WinUI.Services.Interfaces;
+using System;
 
 namespace MI_GUI_WinUI.Pages
 {
     public sealed partial class ActionStudioPage : Page
     {
-        public ActionStudioViewModel ViewModel { get; }
+        private readonly ActionStudioViewModel ViewModel;
+        private readonly IWindowManager _windowManager;
 
         public ActionStudioPage()
         {
             this.InitializeComponent();
-            ViewModel = App.Current.Services.GetRequiredService<ActionStudioViewModel>();
+            var services = App.Current.Services;
+            ViewModel = services.GetRequiredService<ActionStudioViewModel>();
+            _windowManager = services.GetRequiredService<IWindowManager>();
             DataContext = ViewModel;
             this.Loaded += ActionStudioPage_Loaded;
+            this.Unloaded += ActionStudioPage_Unloaded;
         }
 
-        private void ActionStudioPage_Loaded(object sender, RoutedEventArgs e)
+        private async void ActionStudioPage_Loaded(object sender, RoutedEventArgs e)
         {
             if (ViewModel != null)
             {
-                ViewModel.XamlRoot = XamlRoot;
+                // Set Window for dialogs
+                ViewModel.Window = _windowManager.MainWindow;
+                
+                // Begin initialization
+                await ViewModel.InitializeAsync();
+            }
+        }
+
+        private void ActionStudioPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.Window = null;
+                ViewModel.Cleanup();
             }
         }
 
@@ -41,7 +59,7 @@ namespace MI_GUI_WinUI.Pages
             base.OnNavigatedFrom(e);
             if (ViewModel != null)
             {
-                ViewModel.XamlRoot = null;
+                ViewModel?.Cleanup();
             }
         }
     }

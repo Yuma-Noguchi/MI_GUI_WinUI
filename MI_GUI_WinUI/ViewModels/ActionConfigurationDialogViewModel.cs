@@ -1,24 +1,26 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MI_GUI_WinUI.Models;
+using MI_GUI_WinUI.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System;
 using System.Linq;
-using System.Windows.Input;
 using System.IO;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
-using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Services.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class ActionConfigurationDialogViewModel : ObservableObject
+    public partial class ActionConfigurationDialogViewModel : ViewModelBase
     {
         private readonly IActionService _actionService;
+        private UnifiedGuiElement _element = new();
         private Action<UnifiedGuiElement>? _onSave;
-        private UnifiedGuiElement _element;
-    
+
         [ObservableProperty]
         private bool isDialogOpen;
 
@@ -26,12 +28,11 @@ namespace MI_GUI_WinUI.ViewModels
         private bool useCustomAction;
 
         [ObservableProperty]
-        private ObservableCollection<ActionData> availableActions;
+        private ObservableCollection<ActionData> availableActions = new();
 
         [ObservableProperty]
         private ActionData? selectedCustomAction;
 
-        private bool _isLoadingActions;
         public bool ShowBasicSettings => !UseCustomAction;
         public bool ShowCustomSettings => UseCustomAction;
 
@@ -41,18 +42,17 @@ namespace MI_GUI_WinUI.ViewModels
         public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
 
         [ObservableProperty]
-        private ObservableCollection<MethodDescription> availableMethods;
+        private ObservableCollection<MethodDescription> availableMethods = new();
 
         [ObservableProperty]
-        private string selectedClass;
+        private string selectedClass = "ds4_gamepad";
 
         [ObservableProperty]
-        private MethodDescription selectedMethod;
+        private MethodDescription selectedMethod = null!;
 
         [ObservableProperty]
         private ObservableCollection<ArgumentInfo> argumentsWithDescriptions = new();
 
-        // Pose detection properties
         [ObservableProperty]
         private bool isPoseEnabled;
 
@@ -68,6 +68,12 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string selectedLandmark = string.Empty;
 
+        [ObservableProperty]
+        private string headerText = "Available Buttons";
+
+        [ObservableProperty]
+        private string helpText = "A, B, X, Y\nLB, RB, LT, RT\nStart, Back, LS, RS\nDPad_Up, DPad_Down, DPad_Left, DPad_Right";
+
         private readonly List<string> LandmarkOptions = new()
         {
             "LEFT_WRIST", "RIGHT_WRIST", 
@@ -79,10 +85,17 @@ namespace MI_GUI_WinUI.ViewModels
             Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
             "MotionInput", "data", "assets", "generated_actions"
         );
+        
+        public IEnumerable<string> LandmarkList => LandmarkOptions;
 
-        public ActionConfigurationDialogViewModel(IActionService actionService)
+        public ActionConfigurationDialogViewModel(
+            IActionService actionService,
+            ILogger<ActionConfigurationDialogViewModel> logger,
+            INavigationService navigationService)
+            : base(logger, navigationService)
         {
-            _actionService = actionService;
+            _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
+            
             AvailableMethods = new ObservableCollection<MethodDescription>
             {
                 new("button_down", "Hold Button"),
@@ -96,26 +109,46 @@ namespace MI_GUI_WinUI.ViewModels
                 new("right_trigger", "Set Right Trigger")
             };
 
-            // Load custom chain actions
-            AvailableActions = new ObservableCollection<ActionData>();
-
-            SaveCommand = new RelayCommand(Save);
-            CancelCommand = new RelayCommand(Cancel);
-
-            LoadAvailableActions();
-
-            SelectedClass = "ds4_gamepad";
-            ArgumentsWithDescriptions = new ObservableCollection<ArgumentInfo>();
             SelectedMethod = AvailableMethods[0];
-            UpdateArgumentInputs();
+            _ = LoadAvailableActionsAsync();
         }
 
-        private async void LoadAvailableActions()
+        public async Task Configure(UnifiedGuiElement element, Action<UnifiedGuiElement> onSave)
         {
-            if (_isLoadingActions) return;
-            _isLoadingActions = true;
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                _element = element ?? throw new ArgumentNullException(nameof(element));
+                _onSave = onSave ?? throw new ArgumentNullException(nameof(onSave));
 
-            try
+                UseCustomAction = element.Action.MethodName == "chain" || (element.Action.MethodName?.StartsWith("chain_") ?? false);
+                SelectedClass = !string.IsNullOrEmpty(element.Action.ClassName) ? element.Action.ClassName : "ds4_gamepad";
+
+                if (UseCustomAction)
+                {
+                    await SetupCustomAction(element);
+                }
+                else if (!string.IsNullOrEmpty(element.Action.MethodName))
+                {
+                    await SetupStandardAction(element);
+                }
+                else
+                {
+                    SelectedMethod = AvailableMethods.First();
+                    UpdateArgumentInputs();
+                }
+
+                SetupPoseSettings(element);
+
+                ValidationMessage = string.Empty;
+                IsDialogOpen = true;
+
+                await Task.CompletedTask;
+            }, nameof(Configure));
+        }
+
+        private async Task LoadAvailableActionsAsync()
+        {
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 var actions = await _actionService.LoadActionsAsync();
                 AvailableActions.Clear();
@@ -123,126 +156,66 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     AvailableActions.Add(action);
                 }
-            }
-            catch (Exception ex)
+            }, nameof(LoadAvailableActionsAsync));
+        }
+
+        private async Task SetupCustomAction(UnifiedGuiElement element)
+        {
+            string? actionName = null;
+            if (element.Action.MethodName == "chain")
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading actions: {ex.Message}");
+                if (element.Action.Arguments?.Count > 0 && element.Action.Arguments[0] is Dictionary<string, object> firstArg)
+                {
+                    if (firstArg.TryGetValue("name", out var nameObj))
+                    {
+                        actionName = nameObj?.ToString();
+                    }
+                }
             }
-            finally
+            else if (element.Action.MethodName?.StartsWith("chain_") ?? false)
             {
-                _isLoadingActions = false;
+                actionName = element.Action.MethodName.Substring(6);
+            }
+
+            if (!string.IsNullOrEmpty(actionName))
+            {
+                if (AvailableActions.Count == 0)
+                {
+                    await LoadAvailableActionsAsync();
+                }
+                SelectedCustomAction = AvailableActions.FirstOrDefault(a => a.Name == actionName);
             }
         }
 
-        public string HeaderText => IsPoseEnabled ? "Pose Detection Help" : 
-            UseCustomAction ? "Custom Action Help" : "Available Buttons";
-
-        public string HelpText => IsPoseEnabled ? 
-            "• Sensitivity affects how quickly the pose is detected\n" +
-            "• Deadzone sets minimum movement required\n" +
-            "• Linear movement provides smoother transitions\n" +
-            "• Select one landmark that should trigger the action" :
-            "A, B, X, Y\n" +
-            "LB, RB, LT, RT\n" +
-            "Start, Back, LS, RS\n" +
-            "DPad_Up, DPad_Down, DPad_Left, DPad_Right";
-
-        public void Initialize(UnifiedGuiElement element, Action<UnifiedGuiElement> onSave)
+        private Task SetupStandardAction(UnifiedGuiElement element)
         {
-            _element = element;
-            _onSave = onSave;
-
-            UseCustomAction = element.Action.MethodName == "chain" || (element.Action.MethodName?.StartsWith("chain_") ?? false);
-            
-            SelectedClass = !string.IsNullOrEmpty(element.Action.ClassName) ? element.Action.ClassName : "ds4_gamepad";
-            
-            if (UseCustomAction)
+            var method = AvailableMethods.FirstOrDefault(m => m.Id == element.Action.MethodName);
+            if (method != null)
             {
-                // Support both formats: "chain" with arg.name and "chain_name"
-                string? actionName = null;
-                if (element.Action.MethodName == "chain")
+                SelectedMethod = method;
+                ArgumentsWithDescriptions.Clear();
+
+                if (element.Action.Arguments?.Any() == true)
                 {
-                    // Extract name from arguments
-                    if (element.Action.Arguments?.Count > 0 && element.Action.Arguments[0] is Dictionary<string, object> firstArg)
+                    var descriptions = GetArgumentDescriptions(method.Id);
+                    for (int i = 0; i < element.Action.Arguments.Count; i++)
                     {
-                        if (firstArg.TryGetValue("name", out var nameObj))
-                        {
-                            actionName = nameObj?.ToString();
-                        }
+                        string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
+                        string value = element.Action.Arguments[i]?.ToString() ?? "";
+                        ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, value, IsButtonArgument(method.Id, i)));
                     }
                 }
-                else if (element.Action.MethodName?.StartsWith("chain_") ?? false)
+                else
                 {
-                    actionName = element.Action.MethodName.Substring(6); // Remove "chain_" prefix
-                }
-                if (!string.IsNullOrEmpty(actionName))
-                {
-                    SelectedCustomAction = AvailableActions.FirstOrDefault(a => a.Name == actionName);
+                    UpdateArgumentInputs();
                 }
             }
-            else if (!string.IsNullOrEmpty(element.Action.MethodName))
-            {
-                var method = AvailableMethods.FirstOrDefault(m => m.Id == element.Action.MethodName);
-                if (method != null)
-                {
-                    SelectedMethod = method;
-                    ArgumentsWithDescriptions.Clear();
-                    if (element.Action.Arguments?.Any() == true)
-                    {
-                        if (method.Id.StartsWith("chain_"))
-                        {
-                            var actionName = method.Id.Substring(6);
-                            var filePath = Path.Combine(ACTIONS_DIR, $"{actionName}.json");
-                            
-                            if (File.Exists(filePath))
-                            {
-                                var json = File.ReadAllText(filePath);
-                                var actionData = JsonConvert.DeserializeObject<dynamic>(json);
 
-                                ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                                    $"Custom action: {actionName}",
-                                    JsonConvert.SerializeObject(actionData.action.args, Formatting.Indented),
-                                    false
-                                ));
-                            }
-                            else
-                            {
-                                ArgumentsWithDescriptions.Add(new ArgumentInfo(
-                                    "Error: Custom action not found",
-                                    "",
-                                    false
-                                ));
-                            }
-                        }
-                        else
-                        {
-                            var descriptions = GetArgumentDescriptions(method.Id);
-                            for (int i = 0; i < element.Action.Arguments.Count; i++)
-                            {
-                                string desc = i < descriptions.Length ? descriptions[i] : $"Argument {i + 1}";
-                                string value = element.Action.Arguments[i]?.ToString() ?? "";
-                                ArgumentsWithDescriptions.Add(new ArgumentInfo(desc, value, IsButtonArgument(method.Id, i)));
-                            }
-                        }
-                    }
-                    else
-                    {
-                        UpdateArgumentInputs();
-                    }
-                }
-            }
-            else
-            {
-                SelectedMethod = AvailableMethods.First();
-                UpdateArgumentInputs();
-            }
+            return Task.CompletedTask;
+        }
 
-            OnPropertyChanged(nameof(ShowBasicSettings));
-            OnPropertyChanged(nameof(ShowCustomSettings));
-            OnPropertyChanged(nameof(HeaderText));
-            OnPropertyChanged(nameof(HelpText));
-
-            // Set up pose settings
+        private void SetupPoseSettings(UnifiedGuiElement element)
+        {
             IsPoseEnabled = element.IsPose;
             if (element.IsPose)
             {
@@ -255,9 +228,6 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 SelectedLandmark = "";
             }
-            
-            ValidationMessage = string.Empty;
-            IsDialogOpen = true;
         }
 
         private bool IsButtonArgument(string methodId, int index)
@@ -290,39 +260,6 @@ namespace MI_GUI_WinUI.ViewModels
                 "left_trigger" or "right_trigger" => new[] { "Trigger Pressure (0.0 to 1.0)" },
                 _ => Array.Empty<string>()
             };
-        }
-
-        partial void OnSelectedMethodChanged(MethodDescription? value)
-        {
-            ValidationMessage = string.Empty;
-            if (value != null) UpdateArgumentInputs();
-        }
-
-        partial void OnUseCustomActionChanged(bool value)
-        {
-            OnPropertyChanged(nameof(ShowBasicSettings));
-            OnPropertyChanged(nameof(ShowCustomSettings));
-            OnPropertyChanged(nameof(HeaderText));
-            OnPropertyChanged(nameof(HelpText));
-            ValidationMessage = string.Empty;
-        }
-
-        partial void OnIsPoseEnabledChanged(bool value)
-        {
-            OnPropertyChanged(nameof(HeaderText));
-            OnPropertyChanged(nameof(HelpText));
-            
-            if (value)
-            {
-                if (string.IsNullOrEmpty(SelectedLandmark))
-                {
-                    SelectedLandmark = LandmarkOptions[0];
-                }
-            }
-            else
-            {
-                SelectedLandmark = "";
-            }
         }
 
         private void UpdateArgumentInputs()
@@ -359,6 +296,80 @@ namespace MI_GUI_WinUI.ViewModels
                     ArgumentsWithDescriptions.Add(new ArgumentInfo(descriptions[0], "0.5"));
                     break;
             }
+        }
+
+        [RelayCommand]
+        private async Task SaveAsync()
+        {
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                if (_onSave == null) return;
+
+                string error = ValidateInputs();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    ValidationMessage = error;
+                    return;
+                }
+
+                var updatedAction = new ActionConfig();
+
+                if (UseCustomAction)
+                {
+                    updatedAction = new ActionConfig
+                    {
+                        ClassName = "ds4_gamepad",
+                        MethodName = "chain",
+                        Arguments = new List<object>
+                        {
+                            new Dictionary<string, object>
+                            {
+                                { "name", SelectedCustomAction!.Name },
+                                { "sequence", SelectedCustomAction!.Sequence.Select(seq => seq.Type == "press" ?
+                                    new { type = "press", button = seq.Value } :
+                                    new { type = "sleep", duration = double.Parse(seq.Value) } as object
+                                ).ToList() }
+                            }
+                        }
+                    };
+                }
+                else
+                {
+                    updatedAction = new ActionConfig
+                    {
+                        ClassName = SelectedClass,
+                        MethodName = SelectedMethod.Id,
+                        Arguments = ArgumentsWithDescriptions.Select(a => 
+                            float.TryParse(a.Value, out float number) ? number :
+                            a.Value as object).ToList()
+                    };
+                }
+
+                var baseElement = _element.WithAction(updatedAction);
+                var updatedElement = baseElement with { File = IsPoseEnabled ? "hit_trigger.py" : "button.py" };
+
+                if (IsPoseEnabled)
+                {
+                    updatedElement = updatedElement
+                        .WithLandmarks(new List<string> { SelectedLandmark })
+                        .WithPoseSettings(Sensitivity, Deadzone, Linear);
+                }
+                else
+                {
+                    updatedElement = updatedElement
+                        .WithLandmarks(new List<string>())
+                        .WithPoseSettings(1.0, 10, true);
+                }
+
+                _onSave(updatedElement);
+                IsDialogOpen = false;
+            }, nameof(SaveAsync));
+        }
+
+        [RelayCommand]
+        private void Cancel()
+        {
+            IsDialogOpen = false;
         }
 
         private string ValidateInputs()
@@ -413,7 +424,6 @@ namespace MI_GUI_WinUI.ViewModels
                     }
                 }
 
-                // Validate pose settings if enabled
                 if (IsPoseEnabled)
                 {
                     if (Sensitivity < 0.1 || Sensitivity > 2.0)
@@ -434,82 +444,73 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        private void Save()
+        partial void OnSelectedMethodChanged(MethodDescription? value)
         {
-            if (_onSave == null) return;
+            ValidationMessage = string.Empty;
+            if (value != null) UpdateArgumentInputs();
+        }
 
-            string error = ValidateInputs();
-            if (!string.IsNullOrEmpty(error))
+        partial void OnUseCustomActionChanged(bool value)
+        {
+            if (value)
             {
-                ValidationMessage = error;
-                return;
-            }
-
-            var updatedAction = new ActionConfig();
-
-            if (UseCustomAction)
-            {
-                // Convert selected action into a chain action
-                updatedAction = new ActionConfig
-                {
-                    ClassName = "ds4_gamepad",
-                    MethodName = "chain",
-                    Arguments = new List<object>
-                    {
-                        new Dictionary<string, object>
-                        {
-                            { "name", SelectedCustomAction!.Name },
-                            { "sequence", SelectedCustomAction!.Sequence.Select(seq => seq.Type == "press" ?
-                                new { type = "press", button = seq.Value } :
-                                new { type = "sleep", duration = double.Parse(seq.Value) } as object
-                            ).ToList() }
-                        }
-                    }
-                };
+                HeaderText = "Custom Action Help";
             }
             else
             {
-                updatedAction = new ActionConfig
-                {
-                    ClassName = SelectedClass,
-                    MethodName = SelectedMethod.Id,
-                    Arguments = ArgumentsWithDescriptions.Select(a => 
-                        float.TryParse(a.Value, out float number) ? number :
-                        a.Value as object).ToList()
-                };
+                HeaderText = "Available Buttons";
             }
+            OnPropertyChanged(nameof(ShowBasicSettings));
+            OnPropertyChanged(nameof(ShowCustomSettings));
+            ValidationMessage = string.Empty;
+        }
 
-            var baseElement = _element.WithAction(updatedAction);
-
-            var updatedElement = baseElement with
+        partial void OnIsPoseEnabledChanged(bool value)
+        {
+            if (value)
             {
-                File = IsPoseEnabled ? "hit_trigger.py" : "button.py"
-            };
+                HeaderText = "Pose Detection Help";
+                HelpText = "• Sensitivity affects how quickly the pose is detected\n" +
+                          "• Deadzone sets minimum movement required\n" +
+                          "• Linear movement provides smoother transitions\n" +
+                          "• Select one landmark that should trigger the action";
 
-            if (IsPoseEnabled)
-            {
-                updatedElement = updatedElement
-                    .WithLandmarks(new List<string> { SelectedLandmark })
-                    .WithPoseSettings(Sensitivity, Deadzone, Linear);
+                if (string.IsNullOrEmpty(SelectedLandmark))
+                {
+                    SelectedLandmark = LandmarkOptions[0];
+                }
             }
             else
             {
-                updatedElement = updatedElement
-                    .WithLandmarks(new List<string>())
-                    .WithPoseSettings(1.0, 10, true);
+                HeaderText = "Available Buttons";
+                HelpText = "A, B, X, Y\n" +
+                          "LB, RB, LT, RT\n" +
+                          "Start, Back, LS, RS\n" +
+                          "DPad_Up, DPad_Down, DPad_Left, DPad_Right";
+                SelectedLandmark = "";
             }
-
-            _onSave(updatedElement);
-            IsDialogOpen = false;
         }
 
-        private void Cancel()
+        protected override async Task ShowErrorAsync(string message)
         {
-            IsDialogOpen = false;
+            ValidationMessage = message;
+            await Task.CompletedTask;
         }
 
-        public IRelayCommand SaveCommand { get; }
-        public IRelayCommand CancelCommand { get; }
-        public IEnumerable<string> LandmarkList => LandmarkOptions;
+        public override void Cleanup()
+        {
+            try
+            {
+                ArgumentsWithDescriptions?.Clear();
+                AvailableActions?.Clear();
+                _onSave = null;
+
+                base.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
+        }
     }
 }

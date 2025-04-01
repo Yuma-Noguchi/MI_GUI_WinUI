@@ -2,21 +2,26 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MI_GUI_WinUI.Pages;
 using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels.Base;
 using CommunityToolkit.Mvvm.DependencyInjection;
 
 namespace MI_GUI_WinUI.Services
 {
     /// <summary>
-    /// Implementation of INavigationService for WinUI navigation
+    /// Implementation of INavigationService for WinUI navigation with window management
     /// </summary>
     public class NavigationService : INavigationService
     {
         private Frame? _frame;
         private readonly ILogger<NavigationService> _logger;
         private readonly ILoggingService _loggingService;
+        private readonly Dictionary<Window, WeakReference<ViewModelBase>> _windowViewModels;
+        private readonly Dictionary<Window, Frame> _windowFrames;
 
         public event EventHandler<string> NavigationChanged;
 
@@ -26,6 +31,8 @@ namespace MI_GUI_WinUI.Services
         {
             _logger = logger;
             _loggingService = loggingService;
+            _windowViewModels = new Dictionary<Window, WeakReference<ViewModelBase>>();
+            _windowFrames = new Dictionary<Window, Frame>();
         }
 
         public void Initialize(Frame frame)
@@ -33,6 +40,43 @@ namespace MI_GUI_WinUI.Services
             _frame = frame ?? throw new ArgumentNullException(nameof(frame));
             _frame.Navigated += Frame_Navigated;
             _logger.LogInformation("Navigation service initialized");
+        }
+
+        public void RegisterWindow(Window window)
+        {
+            if (!_windowViewModels.ContainsKey(window))
+            {
+                _windowViewModels.Add(window, new WeakReference<ViewModelBase>(null));
+                _logger.LogInformation("Window registered with navigation service");
+            }
+
+            // Find the main content frame
+            if (window.Content is FrameworkElement element)
+            {
+                var frame = FindFrameInElement(element);
+                if (frame != null)
+                {
+                    RegisterFrame(window, frame);
+                }
+            }
+        }
+
+        public void UnregisterWindow(Window window)
+        {
+            if (_windowViewModels.TryGetValue(window, out var viewModelRef))
+            {
+                if (viewModelRef.TryGetTarget(out var viewModel))
+                {
+                    viewModel.Cleanup();
+                }
+                _windowViewModels.Remove(window);
+                _logger.LogInformation("Window unregistered from navigation service");
+            }
+
+            if (_windowFrames.ContainsKey(window))
+            {
+                _windowFrames.Remove(window);
+            }
         }
 
         public bool Navigate<T>(object? parameter = null) where T : Page
@@ -45,6 +89,14 @@ namespace MI_GUI_WinUI.Services
 
             try
             {
+                // Get current page's ViewModel before navigation
+                if (_frame.Content is FrameworkElement oldPage && 
+                    oldPage.DataContext is ViewModelBase oldViewModel)
+                {
+                    // Dispose the old ViewModel
+                    oldViewModel.Dispose();
+                }
+
                 var pageType = typeof(T);
                 var result = _frame.Navigate(pageType, parameter);
                 if (result)
@@ -65,9 +117,46 @@ namespace MI_GUI_WinUI.Services
             }
         }
 
-        public bool Navigate<TPage, TViewModel>(object? parameter = null)
+        public bool Navigate<TPage, TViewModel>(Window window, object parameter = null)
             where TPage : Page
-            where TViewModel : class
+            where TViewModel : ViewModelBase
+        {
+            try
+            {
+                // Get the ViewModel
+                var viewModel = Ioc.Default.GetRequiredService<TViewModel>();
+
+                // Create the page instance from DI
+                var page = Ioc.Default.GetRequiredService<TPage>();
+
+                // Set DataContext
+                page.DataContext = viewModel;
+
+                // Set window reference to ViewModel
+                viewModel.Window = window;
+
+                // Initialize ViewModel if needed
+                _ = viewModel.InitializeAsync();
+
+                // Get the frame for this window
+                if (TryGetFrameForWindow(window, out var frame))
+                {
+                    return frame.Navigate(page.GetType(), parameter);
+                }
+
+                _logger.LogError("Navigation failed: No frame found for window");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Navigation failed to {Page}", typeof(TPage).Name);
+                return false;
+            }
+        }
+
+        public async Task<bool> NavigateAsync<TPage, TViewModel>(Window window, object? parameter = null)
+            where TPage : Page
+            where TViewModel : ViewModelBase
         {
             if (_frame == null)
             {
@@ -80,6 +169,24 @@ namespace MI_GUI_WinUI.Services
                 // Get ViewModel from DI
                 var viewModel = Ioc.Default.GetRequiredService<TViewModel>();
                 
+                // Set window reference and initialize
+                viewModel.Window = window;
+                await viewModel.InitializeAsync();
+
+                // Store ViewModel reference
+                if (_windowViewModels.ContainsKey(window))
+                {
+                    if (_windowViewModels[window].TryGetTarget(out var oldViewModel))
+                    {
+                        oldViewModel.Cleanup();
+                    }
+                    _windowViewModels[window] = new WeakReference<ViewModelBase>(viewModel);
+                }
+                else
+                {
+                    _windowViewModels.Add(window, new WeakReference<ViewModelBase>(viewModel));
+                }
+
                 // Navigate with ViewModel as parameter
                 var pageType = typeof(TPage);
                 var result = _frame.Navigate(pageType, viewModel);
@@ -128,6 +235,43 @@ namespace MI_GUI_WinUI.Services
         {
             _logger.LogDebug("Frame navigated to: {Page}", e.SourcePageType.Name);
             NavigationChanged?.Invoke(this, e.SourcePageType.Name);
+        }
+
+        public void RegisterFrame(Window window, Frame frame)
+        {
+            if (window != null && frame != null)
+            {
+                _windowFrames[window] = frame;
+            }
+        }
+
+        private bool TryGetFrameForWindow(Window window, out Frame frame)
+        {
+            if (window != null && _windowFrames.TryGetValue(window, out frame))
+            {
+                return true;
+            }
+            
+            frame = null;
+            return false;
+        }
+
+        private Frame FindFrameInElement(FrameworkElement element)
+        {
+            // Try to find a Frame in the visual tree
+            if (element is Frame frame)
+            {
+                return frame;
+            }
+            
+            // Look for a content frame property or field by convention
+            var contentFrame = element.FindName("ContentFrame") as Frame;
+            if (contentFrame != null)
+            {
+                return contentFrame;
+            }
+            
+            return null;
         }
     }
 }

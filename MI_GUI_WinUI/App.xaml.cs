@@ -20,6 +20,7 @@ namespace MI_GUI_WinUI
     public partial class App : Application
     {
         private readonly IWindowManager _windowManager;
+        private readonly INavigationService _navigationService;
         private bool _isClosing;
         private readonly IServiceProvider _serviceProvider;
 
@@ -28,6 +29,8 @@ namespace MI_GUI_WinUI
 
         public App()
         {
+            InitializeComponent();
+
             // Configure services
             var services = new ServiceCollection();
 
@@ -41,10 +44,8 @@ namespace MI_GUI_WinUI
                     new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
             });
 
-            // Register window management
+            // Register window management and navigation
             services.AddSingleton<IWindowManager, WindowManager>();
-
-            // Register navigation
             services.AddSingleton<INavigationService, NavigationService>();
 
             // Register services
@@ -53,6 +54,7 @@ namespace MI_GUI_WinUI
             services.AddSingleton<ILoggingService, LoggingService>();
             services.AddSingleton<IStableDiffusionService, StableDiffusionService>();
             services.AddSingleton<IProfileService, ProfileService>();
+            services.AddSingleton<IDialogService, DialogService>();
 
             // Register view models
             services.AddSingleton<MainWindowViewModel>();
@@ -86,16 +88,24 @@ namespace MI_GUI_WinUI
             _serviceProvider = services.BuildServiceProvider();
             Ioc.Default.ConfigureServices(_serviceProvider);
 
-            // Initialize window manager after service provider is built
+            // Initialize services
             _windowManager = _serviceProvider.GetRequiredService<IWindowManager>();
+            _navigationService = _serviceProvider.GetRequiredService<INavigationService>();
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            // Ensure we have a window created when the app launches
+            // Initialize main window
             if (_windowManager.MainWindow == null && !_isClosing)
             {
                 _windowManager.InitializeMainWindow();
+                var mainWindow = _windowManager.MainWindow;
+
+                // Register window with navigation service
+                if (mainWindow != null)
+                {
+                    _navigationService.RegisterWindow(mainWindow);
+                }
             }
         }
 

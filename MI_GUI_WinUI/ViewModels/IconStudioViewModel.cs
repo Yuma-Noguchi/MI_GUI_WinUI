@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Windows.Storage;
 using MI_GUI_WinUI.Services;
 using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels.Base;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -17,14 +18,13 @@ using System.Linq;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class IconStudioViewModel : ObservableObject
+    public partial class IconStudioViewModel : ViewModelBase
     {
         private XamlRoot? _xamlRoot;
-        private readonly ILogger<IconStudioViewModel> _logger;
-        private readonly INavigationService _navigationService;
         private readonly IStableDiffusionService _sdService;
         private bool _executingInference;
         private string[] _currentImagePaths = Array.Empty<string>();
+        private string helperPrompt = "{}";
 
         public XamlRoot? XamlRoot
         {
@@ -85,14 +85,17 @@ namespace MI_GUI_WinUI.ViewModels
 
         public double ProgressPercentage => _sdService?.Percentage ?? 0;
 
+        public bool IsNotGenerating => !IsGenerating;
+        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
+        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
+
         public IconStudioViewModel(
             IStableDiffusionService sdService,
             ILogger<IconStudioViewModel> logger,
             INavigationService navigationService)
+            : base(logger, navigationService)
         {
-            _sdService = sdService;
-            _logger = logger;
-            _navigationService = navigationService;
+            _sdService = sdService ?? throw new ArgumentNullException(nameof(sdService));
 
             if (_sdService is INotifyPropertyChanged npc)
             {
@@ -106,9 +109,18 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public bool IsNotGenerating => !IsGenerating;
-        public bool IsReady => _sdService.IsInitialized && !IsInitializing;
-        public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
+        protected override void OnWindowChanged()
+        {
+            base.OnWindowChanged();
+            if (Window != null)
+            {
+                _xamlRoot = Window.Content?.XamlRoot;
+            }
+            else
+            {
+                _xamlRoot = null;
+            }
+        }
 
         partial void OnIsGeneratingChanged(bool value)
         {
@@ -131,7 +143,7 @@ namespace MI_GUI_WinUI.ViewModels
             OnPropertyChanged(nameof(CanGenerate));
         }
 
-        private string helperPrompt = "{}";
+        private bool CanGenerateExecute() => !_executingInference;
 
         private string BuildFinalPrompt(string prompt)
         {
@@ -141,29 +153,27 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
         private async Task GenerateAsync()
         {
+            _executingInference = true;
+            IsGenerating = true;
+
             try
             {
-                _executingInference = true;
-                StatusString = "Generating...";
-                IsGenerating = true;
-
-                // If we're using CPU, warn the user about slower performance
-                if (_sdService.UsingCpuFallback)
+                await ExecuteWithErrorHandlingAsync(async () =>
                 {
-                    StatusMessage = "Running on CPU - generation may take longer";
-                }
+                    StatusString = "Generating...";
 
-                var prompt = BuildFinalPrompt(InputDescription);
-                _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
+                    if (_sdService.UsingCpuFallback)
+                    {
+                        StatusMessage = "Running on CPU - generation may take longer";
+                    }
 
-                StatusString = "Generation complete";
-                await LoadImagesAsync(_currentImagePaths);
-                IsImageGenerated = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating images");
-                StatusString = "Error generating images";
+                    var prompt = BuildFinalPrompt(InputDescription);
+                    _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
+
+                    StatusString = "Generation complete";
+                    await LoadImagesAsync(_currentImagePaths);
+                    IsImageGenerated = true;
+                }, nameof(GenerateAsync));
             }
             finally
             {
@@ -171,8 +181,6 @@ namespace MI_GUI_WinUI.ViewModels
                 IsGenerating = false;
             }
         }
-
-        private bool CanGenerateExecute() => !_executingInference;
 
         private async Task LoadImagesAsync(IEnumerable<string> imagePaths)
         {
@@ -212,39 +220,39 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         private async Task SaveAsync()
         {
-            if (string.IsNullOrWhiteSpace(IconName))
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                if (XamlRoot != null)
+                if (string.IsNullOrWhiteSpace(IconName))
                 {
-                    await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+                    if (XamlRoot != null)
+                    {
+                        await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (!Utils.FileNameHelper.IsValidFileName(IconName))
-            {
-                if (XamlRoot != null)
+                if (!Utils.FileNameHelper.IsValidFileName(IconName))
                 {
-                    await Utils.DialogHelper.ShowError("The icon name contains invalid characters.", XamlRoot);
+                    if (XamlRoot != null)
+                    {
+                        await Utils.DialogHelper.ShowError("The icon name contains invalid characters.", XamlRoot);
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (_currentImagePaths == null || !_currentImagePaths.Any())
-            {
-                if (XamlRoot != null)
+                if (_currentImagePaths == null || !_currentImagePaths.Any())
                 {
-                    await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
+                    if (XamlRoot != null)
+                    {
+                        await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
+                    }
+                    return;
                 }
-                return;
-            }
 
-            try
-            {
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
                 var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
                 Directory.CreateDirectory(iconPath);
-
+                
                 var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
 
                 if (File.Exists(fileName))
@@ -266,19 +274,19 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error saving icon");
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Failed to save icon.", XamlRoot);
-                }
-            }
+            }, nameof(SaveAsync));
         }
 
-        public async Task InitializeAsync()
+        public async Task InitializeStableDiffusionAsync()
         {
+            IsInitializing = true;
+            IsPreInitialization = true;
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+            InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
+
+            await base.InitializeAsync();
+
             if (_sdService.IsInitialized)
             {
                 IsPreInitialization = false;
@@ -287,12 +295,6 @@ namespace MI_GUI_WinUI.ViewModels
 
             try
             {
-                IsInitializing = true;
-                IsPreInitialization = true;
-                InitializationFailed = false;
-                ErrorMessage = string.Empty;
-
-                InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
                 await _sdService.Initialize(UseGpu);
 
                 InitializationStatus = "Initialization complete";
@@ -301,7 +303,6 @@ namespace MI_GUI_WinUI.ViewModels
 
                 if (XamlRoot != null)
                 {
-                    // Check if we fell back to CPU
                     if (UseGpu && _sdService.UsingCpuFallback)
                     {
                         await Utils.DialogHelper.ShowMessage(
@@ -321,33 +322,15 @@ namespace MI_GUI_WinUI.ViewModels
             }
             catch (DirectoryNotFoundException ex)
             {
-                _logger.LogError(ex, "AI Models directory not found");
-                InitializationFailed = true;
-                ErrorMessage = "AI Models directory not found. Please ensure the models are properly installed.";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
+                await HandleInitializationError("AI Models directory not found. Please ensure the models are properly installed.", ex);
             }
             catch (FileNotFoundException ex)
             {
-                _logger.LogError(ex, "Required model file not found");
-                InitializationFailed = true;
-                ErrorMessage = $"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
+                await HandleInitializationError($"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.", ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Icon Studio");
-                InitializationFailed = true;
-                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
+                await HandleInitializationError($"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}", ex);
             }
             finally
             {
@@ -355,13 +338,27 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
+        private async Task HandleInitializationError(string message, Exception ex)
+        {
+            _logger.LogError(ex, message);
+            InitializationFailed = true;
+            ErrorMessage = message;
+            if (XamlRoot != null)
+            {
+                await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
+            }
+        }
+
         [RelayCommand]
         private async Task RetryInitialization()
         {
-            _logger.LogInformation("Retrying initialization");
-            InitializationFailed = false;
-            ErrorMessage = string.Empty;
-            await InitializeAsync();
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                _logger.LogInformation("Retrying initialization");
+                InitializationFailed = false;
+                ErrorMessage = string.Empty;
+                await InitializeStableDiffusionAsync();
+            }, nameof(RetryInitialization));
         }
 
         private void CleanupTempDirectories()
@@ -389,14 +386,47 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public void Cleanup()
+        public override void Cleanup()
         {
-            Images = null;
-            PreviewImage = null;
-            StatusMessage = string.Empty;
-            InitializationStatus = string.Empty;
-            _currentImagePaths = Array.Empty<string>();
-            CleanupTempDirectories();
+            try
+            {
+                // Clear collections
+                if (Images is ObservableCollection<ImageSource> collection)
+                {
+                    collection.Clear();
+                }
+                Images = null;
+
+                // Dispose and clear image resources
+                PreviewImage?.Dispose();
+                PreviewImage = null;
+
+                // Clear paths and status
+                _currentImagePaths = Array.Empty<string>();
+                StatusMessage = string.Empty;
+                InitializationStatus = string.Empty;
+
+                // Clean up directories
+                CleanupTempDirectories();
+
+                // Clear UI references
+                _xamlRoot = null;
+
+                base.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
+        }
+
+        protected override async Task ShowErrorAsync(string message)
+        {
+            ErrorMessage = message;
+            if (XamlRoot != null)
+            {
+                await Utils.DialogHelper.ShowError(message, XamlRoot);
+            }
         }
     }
 }
