@@ -335,11 +335,15 @@ namespace MI_GUI_WinUI.ViewModels
                     if (headTilt != null)
                     {
                         var unifiedElement = UnifiedGuiElement.FromPoseElement(headTilt);
-                        var canvasPosition = ScaleToCanvas(headTilt.Position);
+                        // Head tilt is always centered in the canvas
+                        var canvasPosition = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
                         AddElementToCanvas(ElementAddRequest.FromExisting(
                             unifiedElement,
                             canvasPosition
                         ));
+    
+                        // Configure the dialog with loaded settings
+                        _headTiltConfigurationDialog.Configure(headTilt, UpdateHeadTiltElement);
                     }
 
                     // Load other poses
@@ -540,13 +544,29 @@ namespace MI_GUI_WinUI.ViewModels
                         (int)scaledPosition.Y
                     );
 
-                    if (elementWithPosition.IsPose)
+                    // Handle head tilt elements differently
+                    if (elementWithPosition.File == "head_tilt_joystick.py")
                     {
                         profile.Poses.Add(elementWithPosition.ToPoseElement());
                     }
+                    // Handle other pose elements
+                    else if (elementWithPosition.IsPose)
+                    {
+                        var poseElement = elementWithPosition.ToPoseElement();
+                        poseElement.Position = new List<int> {
+                            (int)scaledPosition.X,
+                            (int)scaledPosition.Y
+                        };
+                        profile.Poses.Add(poseElement);
+                    }
                     else
                     {
-                        profile.GuiElements.Add(elementWithPosition.ToGuiElement());
+                        var guiElement = elementWithPosition.ToGuiElement();
+                        guiElement.Position = new List<int> {
+                            (int)scaledPosition.X,
+                            (int)scaledPosition.Y
+                        };
+                        profile.GuiElements.Add(guiElement);
                     }
                 }
 
