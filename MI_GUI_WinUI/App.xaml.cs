@@ -63,6 +63,7 @@ namespace MI_GUI_WinUI
             services.AddTransient<IconStudioViewModel>();
             services.AddTransient<ProfileEditorViewModel>();
             services.AddTransient<ActionConfigurationDialogViewModel>();
+            services.AddTransient<HeadTiltConfigurationViewModel>();
 
             // Register converters
             services.AddSingleton<StringToBoolConverter>();
@@ -83,6 +84,7 @@ namespace MI_GUI_WinUI
             // Register controls
             services.AddTransient<Controls.PageHeader>();
             services.AddTransient<Controls.ActionConfigurationDialog>();
+            services.AddTransient<Controls.HeadTiltConfigurationDialog>();
 
             // Build and configure services
             _serviceProvider = services.BuildServiceProvider();

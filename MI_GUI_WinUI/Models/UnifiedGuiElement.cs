@@ -48,7 +48,22 @@ namespace MI_GUI_WinUI.Models
         public Models.ActionConfig Action { get; init; } = new();
 
         [JsonIgnore]
-        public bool IsPose => File == "hit_trigger.py";
+        public bool IsPose => File == "hit_trigger.py" || File == "head_tilt_joystick.py";
+
+        public static UnifiedGuiElement CreateHeadTiltElement(int x = 0, int y = 0, int radius = 30)
+        {
+            return new UnifiedGuiElement
+            {
+                File = "head_tilt_joystick.py",
+                Position = new List<int> { x, y },
+                Radius = radius,
+                LeftSkin = "racing/left_arrow.png",
+                RightSkin = "racing/right_arrow.png",
+                Sensitivity = 0.75,
+                Deadzone = 1,
+                Linear = false,
+            };
+        }
 
         public static UnifiedGuiElement CreateGuiElement(int x = 0, int y = 0, int radius = 30)
         {

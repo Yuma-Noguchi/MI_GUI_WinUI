@@ -21,6 +21,7 @@ namespace MI_GUI_WinUI.ViewModels
     {
         private readonly IProfileService _profileService;
         private readonly ActionConfigurationDialog _actionConfigurationDialog;
+        private readonly HeadTiltConfigurationDialog _headTiltConfigurationDialog;
         private const float DROPPED_IMAGE_SIZE = 80;
         private const int MOTION_INPUT_WIDTH = 640;
         private const int MOTION_INPUT_HEIGHT = 480;
@@ -49,15 +50,145 @@ namespace MI_GUI_WinUI.ViewModels
         public ProfileEditorViewModel(
             IProfileService profileService,
             ActionConfigurationDialog actionConfigurationDialog,
+            HeadTiltConfigurationDialog headTiltConfigurationDialog,
             ILogger<ProfileEditorViewModel> logger,
             INavigationService navigationService)
             : base(logger, navigationService)
         {
             _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
             _actionConfigurationDialog = actionConfigurationDialog ?? throw new ArgumentNullException(nameof(actionConfigurationDialog));
+            _headTiltConfigurationDialog = headTiltConfigurationDialog ?? throw new ArgumentNullException(nameof(headTiltConfigurationDialog));
 
             InitializeDefaultButtons();
             LoadCustomButtons();
+        }
+
+        [RelayCommand]
+        private async Task ConfigureHeadTilt()
+        {
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                if (XamlRoot == null)
+                {
+                    throw new InvalidOperationException("XamlRoot is not available");
+                }
+
+                _headTiltConfigurationDialog.XamlRoot = XamlRoot;
+
+                // Find existing head tilt configuration
+                var existingConfig = CanvasElements
+                    .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+
+                PoseGuiElement poseElement;
+                    
+                if (existingConfig != null && existingConfig.Element != null)
+                {
+                    // Use existing configuration
+                    poseElement = existingConfig.Element.ToPoseElement();
+
+                    // Ensure position is set
+                    if (poseElement.Position == null || poseElement.Position.Count != 2)
+                    {
+                        var scaledPosition = ScaleToMotionInput(existingConfig.Position);
+                        poseElement.Position = new List<int> { (int)scaledPosition.X, (int)scaledPosition.Y };
+                    }
+                }
+                else
+                {
+                    // Create new configuration with default values and empty file to indicate disabled state
+                    poseElement = new PoseGuiElement
+                    {
+                        File = string.Empty,  // Empty file indicates disabled state
+                        Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
+                        Sensitivity = 0.75,
+                        Deadzone = 1,
+                        Linear = false,
+                        LeftSkin = "racing/left_arrow.png",
+                        RightSkin = "racing/right_arrow.png"
+                    };
+                }
+
+                _headTiltConfigurationDialog.Configure(poseElement, UpdateHeadTiltElement);
+
+                await _headTiltConfigurationDialog.ShowAsync();
+            }, nameof(ConfigureHeadTilt));
+        }
+
+        private void UpdateHeadTiltElement(PoseGuiElement headTiltElement)
+        {
+            try
+            {
+                // If head tilt is being disabled (empty element)
+                if (string.IsNullOrEmpty(headTiltElement.File))
+                {
+                    var existingElement = CanvasElements
+                        .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+                    
+                    if (existingElement != null)
+                    {
+                        CanvasElements.Remove(existingElement);
+                    }
+                    return;
+                }
+
+                // Ensure head tilt element has position
+                if (headTiltElement.Position == null || headTiltElement.Position.Count != 2)
+                {
+                    headTiltElement.Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 };
+                }
+
+                // Find existing head tilt element or create new one
+                var existing = CanvasElements
+                    .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+
+                Point canvasPosition;
+                if (existing != null)
+                {
+                    // Keep existing canvas position
+                    canvasPosition = new Point(
+                        existing.Position.X,
+                        existing.Position.Y
+                    );
+                }
+                else
+                {
+                    // Convert motion input position to canvas position
+                    canvasPosition = ScaleToCanvas(headTiltElement.Position);
+                }
+
+                // Create unified element with all settings
+                var element = UnifiedGuiElement.FromPoseElement(headTiltElement);
+
+                // Create position info for canvas
+                var elementInfo = new UnifiedPositionInfo(
+                    element,
+                    canvasPosition,
+                    new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
+                );
+
+                try
+                {
+                    // Remove the old element first
+                    var oldElement = CanvasElements.FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+                    if (oldElement != null)
+                    {
+                        CanvasElements.Remove(oldElement);
+                    }
+
+                    // Then add the new element
+                    CanvasElements.Add(elementInfo);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error updating head tilt element");
+                    throw; // Re-throw to be caught by outer try-catch
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating head tilt element");
+                ValidationMessage = "Error updating head tilt configuration";
+            }
         }
 
         protected override void OnWindowChanged()
@@ -197,8 +328,27 @@ namespace MI_GUI_WinUI.ViewModels
                 // Load poses
                 if (profile.Poses != null)
                 {
+                    // Look for head tilt configuration first
+                    var headTilt = profile.Poses.FirstOrDefault(p => p.File == "head_tilt_joystick.py");
+                    
+                    // Load head tilt first if present
+                    if (headTilt != null)
+                    {
+                        var unifiedElement = UnifiedGuiElement.FromPoseElement(headTilt);
+                        var canvasPosition = ScaleToCanvas(headTilt.Position);
+                        AddElementToCanvas(ElementAddRequest.FromExisting(
+                            unifiedElement,
+                            canvasPosition
+                        ));
+                    }
+
+                    // Load other poses
                     foreach (var pose in profile.Poses)
                     {
+                        // Skip head tilt as it's already handled
+                        if (pose.File == "head_tilt_joystick.py")
+                            continue;
+
                         if (!string.IsNullOrEmpty(pose.Skin))
                         {
                             var unifiedElement = UnifiedGuiElement.FromPoseElement(pose);
@@ -209,6 +359,20 @@ namespace MI_GUI_WinUI.ViewModels
                             ));
                         }
                     }
+                }
+                else
+                {
+                    // If no poses section, ensure head tilt is disabled
+                    var emptyHeadTilt = new PoseGuiElement
+                    {
+                        File = string.Empty,
+                        Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 }
+                    };
+                    var dummyRequest = ElementAddRequest.FromExisting(
+                        UnifiedGuiElement.FromPoseElement(emptyHeadTilt),
+                        new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
+                    );
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
                 }
 
                 ValidationMessage = "Profile loaded successfully";
@@ -283,6 +447,24 @@ namespace MI_GUI_WinUI.ViewModels
                 ProfileName = string.Empty;
                 ValidationMessage = string.Empty;
                 CanvasElements.Clear();
+
+                // Initialize head tilt in disabled state
+                var emptyHeadTilt = new PoseGuiElement
+                {
+                    File = string.Empty,
+                    Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
+                    LeftSkin = "racing/left_arrow.png",
+                    RightSkin = "racing/right_arrow.png",
+                    Sensitivity = 0.75,
+                    Deadzone = 1,
+                    Linear = false
+                };
+
+                // Configure dialog with disabled state to ensure consistency
+                if (_headTiltConfigurationDialog != null)
+                {
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
+                }
             }
             catch (Exception ex)
             {
@@ -298,6 +480,24 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 CanvasElements.Clear();
                 ValidationMessage = string.Empty;
+
+                // Reset head tilt to disabled state
+                var emptyHeadTilt = new PoseGuiElement
+                {
+                    File = string.Empty,
+                    Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
+                    LeftSkin = "racing/left_arrow.png",
+                    RightSkin = "racing/right_arrow.png",
+                    Sensitivity = 0.75,
+                    Deadzone = 1,
+                    Linear = false
+                };
+
+                // Configure dialog with disabled state
+                if (_headTiltConfigurationDialog != null)
+                {
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
+                }
             }
             catch (Exception ex)
             {

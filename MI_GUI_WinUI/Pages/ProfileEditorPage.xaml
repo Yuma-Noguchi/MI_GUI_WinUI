@@ -52,7 +52,11 @@
                              VerticalAlignment="Center"
                              Width="220"
                              HorizontalAlignment="Left"/>
-                        <ToggleButton Content="Head Driving Mode" Click="HeadDrivingMode_Clicked" VerticalAlignment="Bottom"/>
+                        <Button Content="Configure Head Tilt"
+                               Command="{x:Bind ViewModel.ConfigureHeadTiltCommand}"
+                               Style="{ThemeResource AccentButtonStyle}"
+                               VerticalAlignment="Bottom">
+                        </Button>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <Button Click="SaveProfile_Click" Background="{StaticResource SystemFillColorAttentionBrush}" Foreground="White">

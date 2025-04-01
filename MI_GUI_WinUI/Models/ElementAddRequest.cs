@@ -35,6 +35,16 @@ namespace MI_GUI_WinUI.Models
             return new ElementAddRequest(element, position, button);
         }
 
+        public static ElementAddRequest CreateHeadTiltRequest(Point position, int radius)
+        {
+            var element = UnifiedGuiElement.CreateHeadTiltElement(
+                (int)position.X,
+                (int)position.Y,
+                radius
+            );
+            return new ElementAddRequest(element, position);
+        }
+
         public static ElementAddRequest CreatePoseRequest(Point position, int radius)
         {
             var element = UnifiedGuiElement.CreatePoseElement(
