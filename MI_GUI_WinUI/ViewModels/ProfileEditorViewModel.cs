@@ -518,6 +518,20 @@ namespace MI_GUI_WinUI.ViewModels
                 }
 
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(ProfileName);
+
+                // Check for existing profile
+                var profiles = await _profileService.ReadProfilesFromJsonAsync(PROFILES_DIR);
+                var existingProfile = profiles.FirstOrDefault(p => p.Name == sanitizedName);
+                if (!existingProfile.Equals(default(Profile)) && XamlRoot != null)
+                {
+                    var result = await Utils.DialogHelper.ShowConfirmation(
+                        $"A profile named '{sanitizedName}' already exists. Do you want to replace it?",
+                        "Replace Existing Profile?",
+                        XamlRoot);
+
+                    if (!result) return;
+                }
+
                 var profile = new Profile
                 {
                     Name = sanitizedName,
