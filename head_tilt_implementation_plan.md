@@ -1,94 +1,69 @@
-# Head Tilt Position Fix Plan
+# Head Tilt Skin Selection Implementation Plan
 
-## Current Issue
-The head tilt configuration is working but saving fails with a NullReferenceException because the PoseGuiElement from the dialog doesn't have position information.
+## UI Changes (HeadTiltConfigurationDialog.xaml)
+1. Add two ComboBoxes for skin selection:
+   - Left skin selector
+   - Right skin selector
+2. Display skin preview images
+3. Add to existing XAML layout below Sensitivity/Deadzone controls
 
-## Analysis
-1. In UpdateHeadTiltElement method:
+## ViewModel Changes (HeadTiltConfigurationViewModel.cs)
+1. Add new properties:
 ```csharp
-// Error occurs here when using existing element's position
-var updatedInfo = existing.With(
-    element: UnifiedGuiElement.FromPoseElement(headTiltElement)
-        .WithPosition(
-            existing.Element.Position?[0] ?? MOTION_INPUT_WIDTH / 2,  // NullReferenceException
-            existing.Element.Position?[1] ?? MOTION_INPUT_HEIGHT / 2
-        )
-);
+public ObservableCollection<EditorButton> AvailableButtons { get; }
+public EditorButton? SelectedLeftSkin { get; set; }
+public EditorButton? SelectedRightSkin { get; set; }
 ```
 
-## Required Changes
-
-1. HeadTiltConfigurationDialog:
-```mermaid
-graph TD
-    A[Dialog Configuration] --> B[Add Position Tracking]
-    B --> C[Pass Position in PoseGuiElement]
-    
-    subgraph "Position Handling"
-        D[Keep Existing Position]
-        E[Set Default Center Position]
-        F[Pass Position to Dialog]
-    end
-```
-
-2. Implementation Changes:
-   - Add Position handling in HeadTiltConfigurationViewModel
-   - Pass current position to Configure method
-   - Preserve position when updating configuration
-
-## Implementation Steps
-
-1. Update HeadTiltConfigurationDialog.Configure method:
+2. Update Configure method:
 ```csharp
-public void Configure(PoseGuiElement? element, Action<PoseGuiElement> onSave)
+public void Configure(PoseGuiElement element, IEnumerable<EditorButton> buttons, Action<PoseGuiElement> onSave)
 {
-    // Add position preservation
-    if (element?.Position != null)
+    AvailableButtons.Clear();
+    foreach (var button in buttons)
     {
-        _currentPosition = element.Position;
+        AvailableButtons.Add(button);
     }
-    else
-    {
-        _currentPosition = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 };
-    }
-    // Rest of configure logic...
+
+    // Set selected skins based on element
+    SelectedLeftSkin = AvailableButtons.FirstOrDefault(b => 
+        b.FileName == Utils.FileNameHelper.ConvertToAssetsRelativePath(element.LeftSkin));
+    SelectedRightSkin = AvailableButtons.FirstOrDefault(b => 
+        b.FileName == Utils.FileNameHelper.ConvertToAssetsRelativePath(element.RightSkin));
+    ...
 }
 ```
 
-2. Update UpdateHeadTiltElement method:
+3. Update Save method to include selected skins:
 ```csharp
-private void UpdateHeadTiltElement(PoseGuiElement headTiltElement)
+var headTiltElement = new PoseGuiElement
 {
-    // If enabling head tilt, ensure position is set
-    if (!string.IsNullOrEmpty(headTiltElement.File))
-    {
-        headTiltElement.Position = headTiltElement.Position ?? 
-            new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 };
-    }
-    // Rest of update logic...
-}
+    ...
+    LeftSkin = SelectedLeftSkin?.FileName ?? "racing/left_arrow.png",
+    RightSkin = SelectedRightSkin?.FileName ?? "racing/right_arrow.png",
+    ...
+};
 ```
 
-3. Modify Position Handling:
-   - Add position preservation in dialog
-   - Default to center position for new configurations
-   - Keep existing position when updating
+## Calling Code Changes (ProfileEditorViewModel.cs)
+1. Pass button collections to dialog:
+```csharp
+var allButtons = DefaultButtons.Concat(CustomButtons).ToList();
+_headTiltConfigurationDialog.Configure(poseElement, allButtons, UpdateHeadTiltElement);
+```
 
-4. Testing Plan:
-   - Test saving new head tilt configuration
-   - Test updating existing configuration
-   - Verify position persists across saves
-   - Test loading profiles with head tilt
-   - Test edge cases (disabled/enabled transitions)
-
-## Expected Behavior
-1. New head tilt configuration: placed at center of canvas
-2. Updating existing configuration: maintains current position
-3. Disabling head tilt: removes element completely
-4. Re-enabling head tilt: restores last position if available, otherwise uses center
+## Testing Plan
+1. Verify default skins are selected for new head tilt
+2. Test skin selection from both default and custom buttons
+3. Verify skin selections are preserved when:
+   - Saving and loading profiles
+   - Toggling head tilt enable/disable
+   - Switching between profiles
+4. Test UI responsiveness and image preview updates
 
 ## Implementation Order
-1. Add position handling in HeadTiltConfigurationViewModel
-2. Update dialog Configure method
-3. Fix UpdateHeadTiltElement position handling
+1. Update HeadTiltConfigurationDialog.xaml with new UI elements
+2. Update HeadTiltConfigurationViewModel with skin selection support
+3. Modify ProfileEditorViewModel to pass button collections
 4. Test all scenarios
+5. Handle edge cases (missing images, invalid selections)

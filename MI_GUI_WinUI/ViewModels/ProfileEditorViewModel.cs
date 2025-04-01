@@ -47,6 +47,11 @@ namespace MI_GUI_WinUI.ViewModels
         public ObservableCollection<EditorButton> DefaultButtons { get; } = new();
         public ObservableCollection<EditorButton> CustomButtons { get; } = new();
 
+        private IEnumerable<EditorButton> GetAvailableButtons()
+        {
+            return DefaultButtons.Concat(CustomButtons).ToList();
+        }
+
         public ProfileEditorViewModel(
             IProfileService profileService,
             ActionConfigurationDialog actionConfigurationDialog,
@@ -63,6 +68,43 @@ namespace MI_GUI_WinUI.ViewModels
             LoadCustomButtons();
         }
 
+        private PoseGuiElement GetHeadTiltConfiguration()
+        {
+            var existingConfig = CanvasElements
+                .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+
+            if (existingConfig != null && existingConfig.Element != null)
+            {
+                var element = existingConfig.Element.ToPoseElement();
+                
+                // Ensure position is set
+                if (element.Position == null || element.Position.Count != 2)
+                {
+                    var scaledPosition = ScaleToMotionInput(existingConfig.Position);
+                    element.Position = new List<int> { 
+                        (int)scaledPosition.X, 
+                        (int)scaledPosition.Y 
+                    };
+                }
+                return element;
+            }
+
+            // Create new configuration with defaults
+            return new PoseGuiElement
+            {
+                File = string.Empty,  // Empty file indicates disabled state
+                Position = new List<int> { 
+                    MOTION_INPUT_WIDTH / 2, 
+                    MOTION_INPUT_HEIGHT / 2 
+                },
+                Sensitivity = 0.75,
+                Deadzone = 1.0,
+                Linear = false,
+                LeftSkin = "racing/left_arrow.png",
+                RightSkin = "racing/right_arrow.png"
+            };
+        }
+
         [RelayCommand]
         private async Task ConfigureHeadTilt()
         {
@@ -74,41 +116,13 @@ namespace MI_GUI_WinUI.ViewModels
                 }
 
                 _headTiltConfigurationDialog.XamlRoot = XamlRoot;
-
-                // Find existing head tilt configuration
-                var existingConfig = CanvasElements
-                    .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
-
-                PoseGuiElement poseElement;
-                    
-                if (existingConfig != null && existingConfig.Element != null)
-                {
-                    // Use existing configuration
-                    poseElement = existingConfig.Element.ToPoseElement();
-
-                    // Ensure position is set
-                    if (poseElement.Position == null || poseElement.Position.Count != 2)
-                    {
-                        var scaledPosition = ScaleToMotionInput(existingConfig.Position);
-                        poseElement.Position = new List<int> { (int)scaledPosition.X, (int)scaledPosition.Y };
-                    }
-                }
-                else
-                {
-                    // Create new configuration with default values and empty file to indicate disabled state
-                    poseElement = new PoseGuiElement
-                    {
-                        File = string.Empty,  // Empty file indicates disabled state
-                        Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
-                        Sensitivity = 0.75,
-                        Deadzone = 1,
-                        Linear = false,
-                        LeftSkin = "racing/left_arrow.png",
-                        RightSkin = "racing/right_arrow.png"
-                    };
-                }
-
-                _headTiltConfigurationDialog.Configure(poseElement, UpdateHeadTiltElement);
+                var poseElement = GetHeadTiltConfiguration();
+                
+                _headTiltConfigurationDialog.Configure(
+                    poseElement,
+                    GetAvailableButtons(),
+                    UpdateHeadTiltElement
+                );
 
                 await _headTiltConfigurationDialog.ShowAsync();
             }, nameof(ConfigureHeadTilt));
@@ -118,7 +132,6 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
-                // If head tilt is being disabled (empty element)
                 if (string.IsNullOrEmpty(headTiltElement.File))
                 {
                     var existingElement = CanvasElements
@@ -131,20 +144,12 @@ namespace MI_GUI_WinUI.ViewModels
                     return;
                 }
 
-                // Ensure head tilt element has position
-                if (headTiltElement.Position == null || headTiltElement.Position.Count != 2)
-                {
-                    headTiltElement.Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 };
-                }
-
-                // Find existing head tilt element or create new one
                 var existing = CanvasElements
                     .FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
 
                 Point canvasPosition;
                 if (existing != null)
                 {
-                    // Keep existing canvas position
                     canvasPosition = new Point(
                         existing.Position.X,
                         existing.Position.Y
@@ -152,37 +157,23 @@ namespace MI_GUI_WinUI.ViewModels
                 }
                 else
                 {
-                    // Convert motion input position to canvas position
-                    canvasPosition = ScaleToCanvas(headTiltElement.Position);
+                    canvasPosition = new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
                 }
 
-                // Create unified element with all settings
                 var element = UnifiedGuiElement.FromPoseElement(headTiltElement);
-
-                // Create position info for canvas
                 var elementInfo = new UnifiedPositionInfo(
                     element,
                     canvasPosition,
                     new Size(DROPPED_IMAGE_SIZE, DROPPED_IMAGE_SIZE)
                 );
 
-                try
+                var oldElement = CanvasElements.FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
+                if (oldElement != null)
                 {
-                    // Remove the old element first
-                    var oldElement = CanvasElements.FirstOrDefault(e => e.Element.File == "head_tilt_joystick.py");
-                    if (oldElement != null)
-                    {
-                        CanvasElements.Remove(oldElement);
-                    }
+                    CanvasElements.Remove(oldElement);
+                }
 
-                    // Then add the new element
-                    CanvasElements.Add(elementInfo);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error updating head tilt element");
-                    throw; // Re-throw to be caught by outer try-catch
-                }
+                CanvasElements.Add(elementInfo);
             }
             catch (Exception ex)
             {
@@ -194,9 +185,9 @@ namespace MI_GUI_WinUI.ViewModels
         protected override void OnWindowChanged()
         {
             base.OnWindowChanged();
-            if (Window != null)
+            if (Window?.Content?.XamlRoot != null)
             {
-                XamlRoot = Window.Content?.XamlRoot;
+                XamlRoot = Window.Content.XamlRoot;
             }
             else
             {
@@ -260,6 +251,7 @@ namespace MI_GUI_WinUI.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error initializing default buttons");
+                ValidationMessage = "Error loading default buttons";
             }
         }
 
@@ -294,6 +286,7 @@ namespace MI_GUI_WinUI.ViewModels
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading custom buttons");
+                ValidationMessage = "Error loading custom buttons";
             }
         }
 
@@ -343,7 +336,7 @@ namespace MI_GUI_WinUI.ViewModels
                         ));
     
                         // Configure the dialog with loaded settings
-                        _headTiltConfigurationDialog.Configure(headTilt, UpdateHeadTiltElement);
+                        _headTiltConfigurationDialog.Configure(headTilt, GetAvailableButtons(), UpdateHeadTiltElement);
                     }
 
                     // Load other poses
@@ -376,7 +369,7 @@ namespace MI_GUI_WinUI.ViewModels
                         UnifiedGuiElement.FromPoseElement(emptyHeadTilt),
                         new Point(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
                     );
-                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, GetAvailableButtons(), UpdateHeadTiltElement);
                 }
 
                 ValidationMessage = "Profile loaded successfully";
@@ -467,7 +460,7 @@ namespace MI_GUI_WinUI.ViewModels
                 // Configure dialog with disabled state to ensure consistency
                 if (_headTiltConfigurationDialog != null)
                 {
-                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, GetAvailableButtons(), UpdateHeadTiltElement);
                 }
             }
             catch (Exception ex)
@@ -500,7 +493,7 @@ namespace MI_GUI_WinUI.ViewModels
                 // Configure dialog with disabled state
                 if (_headTiltConfigurationDialog != null)
                 {
-                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, UpdateHeadTiltElement);
+                    _headTiltConfigurationDialog.Configure(emptyHeadTilt, GetAvailableButtons(), UpdateHeadTiltElement);
                 }
             }
             catch (Exception ex)

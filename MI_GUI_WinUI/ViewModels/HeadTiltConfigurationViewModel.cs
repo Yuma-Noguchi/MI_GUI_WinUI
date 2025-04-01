@@ -2,22 +2,34 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MI_GUI_WinUI.Models;
 using MI_GUI_WinUI.ViewModels.Base;
-using MI_GUI_WinUI.Services.Interfaces;
-using Microsoft.Extensions.Logging;
-using System;
+using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System;
+using System.Linq;
+using Microsoft.Extensions.Logging;
+using MI_GUI_WinUI.Services.Interfaces;
 
 namespace MI_GUI_WinUI.ViewModels
 {
     public partial class HeadTiltConfigurationViewModel : ViewModelBase
     {
+        private PoseGuiElement _element = new();
         private Action<PoseGuiElement>? _onSave;
-        private PoseGuiElement? _currentElement;
-        private const int MOTION_INPUT_WIDTH = 640;
-        private const int MOTION_INPUT_HEIGHT = 480;
 
         [ObservableProperty]
-        private bool isEnabled;
+        private bool isDialogOpen;
+
+        [ObservableProperty]
+        private string validationMessage = string.Empty;
+
+        [ObservableProperty]
+        private ObservableCollection<EditorButton> availableButtons = new();
+
+        [ObservableProperty]
+        private EditorButton? selectedLeftSkin;
+
+        [ObservableProperty]
+        private EditorButton? selectedRightSkin;
 
         [ObservableProperty]
         private double sensitivity = 0.75;
@@ -26,140 +38,162 @@ namespace MI_GUI_WinUI.ViewModels
         private double deadzone = 1.0;
 
         [ObservableProperty]
-        private bool linear;
+        private bool linear = false;
 
         [ObservableProperty]
-        private string validationMessage = string.Empty;
+        private bool isEnabled;
 
         public bool HasValidationMessage => !string.IsNullOrEmpty(ValidationMessage);
 
         public HeadTiltConfigurationViewModel(
             ILogger<HeadTiltConfigurationViewModel> logger,
-            INavigationService navigationService) 
+            INavigationService navigationService)
             : base(logger, navigationService)
         {
         }
 
-        public void Configure(PoseGuiElement? element, Action<PoseGuiElement> onSave)
-        {
-            _onSave = onSave;
-
-            // Determine enabled state based on file presence
-            IsEnabled = element?.File == "head_tilt_joystick.py";
-
-            // Copy existing settings or use defaults
-            if (element != null)
-            {
-                // Create new instance with same values
-                _currentElement = new PoseGuiElement
-                {
-                    File = element.File,
-                    Position = element.Position ?? new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
-                    Radius = element.Radius,
-                    Skin = element.Skin,
-                    LeftSkin = element.LeftSkin ?? "racing/left_arrow.png",
-                    RightSkin = element.RightSkin ?? "racing/right_arrow.png",
-                    Sensitivity = IsEnabled ? element.Sensitivity : 0.75,
-                    Deadzone = IsEnabled ? element.Deadzone : 1.0,
-                    Linear = IsEnabled && element.Linear,
-                    Landmark = element.Landmark,
-                    Action = element.Action
-                };
-
-                // Update observable properties
-                Sensitivity = IsEnabled ? element.Sensitivity : 0.75;
-                Deadzone = IsEnabled ? element.Deadzone : 1.0;
-                Linear = IsEnabled && element.Linear;
-            }
-            else
-            {
-                // Initialize with defaults
-                _currentElement = new PoseGuiElement
-                {
-                    Position = new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 },
-                    LeftSkin = "racing/left_arrow.png",
-                    RightSkin = "racing/right_arrow.png"
-                };
-
-                // Set default values for controls
-                IsEnabled = false;
-                Sensitivity = 0.75;
-                Deadzone = 1.0;
-                Linear = false;
-            }
-
-            ValidationMessage = string.Empty;
-        }
-
-        [RelayCommand]
-        public void Save()
+        public void Configure(PoseGuiElement? element, IEnumerable<EditorButton> buttons, Action<PoseGuiElement> onSave)
         {
             try
             {
-                if (!IsEnabled)
+                _element = element ?? new PoseGuiElement();
+                _onSave = onSave ?? throw new ArgumentNullException(nameof(onSave));
+
+                // Update available buttons
+                AvailableButtons.Clear();
+                foreach (var button in buttons)
                 {
-                    if (_currentElement?.File == "head_tilt_joystick.py")
-                    {
-                        // Remove head tilt configuration but preserve position
-                        var emptyElement = new PoseGuiElement();
-                        if (_currentElement?.Position != null)
-                        {
-                            emptyElement.Position = new List<int>(_currentElement.Position);
-                        }
-                        _onSave?.Invoke(emptyElement);
-                    }
-                    ValidationMessage = string.Empty;
+                    AvailableButtons.Add(button);
+                }
+
+                // Load element settings
+                IsEnabled = !string.IsNullOrEmpty(element?.File);
+                Sensitivity = element?.Sensitivity ?? 0.75;
+                Deadzone = element?.Deadzone ?? 1.0;
+                Linear = element?.Linear ?? false;
+
+                // Set selected skins
+                SetupSkinSelection(element);
+
+                ValidationMessage = string.Empty;
+                IsDialogOpen = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error configuring head tilt");
+                ValidationMessage = "Error loading configuration";
+            }
+        }
+
+        private void SetupSkinSelection(PoseGuiElement? element)
+        {
+            try
+            {
+                // Default skins
+                string leftSkinPath = "racing/left_arrow.png";
+                string rightSkinPath = "racing/right_arrow.png";
+
+                // Use element skins if available
+                if (element != null)
+                {
+                    if (!string.IsNullOrEmpty(element.LeftSkin))
+                        leftSkinPath = Utils.FileNameHelper.ConvertToAssetsRelativePath(element.LeftSkin);
+                    if (!string.IsNullOrEmpty(element.RightSkin))
+                        rightSkinPath = Utils.FileNameHelper.ConvertToAssetsRelativePath(element.RightSkin);
+                }
+
+                // Find matching buttons
+                SelectedLeftSkin = AvailableButtons.FirstOrDefault(b => b.FileName == leftSkinPath);
+                SelectedRightSkin = AvailableButtons.FirstOrDefault(b => b.FileName == rightSkinPath);
+
+                // Fallback to first button if not found
+                if (SelectedLeftSkin == null && AvailableButtons.Any())
+                    SelectedLeftSkin = AvailableButtons.First();
+                if (SelectedRightSkin == null && AvailableButtons.Any())
+                    SelectedRightSkin = AvailableButtons.First();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting up skin selection");
+                ValidationMessage = "Error loading skins";
+            }
+        }
+
+        [RelayCommand]
+        private void Save()
+        {
+            try
+            {
+                string error = ValidateInputs();
+                if (!string.IsNullOrEmpty(error))
+                {
+                    ValidationMessage = error;
                     return;
                 }
 
-                // Validate settings
-                if (Sensitivity < 0.1 || Sensitivity > 1.0)
+                var updatedElement = new PoseGuiElement
                 {
-                    ValidationMessage = "Sensitivity must be between 0.1 and 1.0";
-                    return;
-                }
-
-                if (Deadzone < 0.1 || Deadzone > 5.0)
-                {
-                    ValidationMessage = "Deadzone must be between 0.1 and 5.0";
-                    return;
-                }
-
-                // Create or update head tilt element
-                var headTiltElement = new PoseGuiElement
-                {
-                    File = "head_tilt_joystick.py",
-                    LeftSkin = "racing/left_arrow.png",
-                    RightSkin = "racing/right_arrow.png",
+                    File = IsEnabled ? "head_tilt_joystick.py" : string.Empty,
+                    LeftSkin = SelectedLeftSkin?.FileName ?? "racing/left_arrow.png",
+                    RightSkin = SelectedRightSkin?.FileName ?? "racing/right_arrow.png",
                     Sensitivity = Sensitivity,
                     Deadzone = Deadzone,
-                    Linear = Linear,
-                    Position = _currentElement?.Position != null ? 
-                        new List<int>(_currentElement.Position) : 
-                        new List<int> { MOTION_INPUT_WIDTH / 2, MOTION_INPUT_HEIGHT / 2 }
+                    Linear = Linear
                 };
 
-                _onSave?.Invoke(headTiltElement);
-                ValidationMessage = string.Empty;
+                _onSave?.Invoke(updatedElement);
+                IsDialogOpen = false;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving head tilt configuration");
-                ValidationMessage = "Error saving configuration: " + ex.Message;
+                ValidationMessage = "Error saving configuration";
             }
         }
 
-        public override void Cleanup()
+        private string ValidateInputs()
         {
-            _onSave = null;
-            _currentElement = null;
-            ValidationMessage = string.Empty;
-            base.Cleanup();
+            if (!IsEnabled)
+                return string.Empty;
+
+            if (Sensitivity < 0.1 || Sensitivity > 1.0)
+                return "Sensitivity must be between 0.1 and 1.0";
+
+            if (Deadzone < 0.1 || Deadzone > 5.0)
+                return "Deadzone must be between 0.1 and 5.0";
+
+            if (SelectedLeftSkin == null)
+                return "Please select a left tilt image";
+
+            if (SelectedRightSkin == null)
+                return "Please select a right tilt image";
+
+            return string.Empty;
+        }
+
+        [RelayCommand]
+        private void Cancel()
+        {
+            IsDialogOpen = false;
         }
 
         partial void OnValidationMessageChanged(string value)
         {
             OnPropertyChanged(nameof(HasValidationMessage));
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                AvailableButtons.Clear();
+                _onSave = null;
+                base.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
         }
     }
 }
