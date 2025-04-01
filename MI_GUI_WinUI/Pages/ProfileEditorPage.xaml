@@ -44,13 +44,16 @@
                             CornerRadius="8"
                             Padding="16"
                             Spacing="12">
-                    <TextBox 
-                        Header="Profile Name"
-                        PlaceholderText="Enter profile name"
-                         Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         VerticalAlignment="Center"
-                         Width="380"
-                         HorizontalAlignment="Left"/>
+                    <StackPanel Orientation="Horizontal" Spacing="15">
+                        <TextBox 
+                            Header="Profile Name"
+                            PlaceholderText="Enter profile name"
+                             Text="{x:Bind ViewModel.ProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"
+                             Width="220"
+                             HorizontalAlignment="Left"/>
+                        <ToggleButton Content="Head Driving Mode" Click="HeadDrivingMode_Clicked" VerticalAlignment="Bottom"/>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <Button Click="SaveProfile_Click" Background="{StaticResource SystemFillColorAttentionBrush}" Foreground="White">
                             <StackPanel Orientation="Horizontal" Spacing="5">
