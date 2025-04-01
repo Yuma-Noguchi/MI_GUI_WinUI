@@ -272,6 +272,8 @@ namespace MI_GUI_WinUI.ViewModels
             ErrorMessage = string.Empty;
             InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
 
+            var wasInitialized = _modelManager.IsInitialized;
+            
             try
             {
                 await _modelManager.EnsureInitializedAsync(UseGpu);
@@ -281,20 +283,26 @@ namespace MI_GUI_WinUI.ViewModels
                 InitializationFailed = false;
                 IsPreInitialization = false;
 
-                if (XamlRoot != null && UseGpu && _sdService.UsingCpuFallback)
+                if (XamlRoot != null)
                 {
-                    await Utils.DialogHelper.ShowMessage(
-                        "GPU acceleration was not available or failed to initialize.\n\n" +
-                        "The application will run using CPU instead, which may be significantly slower.",
-                        "Using CPU Mode",
-                        XamlRoot);
-                }
-                else
-                {
-                    await Utils.DialogHelper.ShowMessage(
-                        $"Stable Diffusion initialized successfully with GPU acceleration.",
-                        "Initialization Complete",
-                        XamlRoot);
+                    if (!wasInitialized)
+                    {
+                        if (UseGpu && _sdService.UsingCpuFallback)
+                        {
+                            await Utils.DialogHelper.ShowMessage(
+                                "GPU acceleration was not available or failed to initialize.\n\n" +
+                                "The application will run using CPU instead, which may be significantly slower.",
+                                "Using CPU Mode",
+                                XamlRoot);
+                        }
+                        else
+                        {
+                            await Utils.DialogHelper.ShowMessage(
+                                $"Stable Diffusion initialized successfully with GPU acceleration.",
+                                "Initialization Complete",
+                                XamlRoot);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
