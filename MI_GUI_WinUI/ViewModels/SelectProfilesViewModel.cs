@@ -78,17 +78,24 @@ namespace MI_GUI_WinUI.ViewModels
 
             public ProfilePreview Clone()
             {
-                return ProfilePreview.Create(CloneCanvas(this.Canvas), this.ProfileName);
+                return Clone(TARGET_WIDTH, TARGET_HEIGHT);
             }
 
-            private static Canvas CloneCanvas(Canvas original)
+            public ProfilePreview Clone(double targetWidth, double targetHeight)
             {
-                double popupScaleFactor = GAME_HEIGHT / TARGET_HEIGHT;
+                return ProfilePreview.Create(CloneCanvas(this.Canvas, targetWidth, targetHeight), this.ProfileName);
+            }
 
+            private static Canvas CloneCanvas(Canvas original, double targetWidth, double targetHeight)
+            {
+                // Calculate the scale factor based on the target dimensions
+                double scaleFactorX = targetWidth / GAME_WIDTH;
+                double scaleFactorY = targetHeight / GAME_HEIGHT;
+                
                 Canvas clone = new Canvas
                 {
-                    Width = GAME_WIDTH,
-                    Height = GAME_HEIGHT,
+                    Width = targetWidth,
+                    Height = targetHeight,
                     Background = original.Background,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
@@ -98,16 +105,41 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     if (child is Image originalImage)
                     {
+                        double originalX, originalY;
+                        
+                        // Get the current position, or default to centered if not specified
+                        if (double.IsNaN(Canvas.GetLeft(originalImage)))
+                        {
+                            originalX = GAME_WIDTH / 2;
+                        }
+                        else
+                        {
+                            // Convert from scaled position back to original game coordinates
+                            originalX = Canvas.GetLeft(originalImage) / SCALE_FACTOR + (originalImage.Width / (2 * SCALE_FACTOR));
+                        }
+                        
+                        if (double.IsNaN(Canvas.GetTop(originalImage)))
+                        {
+                            originalY = GAME_HEIGHT / 2;
+                        }
+                        else
+                        {
+                            // Convert from scaled position back to original game coordinates
+                            originalY = Canvas.GetTop(originalImage) / SCALE_FACTOR + (originalImage.Height / (2 * SCALE_FACTOR));
+                        }
+
+                        // Create new image with scaled dimensions
                         Image clonedImage = new Image
                         {
                             Source = originalImage.Source,
-                            Width = originalImage.Width * popupScaleFactor,
-                            Height = originalImage.Height * popupScaleFactor,
+                            Width = originalImage.Width / SCALE_FACTOR * scaleFactorX,
+                            Height = originalImage.Height / SCALE_FACTOR * scaleFactorY,
                             Stretch = originalImage.Stretch
                         };
 
-                        Canvas.SetLeft(clonedImage, Canvas.GetLeft(originalImage) * popupScaleFactor);
-                        Canvas.SetTop(clonedImage, Canvas.GetTop(originalImage) * popupScaleFactor);
+                        // Position the element in the new canvas, accounting for the element's size
+                        Canvas.SetLeft(clonedImage, (originalX * scaleFactorX) - (clonedImage.Width / 2));
+                        Canvas.SetTop(clonedImage, (originalY * scaleFactorY) - (clonedImage.Height / 2));
 
                         clone.Children.Add(clonedImage);
                     }
@@ -154,24 +186,20 @@ namespace MI_GUI_WinUI.ViewModels
         {
             try
             {
-                // Get the dispatcher for the UI thread
                 var dispatcher = DispatcherQueue.GetForCurrentThread();
-                
-                // If we're on the UI thread, clear directly
+
                 if (dispatcher != null)
                 {
                     SafelyClearProfiles();
                 }
-                // Otherwise queue it to the UI thread if Window is available
                 else if (Window != null && Window.DispatcherQueue != null)
                 {
-                    Window.DispatcherQueue.TryEnqueue(() => 
+                    Window.DispatcherQueue.TryEnqueue(() =>
                     {
                         SafelyClearProfiles();
                     });
                 }
-                
-                // Clear other resources safely
+
                 _previewCache.Clear();
                 _previewLock.Dispose();
                 foreach (var preview in previews)
@@ -179,7 +207,7 @@ namespace MI_GUI_WinUI.ViewModels
                     preview.Canvas.Children.Clear();
                 }
                 previews.Clear();
-                
+
                 base.Cleanup();
                 _logger.LogInformation("SelectProfilesViewModel cleaned up successfully");
             }
@@ -188,25 +216,22 @@ namespace MI_GUI_WinUI.ViewModels
                 _logger.LogError(ex, "Error cleaning up SelectProfilesViewModel");
             }
         }
-        
+
         private void SafelyClearProfiles()
         {
             try
             {
-                // Clear the preview collection safely
                 if (previews != null)
                 {
                     previews.Clear();
                 }
-                
-                // Clear the private lists
+
                 _profiles?.Clear();
                 _filteredProfiles?.Clear();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error clearing profile collections");
-                // Suppress the exception - we don't want cleanup to throw
             }
         }
 
@@ -262,7 +287,8 @@ namespace MI_GUI_WinUI.ViewModels
             await ExecuteWithErrorHandlingAsync(async () =>
             {
                 await ClosePopupAsync();
-                SelectedProfilePreview = preview.Clone();
+
+                SelectedProfilePreview = preview.Clone(560, 400);
                 IsPopupOpen = true;
             }, nameof(OpenPopupAsync));
         }
@@ -469,7 +495,7 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     IsLoading = true;
                     ErrorMessage = null;
-                    
+
                     _logger.LogInformation($"Starting deletion of profile: {profileName}");
 
                     _previewCache.Clear();
@@ -501,12 +527,12 @@ namespace MI_GUI_WinUI.ViewModels
             {
                 var profileName = SelectedProfilePreview.ProfileName.Replace(" ", "_");
                 StorageFolder installedLocation = Windows.ApplicationModel.Package.Current.InstalledLocation;
-                
+
                 string sourcePath = Path.Combine(profilesFolderPath, $"{profileName}.json");
                 string destPath = Path.Combine("MotionInput\\data\\modes", $"{profileName}.json");
-                
+
                 _logger.LogInformation($"Attempting to copy from '{sourcePath}' to '{destPath}'");
-                
+
                 StorageFile sourceFile = await installedLocation.GetFileAsync(sourcePath);
                 StorageFile destFile = await installedLocation.CreateFileAsync(destPath, CreationCollisionOption.ReplaceExisting);
 
