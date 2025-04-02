@@ -64,18 +64,18 @@ jobs:
     - name: Install Windows App SDK
       shell: pwsh
       run: |
-        Write-Host "Installing Windows App SDK workloads..."
-        dotnet workload install microsoft-windows-sdk-net-8.0
-        dotnet workload install win10-x64
-        dotnet workload install win10-x86
-        dotnet workload install windows
-        dotnet workload install wasm-tools
-        dotnet workload install winui
+        Write-Host "Installing Windows App SDK components..."
+        
+        # Install only the necessary WinUI components
+        dotnet workload install microsoft-windowsdesktop-sdk-net
+        dotnet workload install microsoft-windowsdesktop-runtime-8.0.100-winui
+        
+        # Verify installation
         Write-Host "Installed workloads:"
         dotnet workload list
         
     - name: Cache NuGet packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
@@ -84,7 +84,7 @@ jobs:
           
     - name: Echo GPU Vendor
       run: |
-        Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}"
+        Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}
           
     - name: Restore
       run: |
@@ -93,10 +93,11 @@ jobs:
       
     - name: Build
       run: |
-        msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /v:detailed
+        msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
       
     - name: Run GPU Tests
       if: success()
+      timeout-minutes: 30
       run: |
         dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
           --filter "TestCategory=RequiresGpu" `
