@@ -112,7 +112,7 @@ jobs:
       
     - name: Run GPU Tests
       if: success()
-      timeout-minutes: 30
+      timeout-minutes: 10
       run: |
         # Add diagnostics to help debug issues
         Write-Host "GPU Info:"
