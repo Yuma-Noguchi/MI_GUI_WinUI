@@ -93,6 +93,10 @@ jobs:
       
     - name: Build
       run: |
+        # First build the native DirectXAdapterSelector project
+        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+        
+        # Then build the main solution
         msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
       
     - name: Run GPU Tests
