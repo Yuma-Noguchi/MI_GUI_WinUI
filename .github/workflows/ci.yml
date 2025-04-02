@@ -57,6 +57,24 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
+
+    - name: Setup Windows SDK
+      uses: actions/setup-windows-sdk-action@v1
+      with:
+        sdk-version: 22621
+
+    - name: Install Windows App SDK
+      shell: pwsh
+      run: |
+        Write-Host "Installing Windows App SDK workloads..."
+        dotnet workload install microsoft-windows-sdk-net-8.0
+        dotnet workload install win10-x64
+        dotnet workload install win10-x86
+        dotnet workload install windows
+        dotnet workload install wasm-tools
+        dotnet workload install winui
+        Write-Host "Installed workloads:"
+        dotnet workload list
         
     - name: Cache NuGet packages
       uses: actions/cache@v3
@@ -71,35 +89,41 @@ jobs:
         Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}"
           
     - name: Restore
-      run: dotnet restore
+      run: |
+        nuget restore MI_GUI_WinUI.sln
+        dotnet restore MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj -v detailed
       
     - name: Build
-      run: dotnet build --configuration ${{ matrix.configuration }} --no-restore
+      run: |
+        msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /v:detailed
       
     - name: Run GPU Tests
+      if: success()
       run: |
-        dotnet test `
+        dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
           --filter "TestCategory=RequiresGpu" `
           --configuration ${{ matrix.configuration }} `
           --no-build `
-          --verbosity normal `
+          --verbosity detailed `
           --logger "trx;LogFileName=gpu-tests.trx" `
           --collect:"XPlat Code Coverage"
       env:
         GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
 
     - name: Run Performance Tests
+      if: success()
       run: |
-        dotnet test `
+        dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
           --filter "TestCategory=Performance" `
           --configuration ${{ matrix.configuration }} `
           --no-build `
-          --verbosity normal `
+          --verbosity detailed `
           --logger "trx;LogFileName=performance-tests.trx"
           
     - name: Run Benchmarks
+      if: success()
       run: |
-        dotnet run --project MI_GUI_WinUI.Tests `
+        dotnet run --project MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
           --filter "*Benchmark*" `
           --configuration Release `
           -- --job short --runtimes net8.0
