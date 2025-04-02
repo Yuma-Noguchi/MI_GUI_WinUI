@@ -136,6 +136,7 @@ jobs:
           Write-Host "============= Test Diagnostics Log ============="
           Get-Content "test_log.txt" | Select-Object -Last 100
           Write-Host "============================================="
+        }
       env:
         GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
 
