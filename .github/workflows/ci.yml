@@ -84,7 +84,7 @@ jobs:
           
     - name: Echo GPU Vendor
       run: |
-        Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}
+        Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}"
           
     - name: Restore
       run: |
