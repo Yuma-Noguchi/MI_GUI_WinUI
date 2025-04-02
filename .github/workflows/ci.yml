@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  detect-gpu:
+    runs-on: windows-latest
+    outputs:
+      gpu-vendor: ${{ steps.gpu-detect.outputs.gpu-vendor }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: GPU Detection
+      id: gpu-detect
+      shell: pwsh
+      run: |
+        $gpu = Get-WmiObject Win32_VideoController
+        if ($gpu.Name -match "NVIDIA") {
+            echo "::set-output name=gpu-vendor::nvidia"
+        } elseif ($gpu.Name -match "AMD") {
+            echo "::set-output name=gpu-vendor::amd"
+        } elseif ($gpu.Name -match "Intel") {
+            echo "::set-output name=gpu-vendor::intel"
+        } else {
+            echo "::set-output name=gpu-vendor::none"
+        }
+
+  build-and-test:
+    needs: detect-gpu
+    if: needs.detect-gpu.outputs.gpu-vendor != 'none'
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Release]
+        platform: [x64]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Restore
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --configuration ${{ matrix.configuration }} --no-restore
+      
+    - name: Run GPU Tests
+      run: |
+        dotnet test `
+          --filter "TestCategory=RequiresGpu" `
+          --configuration ${{ matrix.configuration }} `
+          --no-build `
+          --verbosity normal `
+          --logger "trx;LogFileName=gpu-tests.trx" `
+          --collect:"XPlat Code Coverage"
+      env:
+        GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
+
+    - name: Run Performance Tests
+      run: |
+        dotnet test `
+          --filter "TestCategory=Performance" `
+          --configuration ${{ matrix.configuration }} `
+          --no-build `
+          --verbosity normal `
+          --logger "trx;LogFileName=performance-tests.trx"
+          
+    - name: Run Benchmarks
+      run: |
+        dotnet run --project MI_GUI_WinUI.Tests `
+          --filter "*Benchmark*" `
+          --configuration Release `
+          -- --job short --runtimes net8.0
+
+    - name: Upload Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.platform }}
+        path: |
+          **/TestResults/*.trx
+          **/TestResults/**/coverage.cobertura.xml
+          **/BenchmarkDotNet.Artifacts/**/*

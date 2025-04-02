@@ -18,6 +18,21 @@
             "stopAtEntry": false
         },
         {
+            "name": ".NET Core Test with debugger",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-tests",
+            "program": "dotnet",
+            "args": [
+                "test", 
+                "${workspaceFolder}/MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj",
+                "/property:Platform=x64"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"

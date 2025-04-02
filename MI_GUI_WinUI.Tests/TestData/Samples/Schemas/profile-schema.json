@@ -1,0 +1,116 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["name", "description", "version", "createdAt", "modifiedAt", "elements"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+        },
+        "description": {
+            "type": "string",
+            "maxLength": 500
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "settings": {
+            "type": "object",
+            "properties": {
+                "inputSensitivity": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 2.0
+                },
+                "smoothing": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "debounceTime": {
+                    "type": "number",
+                    "minimum": 0
+                }
+            }
+        },
+        "elements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "type", "name", "x", "y", "radius"],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9-_]+$"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["GuiElement", "PoseElement"]
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "x": {
+                        "type": "number"
+                    },
+                    "y": {
+                        "type": "number"
+                    },
+                    "radius": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "action": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["click", "keypress", "sequence"]
+                            },
+                            "duration": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        }
+                    },
+                    "poseData": {
+                        "type": "object",
+                        "required": ["confidence", "landmarks"],
+                        "properties": {
+                            "confidence": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "landmarks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": ["x", "y", "z"],
+                                    "properties": {
+                                        "x": { "type": "number" },
+                                        "y": { "type": "number" },
+                                        "z": { "type": "number" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

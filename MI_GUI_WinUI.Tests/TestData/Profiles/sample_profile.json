@@ -1,0 +1,22 @@
+{
+    "name": "Sample Profile",
+    "description": "A sample profile for testing",
+    "elements": [
+        {
+            "type": "GuiElement",
+            "x": 100,
+            "y": 100,
+            "radius": 30,
+            "name": "Button1"
+        },
+        {
+            "type": "PoseElement",
+            "x": 200,
+            "y": 200,
+            "radius": 40,
+            "name": "Pose1"
+        }
+    ],
+    "createdAt": "2024-04-02T00:00:00Z",
+    "modifiedAt": "2024-04-02T00:00:00Z"
+}

@@ -1,0 +1,157 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["actions", "metadata"],
+    "properties": {
+        "actions": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "required": ["id", "name", "type", "args"],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9-_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "MouseAction",
+                            "KeyboardAction",
+                            "SequenceAction",
+                            "PoseAction",
+                            "ConditionalAction"
+                        ]
+                    },
+                    "args": {
+                        "type": "object",
+                        "oneOf": [
+                            {
+                                "if": { "properties": { "type": { "const": "MouseAction" } } },
+                                "then": {
+                                    "required": ["button", "x", "y"],
+                                    "properties": {
+                                        "button": { "enum": ["Left", "Right", "Middle"] },
+                                        "x": { "type": "number" },
+                                        "y": { "type": "number" },
+                                        "duration": { "type": "number", "minimum": 0 },
+                                        "clickType": { "enum": ["Single", "Double", "Hold"] }
+                                    }
+                                }
+                            },
+                            {
+                                "if": { "properties": { "type": { "const": "KeyboardAction" } } },
+                                "then": {
+                                    "required": ["key"],
+                                    "properties": {
+                                        "key": { "type": "string" },
+                                        "modifiers": {
+                                            "type": "array",
+                                            "items": {
+                                                "enum": ["Control", "Shift", "Alt", "Windows"]
+                                            }
+                                        },
+                                        "duration": { "type": "number", "minimum": 0 },
+                                        "repeat": { "type": "number", "minimum": 1 }
+                                    }
+                                }
+                            },
+                            {
+                                "if": { "properties": { "type": { "const": "SequenceAction" } } },
+                                "then": {
+                                    "required": ["actions"],
+                                    "properties": {
+                                        "actions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "required": ["id", "type", "args"],
+                                                "properties": {
+                                                    "id": { "type": "string" },
+                                                    "type": { "enum": ["MouseAction", "KeyboardAction"] },
+                                                    "args": { "type": "object" }
+                                                }
+                                            }
+                                        },
+                                        "delay": { "type": "number", "minimum": 0 }
+                                    }
+                                }
+                            },
+                            {
+                                "if": { "properties": { "type": { "const": "PoseAction" } } },
+                                "then": {
+                                    "required": ["poseType", "threshold", "targetAction"],
+                                    "properties": {
+                                        "poseType": { "enum": ["HeadTilt", "HandRaise", "EyeBlink"] },
+                                        "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+                                        "duration": { "type": "number", "minimum": 0 },
+                                        "cooldown": { "type": "number", "minimum": 0 },
+                                        "targetAction": {
+                                            "type": "object",
+                                            "required": ["type", "args"],
+                                            "properties": {
+                                                "type": { "enum": ["MouseAction", "KeyboardAction"] },
+                                                "args": { "type": "object" }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "if": { "properties": { "type": { "const": "ConditionalAction" } } },
+                                "then": {
+                                    "required": ["condition", "trueAction", "falseAction"],
+                                    "properties": {
+                                        "condition": {
+                                            "type": "object",
+                                            "required": ["type"],
+                                            "properties": {
+                                                "type": { "enum": ["PoseCondition", "TimeCondition", "StateCondition"] },
+                                                "poseType": { "enum": ["HeadTilt", "HandRaise", "EyeBlink"] },
+                                                "threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+                                            }
+                                        },
+                                        "trueAction": {
+                                            "type": "object",
+                                            "required": ["type", "args"]
+                                        },
+                                        "falseAction": {
+                                            "type": "object",
+                                            "required": ["type", "args"]
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "metadata": {
+            "type": "object",
+            "required": ["version", "createdAt", "lastModified"],
+            "properties": {
+                "version": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+                },
+                "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "lastModified": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

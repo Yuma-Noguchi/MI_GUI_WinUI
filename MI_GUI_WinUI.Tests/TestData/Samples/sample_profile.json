@@ -1,0 +1,41 @@
+{
+    "name": "Sample Test Profile",
+    "description": "A sample profile for testing",
+    "version": "1.0",
+    "createdAt": "2025-04-02T00:00:00Z",
+    "modifiedAt": "2025-04-02T00:00:00Z",
+    "settings": {
+        "inputSensitivity": 1.0,
+        "smoothing": 0.5,
+        "debounceTime": 100
+    },
+    "elements": [
+        {
+            "id": "test-element-1",
+            "type": "GuiElement",
+            "name": "TestButton1",
+            "x": 100,
+            "y": 100,
+            "radius": 30,
+            "action": {
+                "type": "click",
+                "duration": 100
+            }
+        },
+        {
+            "id": "test-element-2",
+            "type": "PoseElement",
+            "name": "TestPose1",
+            "x": 200,
+            "y": 200,
+            "radius": 40,
+            "poseData": {
+                "confidence": 0.95,
+                "landmarks": [
+                    {"x": 0, "y": 0, "z": 0},
+                    {"x": 1, "y": 1, "z": 1}
+                ]
+            }
+        }
+    ]
+}

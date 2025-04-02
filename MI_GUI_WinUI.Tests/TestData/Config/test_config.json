@@ -1,0 +1,40 @@
+{
+    "test": {
+        "useGpu": false,
+        "imageSize": 512,
+        "batchSize": 1,
+        "modelPath": "./TestData/Models",
+        "outputPath": "./TestData/Output",
+        "timeouts": {
+            "imageGeneration": 30000,
+            "modelLoading": 10000,
+            "profileSave": 5000
+        }
+    },
+    "services": {
+        "stableDiffusion": {
+            "defaultPrompt": "test image",
+            "modelVariant": "fp16",
+            "useDirectML": false
+        },
+        "action": {
+            "maxDuration": 5000,
+            "delayBetweenActions": 100
+        },
+        "profile": {
+            "maxElements": 100,
+            "autosaveInterval": 300000
+        }
+    },
+    "performance": {
+        "targets": {
+            "imageGeneration": 5000,
+            "profileLoad": 500,
+            "actionExecution": 100
+        },
+        "memoryLimits": {
+            "imageGeneration": 2048,
+            "general": 512
+        }
+    }
+}
