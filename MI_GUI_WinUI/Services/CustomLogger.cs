@@ -30,7 +30,28 @@ namespace MI_GUI_WinUI.Services
 
             var message = formatter(state, exception);
             var logMessage = $"[{_categoryName}] [{logLevel}] {message}";
-            _loggingService.Log(logMessage, exception);
+
+            switch (logLevel)
+            {
+                case LogLevel.Critical:
+                    _loggingService.LogCritical(exception, logMessage);
+                    break;
+                case LogLevel.Error:
+                    _loggingService.LogError(exception, logMessage);
+                    break;
+                case LogLevel.Warning:
+                    _loggingService.LogWarning(logMessage);
+                    break;
+                case LogLevel.Information:
+                    _loggingService.LogInformation(logMessage);
+                    break;
+                case LogLevel.Debug:
+                    _loggingService.LogDebug(logMessage);
+                    break;
+                default:
+                    _loggingService.LogInformation(logMessage);
+                    break;
+            }
         }
     }
 
@@ -45,7 +66,8 @@ namespace MI_GUI_WinUI.Services
 
         public ILogger CreateLogger(string categoryName)
         {
-            return new CustomLogger<object>(_loggingService);
+            var loggerType = typeof(CustomLogger<>).MakeGenericType(Type.GetType(categoryName) ?? typeof(object));
+            return (ILogger)Activator.CreateInstance(loggerType, _loggingService);
         }
 
         public void Dispose()

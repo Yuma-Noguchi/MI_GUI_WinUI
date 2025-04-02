@@ -1,0 +1,63 @@
+{
+    "prompts": {
+        "icons": [
+            {
+                "name": "simple_house",
+                "prompt": "A simple minimalist house icon, clean lines, white background",
+                "negative_prompt": "complex, detailed, photorealistic",
+                "parameters": {
+                    "steps": 20,
+                    "guidance_scale": 7.5
+                }
+            },
+            {
+                "name": "geometric_shape",
+                "prompt": "Abstract geometric pattern, simple shapes, symmetrical design",
+                "negative_prompt": "organic, natural, complex",
+                "parameters": {
+                    "steps": 20,
+                    "guidance_scale": 7.5
+                }
+            },
+            {
+                "name": "simple_face",
+                "prompt": "Simple line art face icon, minimalist design",
+                "negative_prompt": "detailed, realistic, photograph",
+                "parameters": {
+                    "steps": 20,
+                    "guidance_scale": 7.5
+                }
+            }
+        ],
+        "validation": [
+            {
+                "name": "empty_prompt",
+                "prompt": "",
+                "expected_error": "prompt_empty"
+            },
+            {
+                "name": "very_long_prompt",
+                "prompt": "This is a very long prompt that exceeds the maximum allowed length and should trigger a validation error when testing the stable diffusion service",
+                "expected_error": "prompt_too_long"
+            }
+        ],
+        "performance": [
+            {
+                "name": "quick_generation",
+                "prompt": "Simple circle",
+                "parameters": {
+                    "steps": 10,
+                    "guidance_scale": 7.0
+                }
+            },
+            {
+                "name": "complex_generation",
+                "prompt": "Detailed geometric mandala pattern",
+                "parameters": {
+                    "steps": 30,
+                    "guidance_scale": 8.0
+                }
+            }
+        ]
+    }
+}

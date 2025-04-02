@@ -1,0 +1,23 @@
+{
+    "actions": {
+        "action1": {
+            "id": "action1",
+            "name": "Test Action 1",
+            "args": {
+                "button": "Left",
+                "x": 100,
+                "y": 100,
+                "duration": 500
+            }
+        },
+        "action2": {
+            "id": "action2",
+            "name": "Test Action 2",
+            "args": {
+                "keyCode": "A",
+                "modifiers": ["Ctrl", "Shift"],
+                "duration": 100
+            }
+        }
+    }
+}

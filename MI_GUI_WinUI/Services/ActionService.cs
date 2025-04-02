@@ -2,23 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MI_GUI_WinUI.Models;
+using MI_GUI_WinUI.Services.Interfaces;
 using Newtonsoft.Json;
 using System.Linq;
 
 namespace MI_GUI_WinUI.Services
 {
-    public class ActionService
+    /// <summary>
+    /// Implementation of IActionService for managing action data operations
+    /// </summary>
+    public class ActionService : IActionService
     {
         private readonly ILogger<ActionService> _logger;
-        private readonly string ACTIONS_FILE;
+        private readonly string _actionsFile;
         private Dictionary<string, ActionData> _actions = new();
 
         public ActionService(ILogger<ActionService> logger)
         {
             _logger = logger;
-            ACTIONS_FILE = Path.Combine(
+            _actionsFile = Path.Combine(
                 Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
                 "MotionInput", "data", "actions", "actions.json"
             );
@@ -27,7 +32,7 @@ namespace MI_GUI_WinUI.Services
 
         private void EnsureActionsFolderExists()
         {
-            var directory = Path.GetDirectoryName(ACTIONS_FILE);
+            var directory = Path.GetDirectoryName(_actionsFile);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -38,14 +43,14 @@ namespace MI_GUI_WinUI.Services
         {
             try
             {
-                if (!File.Exists(ACTIONS_FILE))
+                if (!File.Exists(_actionsFile))
                 {
                     _logger.LogInformation("Actions file not found, creating new one");
                     await SaveActionsToFileAsync();
                     return new List<ActionData>();
                 }
 
-                var json = await File.ReadAllTextAsync(ACTIONS_FILE);
+                var json = await File.ReadAllTextAsync(_actionsFile);
                 var settings = new JsonSerializerSettings
                 {
                     NullValueHandling = NullValueHandling.Ignore,
@@ -75,7 +80,7 @@ namespace MI_GUI_WinUI.Services
                 };
 
                 var json = JsonConvert.SerializeObject(_actions, settings);
-                await File.WriteAllTextAsync(ACTIONS_FILE, json);
+                await File.WriteAllTextAsync(_actionsFile, json);
             }
             catch (Exception ex)
             {

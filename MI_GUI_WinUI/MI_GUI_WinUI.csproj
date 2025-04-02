@@ -69,6 +69,7 @@
 <ItemGroup>
 <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 <PackageReference Include="CommunityToolkit.WinUI.Converters" Version="8.1.240916" />
+<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.3" />
 <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
 <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
 <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />

@@ -3,10 +3,13 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Windows.Storage;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels.Base;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -15,14 +18,14 @@ using System.Linq;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class IconStudioViewModel : ObservableObject
+    public partial class IconStudioViewModel : ViewModelBase
     {
         private XamlRoot? _xamlRoot;
-        private readonly ILogger<IconStudioViewModel> _logger;
-        private readonly INavigationService _navigationService;
-        private readonly StableDiffusionService _sdService;
+        private readonly IStableDiffusionService _sdService;
         private bool _executingInference;
         private string[] _currentImagePaths = Array.Empty<string>();
+        private string helperPrompt = "{}";
+        private readonly StableDiffusionModelManager _modelManager;
 
         public XamlRoot? XamlRoot
         {
@@ -81,108 +84,45 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        public double ProgressPercentage => _sdService.Percentage;
-
-        public IconStudioViewModel(
-            StableDiffusionService sdService,
-            ILogger<IconStudioViewModel> logger,
-            INavigationService navigationService)
-        {
-            _sdService = sdService;
-            _logger = logger;
-            _navigationService = navigationService;
-
-            // Subscribe to service's percentage changes
-            _sdService.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(StableDiffusionService.Percentage))
-                {
-                    OnPropertyChanged(nameof(ProgressPercentage));
-                }
-            };
-        }
-
-        public async Task InitializeAsync()
-        {
-            if (_sdService.IsInitialized)
-            {
-                IsPreInitialization = false;
-                return;
-            }
-
-            try
-            {
-                IsInitializing = true;
-                IsPreInitialization = true;
-                InitializationFailed = false;
-                ErrorMessage = string.Empty;
-
-                InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
-                await _sdService.Initialize(UseGpu);
-
-                InitializationStatus = "Initialization complete";
-                InitializationFailed = false;
-                IsPreInitialization = false;
-
-                if (XamlRoot != null)
-                {
-                    // Check if we fell back to CPU
-                    if (UseGpu && _sdService.UsingCpuFallback)
-                    {
-                        await Utils.DialogHelper.ShowMessage(
-                            "GPU acceleration was not available or failed to initialize.\n\n" +
-                            "The application will run using CPU instead, which may be significantly slower.",
-                            "Using CPU Mode",
-                            XamlRoot);
-                    }
-                    else
-                    {
-                        await Utils.DialogHelper.ShowMessage(
-                            $"Stable Diffusion initialized successfully with {(_sdService.UsingCpuFallback ? "CPU" : "GPU")} acceleration.",
-                            "Initialization Complete",
-                            XamlRoot);
-                    }
-                }
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                _logger.LogError(ex, "AI Models directory not found");
-                InitializationFailed = true;
-                ErrorMessage = "AI Models directory not found. Please ensure the models are properly installed.";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
-            }
-            catch (FileNotFoundException ex)
-            {
-                _logger.LogError(ex, "Required model file not found");
-                InitializationFailed = true;
-                ErrorMessage = $"Required model file not found: {Path.GetFileName(ex.FileName)}. Please ensure all model files are present.";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to initialize Icon Studio");
-                InitializationFailed = true;
-                ErrorMessage = $"Failed to initialize Icon Studio with {(UseGpu ? "GPU" : "CPU")}. {ex.Message}";
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
-                }
-            }
-            finally
-            {
-                IsInitializing = false;
-            }
-        }
+        public double ProgressPercentage => _sdService?.Percentage ?? 0;
 
         public bool IsNotGenerating => !IsGenerating;
         public bool IsReady => _sdService.IsInitialized && !IsInitializing;
         public bool CanGenerate => IsReady && !IsGenerating && !string.IsNullOrWhiteSpace(InputDescription);
+
+        public IconStudioViewModel(
+            IStableDiffusionService sdService,
+            ILogger<IconStudioViewModel> logger,
+            INavigationService navigationService)
+            : base(logger, navigationService)
+        {
+            _sdService = sdService ?? throw new ArgumentNullException(nameof(sdService));
+            _modelManager = StableDiffusionModelManager.Instance;
+
+            if (_sdService is INotifyPropertyChanged npc)
+            {
+                npc.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(IStableDiffusionService.Percentage))
+                    {
+                        OnPropertyChanged(nameof(ProgressPercentage));
+                    }
+                };
+            }
+        }
+
+        protected override void OnWindowChanged()
+        {
+            base.OnWindowChanged();
+            if (Window != null)
+            {
+                _xamlRoot = Window.Content?.XamlRoot;
+            }
+            else
+            {
+                _xamlRoot = null;
+            }
+        }
 
         partial void OnIsGeneratingChanged(bool value)
         {
@@ -205,10 +145,7 @@ namespace MI_GUI_WinUI.ViewModels
             OnPropertyChanged(nameof(CanGenerate));
         }
 
-        //private string helperPrompt = "minimalist clean icon representing {}, circular button design, game controller style, flat vector art, centered composition, solid background, accessibility-focused, glowing edges, neon accen";
-        //private string helperPrompt = "single clean vector icon, representing {}, modern UI style, simple, flat design, bright colors, no background, isolated icon";
-        //private string helperPrompt = "single clean vector icon representing {}, modern material design, minimal UI/UX style, perfect pixel grid alignment, scalable vector graphics, professional app icon quality, crisp edges";
-        private string helperPrompt = "{}";
+        private bool CanGenerateExecute() => !_executingInference;
 
         private string BuildFinalPrompt(string prompt)
         {
@@ -218,30 +155,27 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand(CanExecute = nameof(CanGenerateExecute))]
         private async Task GenerateAsync()
         {
+            _executingInference = true;
+            IsGenerating = true;
+
             try
             {
-                _executingInference = true;
-                StatusString = "Generating...";
-                IsGenerating = true;
-
-                // If we're using CPU, warn the user about slower performance
-                if (_sdService.UsingCpuFallback)
+                await ExecuteWithErrorHandlingAsync(async () =>
                 {
-                    StatusMessage = "Running on CPU - generation may take longer";
-                }
+                    StatusString = "Generating...";
 
-                var prompt = BuildFinalPrompt(InputDescription);
+                    if (_sdService.UsingCpuFallback)
+                    {
+                        StatusMessage = "Running on CPU - generation may take longer";
+                    }
 
-                _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
+                    var prompt = BuildFinalPrompt(InputDescription);
+                    _currentImagePaths = await _sdService.GenerateImages(prompt, NumberOfImages);
 
-                StatusString = $"{_sdService.NumInferenceSteps} iterations ({_sdService.IterationsPerSecond:F1} it/sec); {_sdService.LastTimeMilliseconds / 1000.0:F1} sec total";
-                await LoadImagesAsync(_currentImagePaths);
-                IsImageGenerated = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating images");
-                StatusString = "Error generating images";
+                    StatusString = "Generation complete";
+                    await LoadImagesAsync(_currentImagePaths);
+                    IsImageGenerated = true;
+                }, nameof(GenerateAsync));
             }
             finally
             {
@@ -249,8 +183,6 @@ namespace MI_GUI_WinUI.ViewModels
                 IsGenerating = false;
             }
         }
-
-        private bool CanGenerateExecute() => !_executingInference;
 
         private async Task LoadImagesAsync(IEnumerable<string> imagePaths)
         {
@@ -290,84 +222,120 @@ namespace MI_GUI_WinUI.ViewModels
         [RelayCommand]
         private async Task SaveAsync()
         {
-            if (string.IsNullOrWhiteSpace(IconName))
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                if (XamlRoot != null)
+                if (string.IsNullOrWhiteSpace(IconName))
                 {
-                    await Utils.DialogHelper.ShowError("Please enter a name for the icon.", XamlRoot);
+                    throw new InvalidOperationException("Please enter a name for the icon.");
                 }
-                return;
-            }
 
-            if (!Utils.FileNameHelper.IsValidFileName(IconName))
-            {
-                if (XamlRoot != null)
+                if (!Utils.FileNameHelper.IsValidFileName(IconName))
                 {
-                    await Utils.DialogHelper.ShowError("The icon name contains invalid characters. Please use only letters, numbers, and basic punctuation.", XamlRoot);
+                    throw new InvalidOperationException("The icon name contains invalid characters.");
                 }
-                return;
-            }
 
-            if (_currentImagePaths == null || !_currentImagePaths.Any())
-            {
-                if (XamlRoot != null)
+                if (_currentImagePaths == null || !_currentImagePaths.Any())
                 {
-                    await Utils.DialogHelper.ShowError("No image to save.", XamlRoot);
+                    throw new InvalidOperationException("No image to save.");
                 }
-                return;
-            }
 
-            try
-            {
                 var sanitizedName = Utils.FileNameHelper.SanitizeFileName(IconName);
                 var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MotionInput", "data", "assets", "generated_icons");
                 Directory.CreateDirectory(iconPath);
-
+                
                 var fileName = Path.Combine(iconPath, $"{sanitizedName}.png");
 
-                // Check if file exists
-                if (File.Exists(fileName))
+                if (File.Exists(fileName) && XamlRoot != null)
                 {
-                    var overwrite = await Utils.DialogHelper.ShowConfirmation(
-                        $"An icon named '{sanitizedName}.png' already exists.\nDo you want to replace it?",
+                    var result = await Utils.DialogHelper.ShowConfirmation(
+                        $"An icon named '{sanitizedName}.png' already exists. Do you want to replace it?",
                         "Replace Existing Icon?",
                         XamlRoot);
 
-                    // If user chooses not to replace, return to page
-                    if (!overwrite)
-                    {
-                        return;
-                    }
+                    if (!result) return;
                 }
 
-                // Create directory if it doesn't exist
-                Directory.CreateDirectory(Path.GetDirectoryName(fileName));
-
-                // Save the first generated image
                 await Utils.ImageHelper.SaveImageAsync(_currentImagePaths.First(), fileName);
 
                 if (XamlRoot != null)
                 {
                     await Utils.DialogHelper.ShowMessage($"Icon saved as {sanitizedName}.png", "Success", XamlRoot);
                 }
+            }, nameof(SaveAsync));
+        }
+
+        public async Task InitializeStableDiffusionAsync()
+        {
+            IsInitializing = true;
+            IsPreInitialization = true;
+            InitializationFailed = false;
+            ErrorMessage = string.Empty;
+            InitializationStatus = $"Initializing with {(UseGpu ? "GPU" : "CPU")} acceleration...";
+
+            var wasInitialized = _modelManager.IsInitialized;
+            
+            try
+            {
+                await _modelManager.EnsureInitializedAsync(UseGpu);
+                await _sdService.Initialize(UseGpu);
+
+                InitializationStatus = "Initialization complete";
+                InitializationFailed = false;
+                IsPreInitialization = false;
+
+                if (XamlRoot != null)
+                {
+                    if (!wasInitialized)
+                    {
+                        if (UseGpu && _sdService.UsingCpuFallback)
+                        {
+                            await Utils.DialogHelper.ShowMessage(
+                                "GPU acceleration was not available or failed to initialize.\n\n" +
+                                "The application will run using CPU instead, which may be significantly slower.",
+                                "Using CPU Mode",
+                                XamlRoot);
+                        }
+                        else
+                        {
+                            await Utils.DialogHelper.ShowMessage(
+                                $"Stable Diffusion initialized successfully with GPU acceleration.",
+                                "Initialization Complete",
+                                XamlRoot);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving icon");
-                if (XamlRoot != null)
-                {
-                    await Utils.DialogHelper.ShowError("Failed to save icon. Please try again.", XamlRoot);
-                }
+                await HandleInitializationError($"Failed to initialize Icon Studio: {ex.Message}", ex);
+            }
+            finally
+            {
+                IsInitializing = false;
+            }
+        }
+
+        private async Task HandleInitializationError(string message, Exception ex)
+        {
+            _logger.LogError(ex, message);
+            InitializationFailed = true;
+            ErrorMessage = message;
+            if (XamlRoot != null)
+            {
+                await Utils.DialogHelper.ShowError(ErrorMessage, XamlRoot);
             }
         }
 
         [RelayCommand]
         private async Task RetryInitialization()
         {
-            _logger.LogInformation("Retrying initialization");
-            InitializationFailed = false;
-            ErrorMessage = string.Empty;
-            await InitializeAsync();
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                _logger.LogInformation("Retrying initialization");
+                InitializationFailed = false;
+                ErrorMessage = string.Empty;
+                await InitializeStableDiffusionAsync();
+            }, nameof(RetryInitialization));
         }
 
         private void CleanupTempDirectories()
@@ -381,7 +349,7 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     try
                     {
-                        Directory.Delete(dir, true);  // recursive delete
+                        Directory.Delete(dir, true);
                     }
                     catch (Exception ex)
                     {
@@ -395,14 +363,43 @@ namespace MI_GUI_WinUI.ViewModels
             }
         }
 
-        public void Cleanup()
+        public override void Cleanup()
         {
-            Images = null;
-            PreviewImage = null;
-            StatusMessage = string.Empty;
-            InitializationStatus = string.Empty;
-            _currentImagePaths = Array.Empty<string>();
-            CleanupTempDirectories();
+            try
+            {
+                // Clear UI resources only
+                if (Images is ObservableCollection<ImageSource> collection)
+                {
+                    collection.Clear();
+                }
+                Images = null;
+
+                PreviewImage?.Dispose();
+                PreviewImage = null;
+
+                _currentImagePaths = Array.Empty<string>();
+                StatusMessage = string.Empty;
+                InitializationStatus = string.Empty;
+
+                CleanupTempDirectories();
+                _xamlRoot = null;
+
+                // Note: Not disposing StableDiffusionService as it's managed by ModelManager
+                base.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during cleanup");
+            }
+        }
+
+        protected override async Task ShowErrorAsync(string message)
+        {
+            ErrorMessage = message;
+            if (XamlRoot != null)
+            {
+                await Utils.DialogHelper.ShowError(message, XamlRoot);
+            }
         }
     }
 }

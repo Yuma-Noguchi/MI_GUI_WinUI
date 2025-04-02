@@ -2,104 +2,135 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Microsoft.Extensions.Configuration;
+using MI_GUI_WinUI.Services.Interfaces;
 
-namespace MI_GUI_WinUI.Services;
-
-public class LoggingService
+namespace MI_GUI_WinUI.Services
 {
-    private readonly string _logFolder = "Logs";
-    private readonly string _logFileName = "window_management.log";
-    private readonly object _logLock = new object();
-
-    public async Task LogAsync(string message, Exception? exception = null)
+    /// <summary>
+    /// Implementation of ILoggingService for file-based logging
+    /// </summary>
+    public class LoggingService : ILoggingService
     {
-        try
-        {
-            var localFolder = ApplicationData.Current.LocalFolder;
-            var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
-            var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.OpenIfExists);
+        private readonly string _logFolder;
+        private readonly string _logFileName;
+        private readonly object _logLock = new object();
+        private readonly bool _includeDebugLogs;
 
-            string logMessage;
-            lock (_logLock)
+        public LoggingService()
+        {
+            _logFolder = "Logs";
+            _logFileName = "MotionInput_Configuration.log";
+            _includeDebugLogs = false;
+        }
+
+        private async Task LogAsync(string level, string message, Exception? exception = null)
+        {
+            if (level == "DEBUG" && !_includeDebugLogs)
+                return;
+
+            try
             {
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                logMessage = $"[{timestamp}] {message}";
-            
-                if (exception != null)
+                var localFolder = ApplicationData.Current.LocalFolder;
+                var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
+                var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.OpenIfExists);
+
+                string logMessage;
+                lock (_logLock)
                 {
-                    logMessage += $"\nException: {exception.GetType().Name}\nMessage: {exception.Message}\nStack Trace:\n{exception.StackTrace}";
-                    if (exception.InnerException != null)
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    logMessage = $"[{timestamp}] [{level}] {message}";
+            
+                    if (exception != null)
                     {
-                        logMessage += $"\nInner Exception: {exception.InnerException.Message}";
+                        logMessage += $"\nException: {exception.GetType().Name}\nMessage: {exception.Message}\nStack Trace:\n{exception.StackTrace}";
+                        if (exception.InnerException != null)
+                        {
+                            logMessage += $"\nInner Exception: {exception.InnerException.Message}";
+                        }
                     }
+
+                    logMessage += "\n----------------------------------------\n";
                 }
 
-                logMessage += "\n----------------------------------------\n";
+                await FileIO.AppendTextAsync(logFile, logMessage);
             }
-
-            await FileIO.AppendTextAsync(logFile, logMessage);
+            catch (Exception ex)
+            {
+                // If logging fails, try to write to a fallback location
+                try
+                {
+                    var fallbackPath = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "MotionInput",
+                        "fallback.log"
+                    );
+                    File.AppendAllText(fallbackPath, $"Logging failed: {ex.Message}\nOriginal message: {message}\n");
+                }
+                catch
+                {
+                    // Silently fail if all logging attempts fail to prevent application disruption
+                }
+            }
         }
-        catch
+
+        public void LogInformation(string message)
         {
-            // Silently fail if logging fails
-            // We don't want logging failures to affect the application
+            _ = LogAsync("INFO", message);
         }
-    }
 
-    public void Log(string message, Exception? exception = null)
-    {
-        // Fire and forget async logging
-        _ = LogAsync(message, exception);
-    }
-
-    public async Task<string> GetLogsAsync()
-    {
-        try
+        public void LogError(Exception ex, string message)
         {
-            var localFolder = ApplicationData.Current.LocalFolder;
-            var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
-            var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.OpenIfExists);
-
-            return await FileIO.ReadTextAsync(logFile);
+            _ = LogAsync("ERROR", message, ex);
         }
-        catch (Exception ex)
+
+        public void LogWarning(string message)
         {
-            return $"Error reading logs: {ex.Message}";
+            _ = LogAsync("WARN", message);
         }
-    }
 
-    public async Task ClearLogsAsync()
-    {
-        try
+        public void LogDebug(string message)
         {
-            var localFolder = ApplicationData.Current.LocalFolder;
-            var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
-            var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.ReplaceExisting);
-            await FileIO.WriteTextAsync(logFile, string.Empty);
+            _ = LogAsync("DEBUG", message);
         }
-        catch
+
+        public void LogCritical(Exception ex, string message)
         {
-            // Silently fail if clearing logs fails
+            _ = LogAsync("CRITICAL", message, ex);
         }
-    }
 
-    public void LogError(string message, Exception? exception = null)
-    {
-        Log($"ERROR: {message}", exception);
-    }
+        public async Task<string> GetLogsAsync()
+        {
+            try
+            {
+                var localFolder = ApplicationData.Current.LocalFolder;
+                var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
+                var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.OpenIfExists);
 
-    public void LogWarning(string message)
-    {
-        Log($"WARNING: {message}");
-    }
+                return await FileIO.ReadTextAsync(logFile);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "Error reading logs");
+                return "Error reading logs. Check the application event log for details.";
+            }
+        }
 
-    public void LogInfo(string message)
-    {
-        Log($"INFO: {message}");
-    }
-
-    public void LogDebug(string message)
-    {
-        Log($"DEBUG: {message}");
+        public async Task ClearLogsAsync()
+        {
+            try
+            {
+                var localFolder = ApplicationData.Current.LocalFolder;
+                var logFolder = await localFolder.CreateFolderAsync(_logFolder, CreationCollisionOption.OpenIfExists);
+                var logFile = await logFolder.CreateFileAsync(_logFileName, CreationCollisionOption.ReplaceExisting);
+                
+                LogInformation("Log file cleared");
+                await FileIO.WriteTextAsync(logFile, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "Error clearing logs");
+            }
+        }
     }
 }

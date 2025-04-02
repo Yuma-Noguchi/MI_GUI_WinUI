@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using MI_GUI_WinUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
+using System;
 
 namespace MI_GUI_WinUI.Pages
 {
@@ -28,17 +29,26 @@ namespace MI_GUI_WinUI.Pages
                 PulseStoryboard.Begin();
             }
 
-            // Ensure we have valid ViewModel
-            if (ViewModel != null)
+             try
             {
-                // Set XamlRoot for dialogs
-                ViewModel.XamlRoot = this.XamlRoot;
-                
-                // Let the page render first
-                //await Task.Yield();
-
-                // Begin initialization
-                await ViewModel.InitializeAsync();
+                if (ViewModel != null)
+                {
+                    ViewModel.XamlRoot = XamlRoot;
+                    // Initialize profiles (preview generation is handled inside)
+                    await ViewModel.InitializeStableDiffusionAsync();
+                }
+                else
+                {
+                    throw new InvalidOperationException("ViewModel is not initialized.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error and show error message
+                if (ViewModel != null)
+                {
+                    ViewModel.ErrorMessage = $"Error initializing page: {ex.Message}";
+                }
             }
         }
 

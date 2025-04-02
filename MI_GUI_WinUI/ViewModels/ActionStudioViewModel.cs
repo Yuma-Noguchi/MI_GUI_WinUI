@@ -10,13 +10,16 @@ using Microsoft.UI.Xaml;
 using MI_GUI_WinUI.Utils;
 using System.Collections.Generic;
 using MI_GUI_WinUI.Services;
+using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels.Base;
 
 namespace MI_GUI_WinUI.ViewModels
 {
-    public partial class ActionStudioViewModel : ObservableObject
+    public partial class ActionStudioViewModel : ViewModelBase
     {
-        private readonly ILogger<ActionStudioViewModel> _logger;
-        private readonly ActionService _actionService;
+        private readonly IActionService _actionService;
+        private XamlRoot? _xamlRoot;
+        private bool _executingInference;
 
         [ObservableProperty]
         private ObservableCollection<ActionData> _actions;
@@ -37,10 +40,13 @@ namespace MI_GUI_WinUI.ViewModels
         [ObservableProperty]
         private double _sleepDuration = 1.0;
 
-        [ObservableProperty]
-        private XamlRoot? xamlRoot;
-
         public bool IsActionSelected => SelectedAction != null;
+
+        public XamlRoot? XamlRoot
+        {
+            get => _xamlRoot;
+            set => _xamlRoot = value;
+        }
 
         public ObservableCollection<string> AvailableButtons { get; } = new()
         {
@@ -49,18 +55,38 @@ namespace MI_GUI_WinUI.ViewModels
             "DPad_Up", "DPad_Down", "DPad_Left", "DPad_Right"
         };
 
-        public ActionStudioViewModel(ILogger<ActionStudioViewModel> logger, ActionService actionService)
+        public ActionStudioViewModel(
+            IActionService actionService,
+            ILogger<ActionStudioViewModel> logger,
+            INavigationService navigationService)
+            : base(logger, navigationService)
         {
-            _logger = logger;
-            _actionService = actionService;
+            _actionService = actionService ?? throw new ArgumentNullException(nameof(actionService));
             _actions = new ObservableCollection<ActionData>();
-
-            InitializeAsync();
         }
 
-        private async void InitializeAsync()
+        protected override void OnWindowChanged()
         {
-            try
+            base.OnWindowChanged();
+            if (Window != null)
+            {
+                _xamlRoot = Window.Content?.XamlRoot;
+            }
+            else
+            {
+                _xamlRoot = null;
+            }
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            await LoadActionsAsync();
+        }
+
+        private async Task LoadActionsAsync()
+        {
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
                 IsLoading = true;
                 ErrorMessage = null;
@@ -71,16 +97,8 @@ namespace MI_GUI_WinUI.ViewModels
                 {
                     Actions.Add(action);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error initializing actions");
-                ErrorMessage = "Failed to load actions. Please try again.";
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+            }, nameof(LoadActionsAsync));
+            IsLoading = false;
         }
 
         [RelayCommand]
@@ -97,109 +115,125 @@ namespace MI_GUI_WinUI.ViewModels
         }
 
         [RelayCommand]
-        private void AddToSequence()
+        private async Task AddToSequence()
         {
-            if (string.IsNullOrEmpty(SelectedButton) || SelectedAction == null) 
-                return;
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                if (string.IsNullOrEmpty(SelectedButton) || SelectedAction == null)
+                {
+                    throw new InvalidOperationException("Please select a button and an action");
+                }
 
-            SelectedAction.Sequence.Add(SequenceItem.CreateButtonPress(SelectedButton));
-            ErrorMessage = null;
+                SelectedAction.Sequence.Add(SequenceItem.CreateButtonPress(SelectedButton));
+            }, nameof(AddToSequence));
         }
 
         [RelayCommand]
-        private void AddSleep()
+        private async Task AddSleep()
         {
-            if (SelectedAction == null) return;
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                if (SelectedAction == null)
+                {
+                    throw new InvalidOperationException("No action selected");
+                }
 
-            SelectedAction.Sequence.Add(SequenceItem.CreateSleep(SleepDuration));
-            ErrorMessage = null;
+                if (SleepDuration <= 0)
+                {
+                    throw new InvalidOperationException("Sleep duration must be greater than 0");
+                }
+
+                SelectedAction.Sequence.Add(SequenceItem.CreateSleep(SleepDuration));
+            }, nameof(AddSleep));
         }
 
         [RelayCommand]
-        private void RemoveFromSequence(SequenceItem item)
+        private async Task RemoveFromSequence(SequenceItem item)
         {
-            if (SelectedAction?.Sequence == null || item == null) 
-                return;
+            await ExecuteWithErrorHandlingAsync(async () =>
+            {
+                if (SelectedAction?.Sequence == null || item == null)
+                {
+                    throw new InvalidOperationException("No sequence item selected");
+                }
 
-            SelectedAction.Sequence.Remove(item);
-            ErrorMessage = null;
+                SelectedAction.Sequence.Remove(item);
+            }, nameof(RemoveFromSequence));
         }
 
         [RelayCommand]
         private async Task SaveSequence()
         {
-            if (SelectedAction == null)
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                ErrorMessage = "No action selected";
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(SelectedAction.Name))
-            {
-                ErrorMessage = "Please enter an action name";
-                if (XamlRoot != null)
+                if (SelectedAction == null)
                 {
-                    await DialogHelper.ShowError("Please enter an action name.", XamlRoot);
+                    throw new InvalidOperationException("No action selected");
                 }
-                return;
-            }
 
-            if (!SelectedAction.Sequence.Any())
-            {
-                ErrorMessage = "Please add at least one button to the sequence";
-                if (XamlRoot != null)
+                if (string.IsNullOrWhiteSpace(SelectedAction.Name))
                 {
-                    await DialogHelper.ShowError("Please add at least one button to the sequence.", XamlRoot);
+                    throw new InvalidOperationException("Please enter an action name");
                 }
-                return;
-            }
 
-            try
-            {
+                if (!SelectedAction.Sequence.Any())
+                {
+                    throw new InvalidOperationException("Please add at least one button to the sequence");
+                }
+
+                // Create a local copy of the selected action to prevent issues
+                // if the selection changes during collection updates
                 var actionToSave = SelectedAction;
-                await _actionService.SaveActionAsync(actionToSave);
 
+                await _actionService.SaveActionAsync(actionToSave);
+                
                 // Update or add the action in the list
                 var existingIndex = Actions.ToList().FindIndex(a => a.Name == actionToSave.Name);
                 if (existingIndex >= 0)
                 {
                     Actions[existingIndex] = actionToSave;
+                    
+                    // Ensure selection is maintained
+                    if (SelectedAction == null)
+                    {
+                        SelectedAction = actionToSave;
+                    }
                 }
                 else if (!Actions.Contains(actionToSave))
                 {
                     Actions.Add(actionToSave);
+                    
+                    // Ensure selection is maintained
+                    if (SelectedAction == null)
+                    {
+                        SelectedAction = actionToSave;
+                    }
                 }
 
-                ErrorMessage = null;
-                if (XamlRoot != null)
+                // Use the local copy for the dialog
+                if (_xamlRoot != null)
                 {
-                    await DialogHelper.ShowMessage($"Action '{actionToSave.Name}' saved successfully.", "Success", XamlRoot);
+                    await DialogHelper.ShowMessage($"Action '{actionToSave.Name}' saved successfully.", "Success", _xamlRoot);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error saving action: {SelectedAction.Name}");
-                ErrorMessage = "Failed to save action. Please try again.";
-                if (XamlRoot != null)
-                {
-                    await DialogHelper.ShowError("Failed to save action. Please try again.", XamlRoot);
-                }
-            }
+            }, nameof(SaveSequence));
         }
 
         [RelayCommand]
         private async Task DeleteAction(ActionData action)
         {
-            if (action == null) return;
-
-            try
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                if (XamlRoot != null)
+                if (action == null)
+                {
+                    throw new InvalidOperationException("No action selected for deletion");
+                }
+
+                if (_xamlRoot != null)
                 {
                     var result = await DialogHelper.ShowConfirmation(
                         $"Are you sure you want to delete action '{action.Name}'?",
                         "Delete Action",
-                        XamlRoot
+                        _xamlRoot
                     );
 
                     if (!result) return;
@@ -214,16 +248,32 @@ namespace MI_GUI_WinUI.ViewModels
                 }
 
                 _logger.LogInformation($"Action deleted successfully: {action.Name}");
-                ErrorMessage = null;
+            }, nameof(DeleteAction));
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                Actions.Clear();
+                SelectedAction = null;
+                _xamlRoot = null;
+
+                base.Cleanup();
+                _logger.LogInformation("Cleaned up ActionStudioViewModel resources");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting action: {action.Name}");
-                ErrorMessage = "Failed to delete action. Please try again.";
-                if (XamlRoot != null)
-                {
-                    await DialogHelper.ShowError("Failed to delete action. Please try again.", XamlRoot);
-                }
+                _logger.LogError(ex, "Error during cleanup");
+            }
+        }
+
+        protected override async Task ShowErrorAsync(string message)
+        {
+            ErrorMessage = message;
+            if (_xamlRoot != null)
+            {
+                await DialogHelper.ShowError(message, _xamlRoot);
             }
         }
     }

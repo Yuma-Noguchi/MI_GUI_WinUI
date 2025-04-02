@@ -48,7 +48,20 @@ namespace MI_GUI_WinUI.Models
         public Models.ActionConfig Action { get; init; } = new();
 
         [JsonIgnore]
-        public bool IsPose => File == "hit_trigger.py";
+        public bool IsPose => File == "hit_trigger.py" || File == "head_tilt_joystick.py";
+
+        public static UnifiedGuiElement CreateHeadTiltElement()
+        {
+            return new UnifiedGuiElement
+            {
+                File = "head_tilt_joystick.py",
+                LeftSkin = "racing/left_arrow.png",
+                RightSkin = "racing/right_arrow.png",
+                Sensitivity = 0.75,
+                Deadzone = 1,
+                Linear = false
+            };
+        }
 
         public static UnifiedGuiElement CreateGuiElement(int x = 0, int y = 0, int radius = 30)
         {
@@ -127,20 +140,37 @@ namespace MI_GUI_WinUI.Models
             Action = Action
         };
 
-        public PoseGuiElement ToPoseElement() => new PoseGuiElement
+        public PoseGuiElement ToPoseElement()
         {
-            File = File,
-            Position = Position,
-            Radius = Radius,
-            Skin = Utils.FileNameHelper.ConvertToAssetsRelativePath(Skin),
-            LeftSkin = LeftSkin ?? string.Empty,
-            RightSkin = RightSkin ?? string.Empty,
-            Sensitivity = Sensitivity ?? 1.0,
-            Deadzone = Deadzone ?? 10,
-            Linear = Linear ?? true,
-            Landmark = Landmarks.FirstOrDefault() ?? string.Empty,
-            Action = Action
-        };
+            if (File == "head_tilt_joystick.py")
+            {
+                return new PoseGuiElement
+                {
+                    File = File,
+                    LeftSkin = LeftSkin ?? "racing/left_arrow.png",
+                    RightSkin = RightSkin ?? "racing/right_arrow.png",
+                    Sensitivity = Sensitivity ?? 0.75,
+                    Deadzone = Deadzone ?? 1,
+                    Linear = Linear ?? false
+                };
+            }
+
+            // For other pose types
+            return new PoseGuiElement
+            {
+                File = File,
+                Position = Position,
+                Radius = Radius,
+                Skin = Utils.FileNameHelper.ConvertToAssetsRelativePath(Skin),
+                LeftSkin = LeftSkin ?? string.Empty,
+                RightSkin = RightSkin ?? string.Empty,
+                Sensitivity = Sensitivity ?? 1.0,
+                Deadzone = Deadzone ?? 10,
+                Linear = Linear ?? true,
+                Landmark = Landmarks.FirstOrDefault() ?? string.Empty,
+                Action = Action
+            };
+        }
 
         public static UnifiedGuiElement FromGuiElement(GuiElement element) => new()
         {

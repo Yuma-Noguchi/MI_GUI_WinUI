@@ -3,145 +3,196 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json; // Using Newtonsoft.Json
-using Newtonsoft.Json.Linq; // Using Newtonsoft.Json.Linq
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using MI_GUI_WinUI.Services.Interfaces;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-namespace MI_GUI_WinUI.Services;
-
-
-public class MotionInputService
+namespace MI_GUI_WinUI.Services
 {
-
-    private Process? MotionInput;
-    private string configFilePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\data\\config.json");
-    public static string ReadModeFromJsonFile(string filePath)
+    /// <summary>
+    /// Implementation of IMotionInputService for managing Motion Input operations
+    /// </summary>
+    public class MotionInputService : IMotionInputService
     {
-        if (!File.Exists(filePath))
+        private readonly ILogger<MotionInputService> _logger;
+        private Process? _motionInput;
+        private readonly string _configFilePath;
+        private readonly string _executablePath;
+
+        public MotionInputService(ILogger<MotionInputService> logger)
         {
-            throw new FileNotFoundException($"JSON file not found at path: {filePath}");
+            _logger = logger;
+            var basePath = Windows.ApplicationModel.Package.Current.InstalledLocation.Path;
+            _configFilePath = Path.Combine(basePath, "MotionInput", "data", "config.json");
+            _executablePath = Path.Combine(basePath, "MotionInput", "MotionInput.exe");
         }
 
-        string jsonString = File.ReadAllText(filePath);
-
-        try
+        private string ReadModeFromJsonFile(string filePath)
         {
-            JObject jsonObject = JObject.Parse(jsonString); // Parse JSON into a dynamic JObject
-            string modeValue = (string)jsonObject["mode"]; // Access "mode" property as string
-
-            return modeValue;
-        }
-        catch (JsonException ex)
-        {
-            throw new JsonException($"Error parsing JSON from file: {filePath}. {ex.Message}", ex);
-        }
-        catch (InvalidCastException castEx)
-        {
-            throw new InvalidCastException($"Error casting 'mode' value to string from JSON file: {filePath}.  Ensure 'mode' is a string. {castEx.Message}", castEx);
-        }
-        catch (NullReferenceException nullRefEx)
-        {
-            throw new NullReferenceException($"'mode' property not found in JSON file: {filePath}. {nullRefEx.Message}", nullRefEx);
-        }
-    }
-
-    public static void WriteModeToJsonFile(string filePath, string modeValue)
-    {
-        if (string.IsNullOrEmpty(filePath))
-        {
-            throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
-        }
-        if (modeValue == null) // Mode value can be empty string, but not null in this context
-        {
-            throw new ArgumentNullException(nameof(modeValue), "Mode value cannot be null.");
-        }
-
-        try
-        {
-            JObject jsonObject;
-
-            // Try to read existing JSON file, if it exists. If not, create a new empty JObject.
-            if (File.Exists(filePath))
+            if (!File.Exists(filePath))
             {
-                string existingJsonString = File.ReadAllText(filePath);
-                jsonObject = JObject.Parse(existingJsonString);
-            }
-            else
-            {
-                jsonObject = new JObject(); // Create a new empty JSON object
+                throw new FileNotFoundException($"JSON file not found at path: {filePath}");
             }
 
-            // Update or add the "mode" property
-            jsonObject["mode"] = modeValue;
-
-            // Serialize the JObject back to a JSON string (with indentation for readability)
-            string jsonString = JsonConvert.SerializeObject(jsonObject, Formatting.Indented);
-
-            // Write the JSON string to the file
-            File.WriteAllText(filePath, jsonString);
-        }
-        catch (JsonException ex)
-        {
-            throw new JsonException($"Error serializing JSON to file: {filePath}. {ex.Message}", ex);
-        }
-        catch (IOException ioEx)
-        {
-            throw new IOException($"Error writing to file: {filePath}. {ioEx.Message}", ioEx);
-        }
-    }
-
-    public async Task<bool> Start(string profileName)
-    {
-        WriteModeToJsonFile(configFilePath, profileName);
-        return await Launch();
-    }
-
-    public async Task<bool> ChangeMode(string mode)
-    {
-        try
-        {
-            // Read the JSON file
-            string configJson = File.ReadAllText(configFilePath);
-
-            // Parse the JSON file
-            JObject configJsonObj = JObject.Parse(configJson);
-
-            // Modify the specific key-value pairs
-            configJsonObj["mode"] = mode;
-
-            // Write the modified JSON back to the file
-            File.WriteAllText(configFilePath, configJsonObj.ToString());
-
-            return await Launch();
-        }
-        catch (Exception e)
-        {
-            return false;
-        }
-    }
-
-    public async Task<bool> Launch()
-    {
-        try
-        {
-            // Path to the executable
-            string FilePath = Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "MotionInput\\MotionInput.exe");
-
-            if (MotionInput != null)
+            try
             {
-                MotionInput.Kill();
+                var jsonString = File.ReadAllText(filePath);
+                var jsonObject = JObject.Parse(jsonString);
+                var modeValue = (string)jsonObject["mode"];
+
+                if (string.IsNullOrEmpty(modeValue))
+                {
+                    throw new InvalidOperationException($"Mode value is empty in file: {filePath}");
+                }
+
+                _logger.LogInformation($"Read mode from config: {modeValue}");
+                return modeValue;
             }
-            MotionInput = new();
-            MotionInput.StartInfo.UseShellExecute = true;
-            MotionInput.StartInfo.FileName = FilePath;
-            MotionInput.StartInfo.WorkingDirectory = Path.GetDirectoryName(FilePath);
-            MotionInput.Start();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reading mode from config file: {filePath}");
+                throw;
+            }
         }
-        catch (Exception e)
+
+        private void WriteModeToJsonFile(string filePath, string modeValue)
         {
-            return false;
+            if (string.IsNullOrEmpty(filePath))
+            {
+                throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
+            }
+            if (modeValue == null)
+            {
+                throw new ArgumentNullException(nameof(modeValue), "Mode value cannot be null.");
+            }
+
+            try
+            {
+                var jsonObject = File.Exists(filePath)
+                    ? JObject.Parse(File.ReadAllText(filePath))
+                    : new JObject();
+
+                jsonObject["mode"] = modeValue;
+                var jsonString = JsonConvert.SerializeObject(jsonObject, Formatting.Indented);
+                
+                File.WriteAllText(filePath, jsonString);
+                _logger.LogInformation($"Updated mode in config file: {modeValue}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error writing mode to config file: {filePath}");
+                throw;
+            }
         }
-        return true;
+
+        public async Task<bool> StartAsync(string profileName)
+        {
+            try
+            {
+                WriteModeToJsonFile(_configFilePath, profileName);
+                _logger.LogInformation($"Starting profile: {profileName}");
+                return await LaunchAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error starting profile: {profileName}");
+                throw;
+            }
+        }
+
+        public async Task<bool> StopAsync(string profileName)
+        {
+            try
+            {
+                if (_motionInput != null)
+                {
+                    _motionInput.Kill();
+                    _motionInput = null;
+                    _logger.LogInformation($"Stopped profile: {profileName}");
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error stopping profile: {profileName}");
+                throw;
+            }
+        }
+
+        public async Task<bool> LaunchAsync()
+        {
+            try
+            {
+                if (_motionInput != null)
+                {
+                    _motionInput.Kill();
+                }
+
+                _motionInput = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        UseShellExecute = true,
+                        FileName = _executablePath,
+                        WorkingDirectory = Path.GetDirectoryName(_executablePath)
+                    }
+                };
+
+                _logger.LogInformation("Launching Motion Input");
+                return _motionInput.Start();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error launching Motion Input");
+                throw;
+            }
+        }
+
+        public async Task<List<string>> GetAvailableProfilesAsync()
+        {
+            try
+            {
+                var profilesPath = Path.Combine(
+                    Path.GetDirectoryName(_configFilePath),
+                    "profiles"
+                );
+
+                if (!Directory.Exists(profilesPath))
+                {
+                    _logger.LogWarning($"Profiles directory not found: {profilesPath}");
+                    return new List<string>();
+                }
+
+                var profileFiles = Directory.GetFiles(profilesPath, "*.json");
+                return profileFiles.Select(Path.GetFileNameWithoutExtension).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting available profiles");
+                throw;
+            }
+        }
+
+        private async Task<bool> ChangeMode(string mode)
+        {
+            try
+            {
+                string configJson = await File.ReadAllTextAsync(_configFilePath);
+                var configJsonObj = JObject.Parse(configJson);
+                configJsonObj["mode"] = mode;
+                await File.WriteAllTextAsync(_configFilePath, configJsonObj.ToString(Formatting.Indented));
+                _logger.LogInformation($"Changed mode to: {mode}");
+                return await LaunchAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error changing mode to: {mode}");
+                throw;
+            }
+        }
     }
 }

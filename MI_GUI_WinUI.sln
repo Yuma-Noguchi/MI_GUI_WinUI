@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXAdapterSelector", "D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StableDiffusion.ML.OnnxRuntime", "StableDiffusion.ML.OnnxRuntime\StableDiffusion.ML.OnnxRuntime.csproj", "{9F1E79AB-552C-23A7-3231-669D7CC11C01}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MI_GUI_WinUI.Tests", "MI_GUI_WinUI.Tests\MI_GUI_WinUI.Tests.csproj", "{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -61,6 +63,18 @@ Global
 		{9F1E79AB-552C-23A7-3231-669D7CC11C01}.Release|x64.Build.0 = Release|x64
 		{9F1E79AB-552C-23A7-3231-669D7CC11C01}.Release|x86.ActiveCfg = Release|x86
 		{9F1E79AB-552C-23A7-3231-669D7CC11C01}.Release|x86.Build.0 = Release|x86
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|ARM64.Build.0 = Debug|ARM64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|x64.ActiveCfg = Debug|x64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|x64.Build.0 = Debug|x64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|x86.ActiveCfg = Debug|x86
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Debug|x86.Build.0 = Debug|x86
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|ARM64.ActiveCfg = Release|ARM64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|ARM64.Build.0 = Release|ARM64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|x64.ActiveCfg = Release|x64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|x64.Build.0 = Release|x64
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|x86.ActiveCfg = Release|x86
+		{AC3926D5-3C5C-4CEE-5C50-9B568FAB2947}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

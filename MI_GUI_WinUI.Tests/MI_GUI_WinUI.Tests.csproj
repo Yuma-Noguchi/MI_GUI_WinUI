@@ -1,0 +1,107 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+	  <WindowsAppSdkBootstrapInitialize>true</WindowsAppSdkBootstrapInitialize>
+	  <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &gt;= 8">win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+	<Platform>x64</Platform>
+    <Platforms>x86;x64;</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWinUI>true</UseWinUI>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);CS8618</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Test Framework -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.8.0" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.8.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="FluentAssertions" Version="8.1.0" />
+    
+    <!-- JSON Schema Validation -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json.Schema" Version="4.0.1" />
+    
+    <!-- Windows App SDK -->
+	<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
+	<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250205002" />
+    
+    <!-- MVVM and DI -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.2" />
+    
+    <!-- ML.NET and ONNX -->
+    <PackageReference Include="Microsoft.ML" Version="4.0.2" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.20.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Extensions" Version="0.13.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.20.2" />
+    
+    <!-- Performance Testing -->
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageReference Include="NBench" Version="2.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Project References -->
+    <ProjectReference Include="..\MI_GUI_WinUI\MI_GUI_WinUI.csproj">
+      <Private>True</Private>
+      <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
+      <ReferenceOutputAssembly>True</ReferenceOutputAssembly>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </ProjectReference>
+    <ProjectReference Include="..\StableDiffusion.ML.OnnxRuntime\StableDiffusion.ML.OnnxRuntime.csproj">
+      <Private>True</Private>
+      <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="EnsureReferencedProjectsBuilt" BeforeTargets="Build">
+    <MSBuild Projects="..\MI_GUI_WinUI\MI_GUI_WinUI.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="..\StableDiffusion.ML.OnnxRuntime\StableDiffusion.ML.OnnxRuntime.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+  </Target>
+
+  <ItemGroup>
+    <!-- Test Data -->
+    <None Update="TestData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="$(MSBuildThisFileDirectory)\MI_GUI_WinUI.Tests.runsettings">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test Categories -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Test Settings -->
+    <VSTestLogger>trx</VSTestLogger>
+    <VSTestResultsDirectory>$(OutputPath)TestResults</VSTestResultsDirectory>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)\MI_GUI_WinUI.Tests.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
+  <!-- Performance Test Configuration -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+</Project>

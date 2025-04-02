@@ -142,21 +142,22 @@
                         CornerRadius="8"
                         Padding="24">
 
-                        <Border Margin="0,0,0,16"
+                    <Border Margin="0,0,0,16"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderThickness="1"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         CornerRadius="8"
-                        MaxWidth="560"
-                        MaxHeight="400"
+                        Width="560"
+                        Height="400"
                         Translation="0,0,8">
                         <Border.Shadow>
                             <ThemeShadow />
                         </Border.Shadow>
-                        <Grid MaxWidth="640" MaxHeight="480">
+                        <Grid>
                             <ContentPresenter Content="{Binding SelectedProfilePreview.Canvas}"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"/>
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="0"/>
                         </Grid>
                     </Border>
 

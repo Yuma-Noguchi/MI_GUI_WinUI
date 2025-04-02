@@ -14,29 +14,13 @@ namespace MI_GUI_WinUI.Pages
 {
     public sealed partial class SelectProfilesPage : Page
     {
-        private SelectProfilesViewModel? _viewModel;
+        private readonly SelectProfilesViewModel ViewModel;
 
         public SelectProfilesPage()
         {
             this.InitializeComponent();
-            
-            // Get ViewModel from DI if not provided through navigation
-            if (_viewModel == null)
-            {
-                _viewModel = Ioc.Default.GetRequiredService<SelectProfilesViewModel>();
-                SetViewModel(_viewModel);
-            }
-        }
-
-        private void SetViewModel(SelectProfilesViewModel viewModel)
-        {
-            _viewModel = viewModel;
-            if (Application.Current is App app)
-            {
-                var windowManager = app.Services.GetRequiredService<WindowManager>();
-                _viewModel.Window = windowManager.MainWindow;
-            }
-            this.DataContext = _viewModel;
+            ViewModel = App.Current.Services.GetService<SelectProfilesViewModel>();
+            DataContext = ViewModel;
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -45,23 +29,10 @@ namespace MI_GUI_WinUI.Pages
 
             try
             {
-                // If we got ViewModel through navigation, use it
-                if (e.Parameter is SelectProfilesViewModel vm)
-                {
-                    SetViewModel(vm);
-                }
-
-                // Ensure window reference is set
-                if (_viewModel != null && Application.Current is App app)
-                {
-                    var windowManager = app.Services.GetRequiredService<WindowManager>();
-                    _viewModel.Window = windowManager.MainWindow;
-                }
-
-                if (_viewModel != null)
+                if (ViewModel != null)
                 {
                     // Initialize profiles (preview generation is handled inside)
-                    await _viewModel.InitializeAsync();
+                    await ViewModel.InitializeAsync();
                 }
                 else
                 {
@@ -71,22 +42,9 @@ namespace MI_GUI_WinUI.Pages
             catch (Exception ex)
             {
                 // Log error and show error message
-                if (_viewModel != null)
+                if (ViewModel != null)
                 {
-                    _viewModel.ErrorMessage = $"Error initializing page: {ex.Message}";
-                }
-            }
-        }
-
-        public SelectProfilesViewModel? ViewModel
-        {
-            get => _viewModel;
-            private set
-            {
-                if (_viewModel != value)
-                {
-                    _viewModel = value;
-                    this.DataContext = _viewModel;
+                    ViewModel.ErrorMessage = $"Error initializing page: {ex.Message}";
                 }
             }
         }
@@ -99,8 +57,6 @@ namespace MI_GUI_WinUI.Pages
             {
                 ViewModel.IsPopupOpen = false;
                 ViewModel.SelectedProfilePreview = null;
-                // Refresh the view model to ensure fresh data next time
-                await ViewModel.InitializeAsync();
             }
         }
 
@@ -131,11 +87,6 @@ namespace MI_GUI_WinUI.Pages
                     await ViewModel.DeleteProfileAsync(profileName);
                 }
             }
-        }
-
-        private void HelpButton_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.Help();
         }
 
         private async void OpenProfilePopup_Click(object sender, RoutedEventArgs e)
