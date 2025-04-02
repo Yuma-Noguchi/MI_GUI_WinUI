@@ -118,7 +118,6 @@ jobs:
           --filter "TestCategory=RequiresGpu" `
           --configuration ${{ matrix.configuration }} `
           --no-build `
-          --verbosity detailed `
           --logger "trx;LogFileName=gpu-tests.trx" `
           --collect:"XPlat Code Coverage"
       env:
