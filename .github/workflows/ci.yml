@@ -97,7 +97,7 @@ jobs:
     - name: Build
       run: |
         # First build the native DirectXAdapterSelector project with the correct output directory
-        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:OutDir="$(SolutionDir)x64\${{ matrix.configuration }}\"
+        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:OutDir="$(pwd)\x64\${{ matrix.configuration }}\"
         
         # Verify the DLL exists in the expected location
         if (-Not (Test-Path "x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll")) {
