@@ -66,14 +66,17 @@ jobs:
       run: |
         Write-Host "Installing Windows App SDK components..."
         
-        # Install only the necessary WinUI components
-        dotnet workload install microsoft-windowsdesktop-sdk-net
-        dotnet workload install microsoft-windowsdesktop-runtime-8.0.100-winui
+        # Install the Windows App SDK packages by referencing them in a temporary project
+        dotnet new console -n temp
+        cd temp
+        dotnet add package Microsoft.WindowsAppSDK --version 1.6.250205002
+        dotnet add package Microsoft.Windows.SDK.BuildTools --version 10.0.26100.1742
+        dotnet restore
+        cd ..
         
         # Verify installation
-        Write-Host "Installed workloads:"
-        dotnet workload list
-        
+        Write-Host "Successfully installed Windows App SDK components"
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -93,8 +96,16 @@ jobs:
       
     - name: Build
       run: |
-        # First build the native DirectXAdapterSelector project
-        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+        # First build the native DirectXAdapterSelector project with the correct output directory
+        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:OutDir="$(SolutionDir)x64\${{ matrix.configuration }}\"
+        
+        # Verify the DLL exists in the expected location
+        if (-Not (Test-Path "x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll")) {
+          Write-Error "DirectXAdapterSelector.dll was not built to the expected location"
+          exit 1
+        } else {
+          Write-Host "Successfully built DirectXAdapterSelector.dll to expected location"
+        }
         
         # Then build the main solution
         msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
