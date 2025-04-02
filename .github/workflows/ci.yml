@@ -114,12 +114,28 @@ jobs:
       if: success()
       timeout-minutes: 30
       run: |
+        # Add diagnostics to help debug issues
+        Write-Host "GPU Info:"
+        Get-WmiObject Win32_VideoController | Format-List Name, DriverVersion, VideoModeDescription
+        
+        # Set environment variables to help with GPU detection
+        $env:GPU_VENDOR = "${{ needs.detect-gpu.outputs.gpu-vendor }}"
+        
+        # Run tests with more verbosity and diagnostics
         dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
           --filter "TestCategory=RequiresGpu" `
           --configuration ${{ matrix.configuration }} `
-          --no-build `
+          --verbosity detailed `
+          --logger "console;verbosity=detailed" `
           --logger "trx;LogFileName=gpu-tests.trx" `
-          --collect:"XPlat Code Coverage"
+          --collect:"XPlat Code Coverage" `
+          --diag:test_log.txt
+        
+        # If tests time out, we should still attempt to upload logs
+        if (Test-Path "test_log.txt") {
+          Write-Host "============= Test Diagnostics Log ============="
+          Get-Content "test_log.txt" | Select-Object -Last 100
+          Write-Host "============================================="
       env:
         GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
 
