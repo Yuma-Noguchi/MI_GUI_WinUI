@@ -58,10 +58,8 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Setup Windows SDK
-      uses: actions/setup-windows-sdk-action@v1
-      with:
-        sdk-version: 22621
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2.0
 
     - name: Install Windows App SDK
       shell: pwsh
