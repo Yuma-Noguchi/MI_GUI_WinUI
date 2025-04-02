@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using MI_GUI_WinUI.Pages;
 using MI_GUI_WinUI.Services.Interfaces;
 using MI_GUI_WinUI.ViewModels.Base;
-using CommunityToolkit.Mvvm.DependencyInjection;
 
 namespace MI_GUI_WinUI.Services
 {
@@ -20,6 +19,7 @@ namespace MI_GUI_WinUI.Services
         private Frame? _frame;
         private readonly ILogger<NavigationService> _logger;
         private readonly ILoggingService _loggingService;
+        private readonly IPageFactory _pageFactory;
         private readonly Dictionary<Window, WeakReference<ViewModelBase>> _windowViewModels;
         private readonly Dictionary<Window, Frame> _windowFrames;
 
@@ -27,10 +27,14 @@ namespace MI_GUI_WinUI.Services
 
         public bool CanGoBack => _frame?.CanGoBack ?? false;
 
-        public NavigationService(ILogger<NavigationService> logger, ILoggingService loggingService)
+        public NavigationService(
+            ILogger<NavigationService> logger,
+            ILoggingService loggingService,
+            IPageFactory pageFactory)
         {
-            _logger = logger;
-            _loggingService = loggingService;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            _pageFactory = pageFactory ?? throw new ArgumentNullException(nameof(pageFactory));
             _windowViewModels = new Dictionary<Window, WeakReference<ViewModelBase>>();
             _windowFrames = new Dictionary<Window, Frame>();
         }
@@ -123,25 +127,26 @@ namespace MI_GUI_WinUI.Services
         {
             try
             {
-                // Get the ViewModel
-                var viewModel = Ioc.Default.GetRequiredService<TViewModel>();
-
-                // Create the page instance from DI
-                var page = Ioc.Default.GetRequiredService<TPage>();
-
-                // Set DataContext
-                page.DataContext = viewModel;
-
-                // Set window reference to ViewModel
-                viewModel.Window = window;
-
-                // Initialize ViewModel if needed
-                _ = viewModel.InitializeAsync();
-
-                // Get the frame for this window
-                if (TryGetFrameForWindow(window, out var frame))
+                // Create the page with its ViewModel using PageFactory
+                var page = _pageFactory.CreatePage<TPage, TViewModel>();
+                
+                if (page.DataContext is TViewModel viewModel)
                 {
-                    return frame.Navigate(page.GetType(), parameter);
+                    // Set window reference
+                    viewModel.Window = window;
+
+                    // Initialize ViewModel if needed
+                    _ = viewModel.InitializeAsync();
+
+                    // Get the frame for this window
+                    if (TryGetFrameForWindow(window, out var frame))
+                    {
+                        return frame.Navigate(page.GetType(), parameter);
+                    }
+                }
+                else
+                {
+                    _logger.LogError("ViewModel not correctly set on page");
                 }
 
                 _logger.LogError("Navigation failed: No frame found for window");
@@ -166,9 +171,15 @@ namespace MI_GUI_WinUI.Services
 
             try
             {
-                // Get ViewModel from DI
-                var viewModel = Ioc.Default.GetRequiredService<TViewModel>();
+                // Create the page with its ViewModel using PageFactory
+                var page = _pageFactory.CreatePage<TPage, TViewModel>();
                 
+                if (!(page.DataContext is TViewModel viewModel))
+                {
+                    _logger.LogError("ViewModel not correctly set on page");
+                    return false;
+                }
+
                 // Set window reference and initialize
                 viewModel.Window = window;
                 await viewModel.InitializeAsync();

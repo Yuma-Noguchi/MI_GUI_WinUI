@@ -9,6 +9,7 @@ using Windows.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MI_GUI_WinUI.Services.Interfaces;
+using MI_GUI_WinUI.ViewModels;
 
 namespace MI_GUI_WinUI.Services
 {
@@ -19,11 +20,18 @@ namespace MI_GUI_WinUI.Services
     {
         private readonly Dictionary<Guid, Window> _windows;
         private readonly ILogger<WindowManager> _logger;
+        private readonly IPageFactory _pageFactory;
+        private readonly MainWindowViewModel _mainWindowViewModel;
         private Window _mainWindow;
 
-        public WindowManager(ILogger<WindowManager> logger)
+        public WindowManager(
+            ILogger<WindowManager> logger,
+            IPageFactory pageFactory,
+            MainWindowViewModel mainWindowViewModel)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _pageFactory = pageFactory ?? throw new ArgumentNullException(nameof(pageFactory));
+            _mainWindowViewModel = mainWindowViewModel ?? throw new ArgumentNullException(nameof(mainWindowViewModel));
             _windows = new Dictionary<Guid, Window>();
         }
 
@@ -32,7 +40,8 @@ namespace MI_GUI_WinUI.Services
         public void InitializeMainWindow()
         {
             _logger.LogInformation("Initializing main window");
-            _mainWindow = new MainWindow();
+            // Create MainWindow with its dependencies
+            _mainWindow = new MainWindow(null, _pageFactory, _mainWindowViewModel);
             var windowId = Guid.NewGuid();
             _windows[windowId] = _mainWindow;
             _mainWindow.Closed += (sender, args) => OnWindowClosed(windowId);

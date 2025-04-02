@@ -14,6 +14,7 @@ using System.IO;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Microsoft.UI.Xaml.Controls;
 
 namespace MI_GUI_WinUI
 {
@@ -21,6 +22,7 @@ namespace MI_GUI_WinUI
     {
         private readonly IWindowManager _windowManager;
         private readonly INavigationService _navigationService;
+        private readonly IPageFactory _pageFactory;
         private bool _isClosing;
         private readonly IServiceProvider _serviceProvider;
 
@@ -29,8 +31,6 @@ namespace MI_GUI_WinUI
 
         public App()
         {
-            InitializeComponent();
-
             // Configure services
             var services = new ServiceCollection();
 
@@ -44,19 +44,11 @@ namespace MI_GUI_WinUI
                     new CustomLoggerProvider(sp.GetRequiredService<LoggingService>()));
             });
 
-            // Register window management and navigation
-            services.AddSingleton<IWindowManager, WindowManager>();
+            // Register core services
+            services.AddSingleton<IPageFactory, PageFactory>();
             services.AddSingleton<INavigationService, NavigationService>();
 
-            // Register services
-            services.AddSingleton<IActionService, ActionService>();
-            services.AddSingleton<IMotionInputService, MotionInputService>();
-            services.AddSingleton<ILoggingService, LoggingService>();
-            services.AddSingleton<IStableDiffusionService, StableDiffusionService>();
-            services.AddSingleton<IProfileService, ProfileService>();
-            services.AddSingleton<IDialogService, DialogService>();
-
-            // Register view models
+            // Register view models first since WindowManager depends on MainWindowViewModel
             services.AddSingleton<MainWindowViewModel>();
             services.AddTransient<SelectProfilesViewModel>();
             services.AddTransient<ActionStudioViewModel>();
@@ -64,6 +56,17 @@ namespace MI_GUI_WinUI
             services.AddTransient<ProfileEditorViewModel>();
             services.AddTransient<ActionConfigurationDialogViewModel>();
             services.AddTransient<HeadTiltConfigurationViewModel>();
+
+            // Register window management after its dependencies
+            services.AddSingleton<IWindowManager, WindowManager>();
+
+            // Register other services
+            services.AddSingleton<IActionService, ActionService>();
+            services.AddSingleton<IMotionInputService, MotionInputService>();
+            services.AddSingleton<ILoggingService, LoggingService>();
+            services.AddSingleton<IStableDiffusionService, StableDiffusionService>();
+            services.AddSingleton<IProfileService, ProfileService>();
+            services.AddSingleton<IDialogService, DialogService>();
 
             // Register converters
             services.AddSingleton<StringToBoolConverter>();
@@ -88,25 +91,44 @@ namespace MI_GUI_WinUI
 
             // Build and configure services
             _serviceProvider = services.BuildServiceProvider();
-            Ioc.Default.ConfigureServices(_serviceProvider);
 
             // Initialize services
+            _pageFactory = _serviceProvider.GetRequiredService<IPageFactory>();
             _windowManager = _serviceProvider.GetRequiredService<IWindowManager>();
             _navigationService = _serviceProvider.GetRequiredService<INavigationService>();
+
+            // Configure IoC container
+            Ioc.Default.ConfigureServices(_serviceProvider);
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            if (_isClosing) return;
+
             // Initialize main window
-            if (_windowManager.MainWindow == null && !_isClosing)
+            _windowManager.InitializeMainWindow();
+            var mainWindow = _windowManager.MainWindow;
+            
+            if (mainWindow != null)
             {
-                _windowManager.InitializeMainWindow();
-                var mainWindow = _windowManager.MainWindow;
+                // Update MainWindow with NavigationService
+                if (mainWindow is MainWindow main)
+                {
+                    main.SetNavigationService(_navigationService);
+                }
 
                 // Register window with navigation service
-                if (mainWindow != null)
+                _navigationService.RegisterWindow(mainWindow);
+
+                // Find and register the content frame
+                if (mainWindow.Content is FrameworkElement element)
                 {
-                    _navigationService.RegisterWindow(mainWindow);
+                    var frame = element.FindName("ContentFrame") as Frame;
+                    if (frame != null)
+                    {
+                        _navigationService.Initialize(frame);
+                        _navigationService.RegisterFrame(mainWindow, frame);
+                    }
                 }
             }
         }
