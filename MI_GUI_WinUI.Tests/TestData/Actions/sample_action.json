@@ -1,23 +1,51 @@
 {
-    "actions": {
-        "action1": {
-            "id": "action1",
-            "name": "Test Action 1",
-            "args": {
-                "button": "Left",
-                "x": 100,
-                "y": 100,
-                "duration": 500
-            }
+    "5cc6f66d-0869-48d8-a455-20d150aef27a": {
+      "id": "5cc6f66d-0869-48d8-a455-20d150aef27a",
+      "name": "test1",
+      "class": "ds4_gamepad",
+      "method": "chain",
+      "args": [
+        {
+          "press": [
+            "back"
+          ]
         },
-        "action2": {
-            "id": "action2",
-            "name": "Test Action 2",
-            "args": {
-                "keyCode": "A",
-                "modifiers": ["Ctrl", "Shift"],
-                "duration": 100
-            }
+        {
+          "sleep": [
+            1.0
+          ]
         }
+      ]
+    },
+    "a8970661-6764-48cb-92f8-6e74c9a43f02": {
+      "id": "a8970661-6764-48cb-92f8-6e74c9a43f02",
+      "name": "test2",
+      "class": "ds4_gamepad",
+      "method": "chain",
+      "args": [
+        {
+          "press": [
+            "rt"
+          ]
+        }
+      ]
+    },
+    "0267e691-1f5c-4521-a365-23de52f01314": {
+      "id": "0267e691-1f5c-4521-a365-23de52f01314",
+      "name": "test3",
+      "class": "ds4_gamepad",
+      "method": "chain",
+      "args": [
+        {
+          "press": [
+            "start"
+          ]
+        },
+        {
+          "sleep": [
+            1.0
+          ]
+        }
+      ]
     }
-}
+  }

@@ -109,4 +109,5 @@ namespace MI_GUI_WinUI.Tests.Performance
             AssertPerformance(testName, 2000, 3000); // Expect initialization within 2-3 seconds
             LogMetrics(testName);
         }
+    }
 }
