@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Profile Schema",
+  "type": "object",
+  "required": ["config", "gui", "poses", "speech"],
+  "properties": {
+    "config": {
+      "type": "object",
+      "description": "Global configuration for the profile",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "gui": {
+      "type": "array",
+      "description": "List of GUI elements",
+      "items": {
+        "type": "object",
+        "required": ["file", "pos", "radius", "skin", "action"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Python file for the element"
+          },
+          "pos": {
+            "type": "array",
+            "description": "Position coordinates [x, y]",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "radius": {
+            "type": "integer",
+            "description": "Radius of the element"
+          },
+          "skin": {
+            "type": "string",
+            "description": "Skin/image path for the element"
+          },
+          "triggered_skin": {
+            "type": "string",
+            "description": "Skin/image path when element is triggered"
+          },
+          "action": {
+            "type": "object",
+            "required": ["class", "method", "args"],
+            "properties": {
+              "class": {
+                "type": "string",
+                "description": "Class name for the action"
+              },
+              "method": {
+                "type": "string",
+                "description": "Method name for the action"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments for the action",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "poses": {
+      "type": "array",
+      "description": "List of pose GUI elements",
+      "items": {
+        "type": "object",
+        "required": ["file"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Python file for the pose"
+          },
+          "pos": {
+            "type": "array",
+            "description": "Position coordinates [x, y]",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "radius": {
+            "type": "integer",
+            "description": "Radius of the pose element"
+          },
+          "skin": {
+            "type": "string",
+            "description": "Skin/image path for the pose"
+          },
+          "left_skin": {
+            "type": "string",
+            "description": "Left skin/image path for head tilt joystick"
+          },
+          "right_skin": {
+            "type": "string",
+            "description": "Right skin/image path for head tilt joystick"
+          },
+          "sensitivity": {
+            "type": "number",
+            "description": "Sensitivity value for the pose"
+          },
+          "deadzone": {
+            "type": "number",
+            "description": "Deadzone value for the pose"
+          },
+          "linear": {
+            "type": "boolean",
+            "description": "Linear flag for the pose"
+          },
+          "flag": {
+            "type": "integer",
+            "description": "Flag value for the pose"
+          },
+          "landmark": {
+            "type": "string",
+            "description": "Single landmark for the pose"
+          },
+          "landmarks": {
+            "type": "array",
+            "description": "Multiple landmarks for the pose",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "object",
+            "required": ["class", "method", "args"],
+            "properties": {
+              "class": {
+                "type": "string",
+                "description": "Class name for the action"
+              },
+              "method": {
+                "type": "string",
+                "description": "Method name for the action"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments for the action",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "speech": {
+      "type": "object",
+      "description": "Speech commands configuration",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "type": "object",
+            "required": ["class", "method", "args"],
+            "properties": {
+              "class": {
+                "type": "string",
+                "description": "Class name for the speech action"
+              },
+              "method": {
+                "type": "string",
+                "description": "Method name for the speech action"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments for the speech action",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
