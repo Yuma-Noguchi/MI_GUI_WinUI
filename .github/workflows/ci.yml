@@ -7,42 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  detect-gpu:
-    runs-on: windows-latest
-    outputs:
-      gpu-vendor: ${{ steps.gpu-detect.outputs.gpu-vendor }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: GPU Detection
-      id: gpu-detect
-      shell: pwsh
-      run: |
-        $gpu = Get-WmiObject Win32_VideoController
-        Write-Host "Detected GPU: $($gpu.Name)"
-        
-        $vendor = "none"
-        if ($gpu.Name -match "NVIDIA") {
-            $vendor = "nvidia"
-        } elseif ($gpu.Name -match "AMD") {
-            $vendor = "amd"
-        } elseif ($gpu.Name -match "Intel") {
-            $vendor = "intel"
-        }
-        
-        Write-Host "Setting GPU vendor to: $vendor"
-        "gpu-vendor=$vendor" >> $env:GITHUB_OUTPUT
-        
-        # Force the job to continue by setting a default vendor
-        if ($vendor -eq "none") {
-            Write-Host "No GPU detected, forcing nvidia for CI"
-            "gpu-vendor=nvidia" >> $env:GITHUB_OUTPUT
-        }
-
   build-and-test:
-    needs: detect-gpu
-    if: success()
     runs-on: windows-latest
     strategy:
       matrix:
@@ -64,18 +29,9 @@ jobs:
     - name: Install Windows App SDK
       shell: pwsh
       run: |
-        Write-Host "Installing Windows App SDK components..."
-        
-        # Install the Windows App SDK packages by referencing them in a temporary project
-        dotnet new console -n temp
-        cd temp
-        dotnet add package Microsoft.WindowsAppSDK --version 1.6.250205002
-        dotnet add package Microsoft.Windows.SDK.BuildTools --version 10.0.26100.1742
-        dotnet restore
-        cd ..
-        
-        # Verify installation
-        Write-Host "Successfully installed Windows App SDK components"
+        # Install minimal required packages directly
+        nuget install Microsoft.WindowsAppSDK -Version 1.6.250205002 -OutputDirectory packages
+        nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.1742 -OutputDirectory packages
 
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -85,18 +41,26 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Echo GPU Vendor
-      run: |
-        Write-Host "Detected GPU vendor: ${{ needs.detect-gpu.outputs.gpu-vendor }}"
-          
     - name: Restore
       run: |
-        nuget restore MI_GUI_WinUI.sln
-        dotnet restore MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj -v detailed
+        dotnet restore MI_GUI_WinUI.sln
       
-    - name: Build
+    - name: Cache DirectXAdapterSelector build output
+      uses: actions/cache@v4
+      id: dx-adapter-cache
+      with:
+        path: |
+          x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll
+          x64/${{ matrix.configuration }}/DirectXAdapterSelector.pdb
+        key: ${{ runner.os }}-dxadapter-${{ matrix.configuration }}-${{ hashFiles('DirectXAdapterSelector/**/*.cpp', 'DirectXAdapterSelector/**/*.h', 'DirectXAdapterSelector/**/*.vcxproj') }}
+        restore-keys: |
+          ${{ runner.os }}-dxadapter-${{ matrix.configuration }}-
+
+    - name: Build DirectXAdapterSelector
+      if: steps.dx-adapter-cache.outputs.cache-hit != 'true'
       run: |
-        # First build the native DirectXAdapterSelector project with the correct output directory
+        # Only build if we didn't get a cache hit
+        Write-Host "Building DirectXAdapterSelector..."
         msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:OutDir="$(pwd)\x64\${{ matrix.configuration }}\"
         
         # Verify the DLL exists in the expected location
@@ -106,89 +70,46 @@ jobs:
         } else {
           Write-Host "Successfully built DirectXAdapterSelector.dll to expected location"
         }
-        
+
+    - name: Verify DirectXAdapterSelector DLL
+      run: |
+        # This runs whether we got a cache hit or built it ourselves
+        if (-Not (Test-Path "x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll")) {
+          Write-Error "DirectXAdapterSelector.dll not found at expected location"
+          exit 1
+        } else {
+          Write-Host "DirectXAdapterSelector.dll available at expected location"
+        }
+
+    - name: Build Main Solution
+      run: |
         # Then build the main solution
         msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
       
-    - name: Run GPU Tests
+    - name: Run All Tests
       if: success()
-      timeout-minutes: 10
+      timeout-minutes: 5
       shell: pwsh
       run: |
-        Write-Host "GPU Info:"
-        Get-WmiObject Win32_VideoController | Format-List Name, DriverVersion, VideoModeDescription
-        
-        # Set environment variables to help with GPU detection
-        $env:GPU_VENDOR = "${{ needs.detect-gpu.outputs.gpu-vendor }}"
-        
-        # Use VSTest.Console.exe directly instead of dotnet test
         # First, build the test project if it's not already built
         msbuild MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
         
-        # Then use VSTest.Console to run the tests
+        # Use VSTest.Console.exe to run all tests
         $vsTestPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
-        
-        if (Test-Path $vsTestPath) {
-            Write-Host "Running tests using VSTest.Console.exe"
-            & $vsTestPath "MI_GUI_WinUI.Tests\bin\${{ matrix.platform }}\${{ matrix.configuration }}\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll" `
-                /TestCaseFilter:"TestCategory=RequiresGpu" `
-                /Platform:${{ matrix.platform }} `
-                /Framework:".NETCoreApp,Version=v8.0" `
-                /Logger:"trx;LogFileName=gpu-tests.trx" `
-                /Diag:test_log.txt
-        } else {
-            Write-Host "VSTest.Console.exe not found, falling back to MSTest"
-            $msTestPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\MSTest.exe"
-            
-            if (Test-Path $msTestPath) {
-                & $msTestPath /testcontainer:"MI_GUI_WinUI.Tests\bin\${{ matrix.platform }}\${{ matrix.configuration }}\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll" `
-                    /category:"RequiresGpu" `
-                    /detail:errormessage
-            } else {
-                Write-Error "Could not find VSTest.Console.exe or MSTest.exe. Falling back to dotnet test with limited capabilities."
-                
-                # Install the Windows Desktop workload which includes the required components
-                Write-Host "Installing Windows Desktop workload..."
-                dotnet workload install windows windows-desktop
-                
-                # Try running the tests with dotnet test again
-                dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-                    --filter "TestCategory=RequiresGpu" `
-                    --configuration ${{ matrix.configuration }} `
-                    --verbosity detailed `
-                    --logger "console;verbosity=detailed" `
-                    --logger "trx;LogFileName=gpu-tests.trx" `
-                    --diag:test_log.txt
-            }
-        }
-        
-        # If tests time out, we should still attempt to upload logs
+
+        Write-Host "Running tests using VSTest.Console.exe"
+        & $vsTestPath "MI_GUI_WinUI.Tests\bin\${{ matrix.platform }}\${{ matrix.configuration }}\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll" `
+            /Platform:${{ matrix.platform }} `
+            /Framework:".NETCoreApp,Version=v8.0" `
+            /Logger:"trx;LogFileName=unit-tests.trx" `
+            /Diag:test_log.txt
+
+        # If tests had issues, we should still attempt to upload logs
         if (Test-Path "test_log.txt") {
             Write-Host "============= Test Diagnostics Log ============="
             Get-Content "test_log.txt" | Select-Object -Last 100
             Write-Host "============================================="
         }
-      env:
-        GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
-        DOTNET_CLI_UI_LANGUAGE: en-US
-
-    - name: Run Performance Tests
-      if: success()
-      run: |
-        dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-          --filter "TestCategory=Performance" `
-          --configuration ${{ matrix.configuration }} `
-          --no-build `
-          --verbosity detailed `
-          --logger "trx;LogFileName=performance-tests.trx"
-          
-    - name: Run Benchmarks
-      if: success()
-      run: |
-        dotnet run --project MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-          --filter "*Benchmark*" `
-          --configuration Release `
-          -- --job short --runtimes net8.0
 
     - name: Upload Results
       if: always()

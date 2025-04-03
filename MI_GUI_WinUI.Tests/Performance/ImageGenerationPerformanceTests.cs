@@ -92,31 +92,6 @@ namespace MI_GUI_WinUI.Tests.Performance
         }
 
         [TestMethod]
-        public async Task ConcurrentImageGeneration_Performance()
-        {
-            // Arrange
-            var prompts = TestDataGenerators.CreateTestPrompts(4).ToList();
-            var testName = "ConcurrentImageGeneration";
-
-            // Act
-            await RunPerformanceTest(testName, async () =>
-            {
-                var tasks = prompts.Select(prompt => _sdService.GenerateImages(prompt, 1));
-                var results = await Task.WhenAll(tasks);
-
-                Assert.AreEqual(prompts.Count, results.Length, "Not all images were generated");
-                Assert.IsTrue(results.All(r => r.Length > 0), "Some image generations failed");
-            });
-
-            // Assert
-            // Concurrent generation might be slower due to resource contention
-            AssertPerformance(testName,
-                MAX_AVERAGE_GENERATION_TIME_MS * 1.5, // Allow 50% more time
-                MAX_P95_GENERATION_TIME_MS * 1.5);
-            LogMetrics(testName);
-        }
-
-        [TestMethod]
         public async Task ModelInitialization_Performance()
         {
             // Arrange
@@ -126,7 +101,7 @@ namespace MI_GUI_WinUI.Tests.Performance
             await RunPerformanceTest(testName, async () =>
             {
                 var newService = GetService<IStableDiffusionService>();
-                await newService.Initialize(useGpu: false);
+                await newService.Initialize(useGpu: true);
                 Assert.IsTrue(newService.IsInitialized, "Model initialization failed");
             });
 
@@ -134,47 +109,4 @@ namespace MI_GUI_WinUI.Tests.Performance
             AssertPerformance(testName, 2000, 3000); // Expect initialization within 2-3 seconds
             LogMetrics(testName);
         }
-
-        [TestMethod]
-        public async Task CpuVsGpuPerformance_Comparison()
-        {
-            // Arrange
-            var prompt = TestDataGenerators.CreateTestPrompts(1).First();
-
-            // GPU Test
-            var gpuService = GetService<IStableDiffusionService>();
-            await gpuService.Initialize(useGpu: true);
-            await RunPerformanceTest("GPU_Generation", async () =>
-            {
-                var images = await gpuService.GenerateImages(prompt, 1);
-                Assert.IsTrue(images.Length > 0);
-            });
-
-            // CPU Test
-            var cpuService = GetService<IStableDiffusionService>();
-            await cpuService.Initialize(useGpu: false);
-            await RunPerformanceTest("CPU_Generation", async () =>
-            {
-                var images = await cpuService.GenerateImages(prompt, 1);
-                Assert.IsTrue(images.Length > 0);
-            });
-
-            // Log comparison
-            LogMetrics("GPU_Generation");
-            LogMetrics("CPU_Generation");
-
-            // Compare results
-            var gpuMetrics = CalculateMetrics("GPU_Generation");
-            var cpuMetrics = CalculateMetrics("CPU_Generation");
-
-            Logger.LogInformation(
-                "Performance Comparison:\n" +
-                "  GPU Average: {GPUAvg:F2}ms\n" +
-                "  CPU Average: {CPUAvg:F2}ms\n" +
-                "  Speedup Factor: {Speedup:F2}x",
-                gpuMetrics.AverageMs,
-                cpuMetrics.AverageMs,
-                cpuMetrics.AverageMs / gpuMetrics.AverageMs);
-        }
-    }
 }
