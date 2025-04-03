@@ -52,9 +52,8 @@ MI_GUI_WinUI.Tests/
 - **UI Tests**: User interface validation
 
 ### 3. Platform Support
-- Windows 11 + GPU vendors (NVIDIA, AMD, Intel)
+- Windows 11 with GPU support
 - Windows 10 compatibility
-- CPU/GPU execution paths
 
 ## Implementation Status
 
@@ -104,11 +103,7 @@ reliability:
 ## Risk Assessment
 
 ### High Priority Risks
-1. GPU Resource Management
-   - Impact: High
-   - Mitigation: Resource pooling and isolation
-
-2. Cross-Platform Compatibility
+1. Cross-Platform Compatibility
    - Impact: High
    - Mitigation: Platform-specific test sets
 
@@ -119,9 +114,8 @@ reliability:
 ## Next Steps
 
 ### Immediate Actions (Week 1)
-1. GPU detection framework
-2. Platform-specific runners
-3. Basic UI automation
+1. Platform-specific runners
+2. Basic UI automation
 
 ### Short-term Goals (Month 1)
 1. Complete integration testing
@@ -138,10 +132,8 @@ reliability:
 ### Hardware
 ```yaml
 test_environments:
-  - windows_11_nvidia
-  - windows_11_amd
-  - windows_11_intel
-  - windows_10_nvidia
+  - windows_11
+  - windows_10
 ```
 
 ### Software
@@ -149,7 +141,6 @@ test_environments:
 development_tools:
   - Visual Studio 2022
   - .NET SDK 8.0
-  - GPU SDKs
   - Testing frameworks
 ```
 

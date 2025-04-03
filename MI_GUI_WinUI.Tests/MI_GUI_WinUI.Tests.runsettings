@@ -17,7 +17,6 @@
   </MSTest>
 
   <TestRunParameters>
-    <Parameter name="UseGpu" value="false" />
     <Parameter name="TestDataPath" value=".\TestData" />
   </TestRunParameters>
 

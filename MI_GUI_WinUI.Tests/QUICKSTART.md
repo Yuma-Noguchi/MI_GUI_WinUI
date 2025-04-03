@@ -20,7 +20,6 @@ Tests are organized into the following categories:
 - `[IntegrationTest]`: Tests that verify component integration
 - `[PerformanceTest]`: Performance benchmarks and measurements
 - `[UITest]`: Tests for UI components
-- `[RequiresGpu]`: Tests that need GPU hardware
 - `[LongRunningTest]`: Tests that take significant time to run
 - `[DataDependentTest]`: Tests that require specific test data
 - `[ModifiesData]`: Tests that modify test data
@@ -35,9 +34,6 @@ dotnet test --filter "TestCategory=Smoke"
 
 # Run all tests except long-running
 dotnet test --filter "TestCategory!=LongRunning"
-
-# Run performance tests with GPU
-dotnet test --filter "TestCategory=Performance&TestCategory=RequiresGpu"
 ```
 
 ## Adding New Tests

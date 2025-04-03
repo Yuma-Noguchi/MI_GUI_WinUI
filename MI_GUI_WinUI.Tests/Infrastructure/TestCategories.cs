@@ -10,7 +10,6 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
         public const string Performance = "Performance";
         public const string UI = "UI";
         public const string Smoke = "Smoke";
-        public const string RequiresGpu = "RequiresGpu";
         public const string LongRunning = "LongRunning";
         public const string ModifiesData = "ModifiesData";
         public const string Isolated = "Isolated";
@@ -38,12 +37,6 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
     public class UITestAttribute : TestCategoryBaseAttribute
     {
         public override IList<string> TestCategories => new[] { TestCategory.UI };
-    }
-
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
-    public class RequiresGpuAttribute : TestCategoryBaseAttribute
-    {
-        public override IList<string> TestCategories => new[] { TestCategory.RequiresGpu };
     }
 
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
