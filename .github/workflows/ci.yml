@@ -113,31 +113,64 @@ jobs:
     - name: Run GPU Tests
       if: success()
       timeout-minutes: 10
+      shell: pwsh
       run: |
-        # Add diagnostics to help debug issues
         Write-Host "GPU Info:"
         Get-WmiObject Win32_VideoController | Format-List Name, DriverVersion, VideoModeDescription
         
         # Set environment variables to help with GPU detection
         $env:GPU_VENDOR = "${{ needs.detect-gpu.outputs.gpu-vendor }}"
         
-        # Run tests with more verbosity and diagnostics
-        dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-          --filter "TestCategory=RequiresGpu" `
-          --configuration ${{ matrix.configuration }} `
-          --verbosity detailed `
-          --logger "trx;LogFileName=gpu-tests.trx" `
-          --collect:"XPlat Code Coverage" `
-          --diag:test_log.txt
+        # Use VSTest.Console.exe directly instead of dotnet test
+        # First, build the test project if it's not already built
+        msbuild MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+        
+        # Then use VSTest.Console to run the tests
+        $vsTestPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
+        
+        if (Test-Path $vsTestPath) {
+            Write-Host "Running tests using VSTest.Console.exe"
+            & $vsTestPath "MI_GUI_WinUI.Tests\bin\${{ matrix.platform }}\${{ matrix.configuration }}\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll" `
+                /TestCaseFilter:"TestCategory=RequiresGpu" `
+                /Platform:${{ matrix.platform }} `
+                /Framework:".NETCoreApp,Version=v8.0" `
+                /Logger:"trx;LogFileName=gpu-tests.trx" `
+                /Diag:test_log.txt
+        } else {
+            Write-Host "VSTest.Console.exe not found, falling back to MSTest"
+            $msTestPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\MSTest.exe"
+            
+            if (Test-Path $msTestPath) {
+                & $msTestPath /testcontainer:"MI_GUI_WinUI.Tests\bin\${{ matrix.platform }}\${{ matrix.configuration }}\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll" `
+                    /category:"RequiresGpu" `
+                    /detail:errormessage
+            } else {
+                Write-Error "Could not find VSTest.Console.exe or MSTest.exe. Falling back to dotnet test with limited capabilities."
+                
+                # Install the Windows Desktop workload which includes the required components
+                Write-Host "Installing Windows Desktop workload..."
+                dotnet workload install windows windows-desktop
+                
+                # Try running the tests with dotnet test again
+                dotnet test MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
+                    --filter "TestCategory=RequiresGpu" `
+                    --configuration ${{ matrix.configuration }} `
+                    --verbosity detailed `
+                    --logger "console;verbosity=detailed" `
+                    --logger "trx;LogFileName=gpu-tests.trx" `
+                    --diag:test_log.txt
+            }
+        }
         
         # If tests time out, we should still attempt to upload logs
         if (Test-Path "test_log.txt") {
-          Write-Host "============= Test Diagnostics Log ============="
-          Get-Content "test_log.txt" | Select-Object -Last 100
-          Write-Host "============================================="
+            Write-Host "============= Test Diagnostics Log ============="
+            Get-Content "test_log.txt" | Select-Object -Last 100
+            Write-Host "============================================="
         }
       env:
         GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
+        DOTNET_CLI_UI_LANGUAGE: en-US
 
     - name: Run Performance Tests
       if: success()
