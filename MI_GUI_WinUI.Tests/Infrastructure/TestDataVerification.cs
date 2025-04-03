@@ -12,111 +12,12 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
     [TestClass]
     public class TestDataVerification : UnitTestBase
     {
-        private string _sourceTestDataDir;
-
         [TestInitialize]
         public override async Task InitializeTest()
         {
             await base.InitializeTest();
-            
-            // Find the output directory where TestData should be
-            string outputDir = AppDomain.CurrentDomain.BaseDirectory;
-            _sourceTestDataDir = Path.Combine(outputDir, "TestData");
-
-            // Verify the source directory exists
-            if (!Directory.Exists(_sourceTestDataDir))
-            {
-                Assert.Fail($"Source test data directory not found at {_sourceTestDataDir}. Make sure TestData is included in the project with CopyToOutputDirectory set to PreserveNewest.");
-            }
-
-            // Create required test data directories
-            var testDataPath = Path.Combine(TestDirectory, "TestData");
-            Directory.CreateDirectory(testDataPath);
-            
-            var requiredDirs = new[]
-            {
-                "Profiles",
-                "Actions",
-                "Config",
-                "Prompts",
-                "Samples",
-                "Schemas"
-            };
-
-            foreach (var dir in requiredDirs)
-            {
-                Directory.CreateDirectory(Path.Combine(testDataPath, dir));
-            }
-            
-            // Copy schema files
-            CopyFilesFromSourceDir("Schemas", Path.Combine(testDataPath, "Schemas"));
-            
-            // Copy other test data files
-            CopyFilesFromSourceDir("Profiles", Path.Combine(testDataPath, "Profiles"));
-            CopyFilesFromSourceDir("Actions", Path.Combine(testDataPath, "Actions"));
-            CopyFilesFromSourceDir("Config", Path.Combine(testDataPath, "Config"));
-            CopyFilesFromSourceDir("Prompts", Path.Combine(testDataPath, "Prompts"));
-            
-            // Copy sample files to the Samples directory
-            var samplesDir = Path.Combine(testDataPath, "Samples");
-            CopyFileWithVerification(
-                Path.Combine(_sourceTestDataDir, "Profiles", "sample_profile.json"),
-                Path.Combine(samplesDir, "sample_profile.json"));
-                
-            CopyFileWithVerification(
-                Path.Combine(_sourceTestDataDir, "Actions", "sample_action.json"),
-                Path.Combine(samplesDir, "sample_action.json"));
         }
         
-        private void CopyFilesFromSourceDir(string sourceDirName, string targetDir)
-        {
-            var sourceDir = Path.Combine(_sourceTestDataDir, sourceDirName);
-            if (!Directory.Exists(sourceDir))
-            {
-                Assert.Fail($"Source directory not found: {sourceDir}");
-            }
-            
-            var jsonFiles = Directory.GetFiles(sourceDir, "*.json");
-            if (jsonFiles.Length == 0)
-            {
-                Assert.Fail($"No JSON files found in source directory: {sourceDir}");
-            }
-            
-            foreach (var file in jsonFiles)
-            {
-                var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
-                CopyFileWithVerification(file, targetFile);
-            }
-        }
-        
-        private void CopyFileWithVerification(string sourcePath, string targetPath)
-        {
-            if (!File.Exists(sourcePath))
-            {
-                Assert.Fail($"Source file not found: {sourcePath}");
-            }
-            
-            try
-            {
-                File.Copy(sourcePath, targetPath, true);
-                
-                // Verify JSON is valid
-                string json = File.ReadAllText(targetPath);
-                try
-                {
-                    JsonDocument.Parse(json);
-                }
-                catch (JsonException ex)
-                {
-                    Assert.Fail($"Invalid JSON in file {sourcePath}: {ex.Message}");
-                }
-            }
-            catch (IOException ex)
-            {
-                Assert.Fail($"Failed to copy file from {sourcePath} to {targetPath}: {ex.Message}");
-            }
-        }
-
         [TestMethod]
         [DataDependentTest("Schemas")]
         [SmokeTest]
@@ -160,13 +61,12 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
         public void VerifySampleData()
         {
             // Verify sample files exist
-            var sampleDir = Path.Combine(TestDirectory, "TestData", "Samples");
-            Assert.IsTrue(Directory.Exists(sampleDir), "Sample directory should exist");
+            var sampleDir = Path.Combine(TestDirectory, "TestData");
 
-            var profilePath = Path.Combine(sampleDir, "sample_profile.json");
+            var profilePath = Path.Combine(sampleDir, "Profiles", "sample_profile.json");
             Assert.IsTrue(File.Exists(profilePath), "Sample profile should exist");
 
-            var actionPath = Path.Combine(sampleDir, "sample_action.json");
+            var actionPath = Path.Combine(sampleDir, "Actions", "sample_action.json");
             Assert.IsTrue(File.Exists(actionPath), "Sample action should exist");
 
             // Validate sample data is valid JSON
@@ -186,7 +86,6 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
                 "Actions",
                 "Config",
                 "Prompts",
-                "Samples",
                 "Schemas"
             };
 

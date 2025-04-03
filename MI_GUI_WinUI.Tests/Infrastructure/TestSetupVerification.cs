@@ -17,54 +17,6 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
             await base.InitializeTest();
             _testOutputPath = Path.Combine(TestDirectory, "TestOutput");
             Directory.CreateDirectory(_testOutputPath);
-
-            // Create required test data directories
-            var testDataPath = Path.Combine(TestDirectory, "TestData");
-            var profilesPath = Path.Combine(testDataPath, "Profiles");
-            var actionsPath = Path.Combine(testDataPath, "Actions");
-            var configPath = Path.Combine(testDataPath, "Config");
-            var promptsPath = Path.Combine(testDataPath, "Prompts");
-            
-            Directory.CreateDirectory(testDataPath);
-            Directory.CreateDirectory(profilesPath);
-            Directory.CreateDirectory(actionsPath);
-            Directory.CreateDirectory(configPath);
-            Directory.CreateDirectory(promptsPath);
-
-            // Find the output directory where TestData should be
-            string outputDir = AppDomain.CurrentDomain.BaseDirectory;
-            string sourceTestDataDir = Path.Combine(outputDir, "TestData");
-
-            // Verify the source directory exists
-            if (!Directory.Exists(sourceTestDataDir))
-            {
-                throw new DirectoryNotFoundException($"Source test data directory not found at {sourceTestDataDir}. Make sure TestData is included in the project with CopyToOutputDirectory set to PreserveNewest.");
-            }
-
-            // Copy the profile file
-            File.Copy(
-                Path.Combine(sourceTestDataDir, "Profiles", "sample_profile.json"),
-                Path.Combine(profilesPath, "sample_profile.json"),
-                true);
-            
-            // Copy the action file
-            File.Copy(
-                Path.Combine(sourceTestDataDir, "Actions", "sample_action.json"),
-                Path.Combine(actionsPath, "sample_action.json"),
-                true);
-            
-            // Copy the config file
-            File.Copy(
-                Path.Combine(sourceTestDataDir, "Config", "test_config.json"),
-                Path.Combine(configPath, "test_config.json"),
-                true);
-            
-            // Copy the prompts file
-            File.Copy(
-                Path.Combine(sourceTestDataDir, "Prompts", "test_prompts.json"),
-                Path.Combine(promptsPath, "test_prompts.json"),
-                true);
-            
         }
 
         
