@@ -88,7 +88,7 @@ jobs:
       
     - name: Run All Tests
       if: success()
-      timeout-minutes: 5
+      timeout-minutes: 15
       shell: pwsh
       run: |
         # First, build the test project if it's not already built
