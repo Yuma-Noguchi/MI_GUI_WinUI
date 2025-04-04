@@ -1,0 +1,33 @@
+# Project Guidelines
+
+## Documentation Requirements
+
+-   Update relevant documentation in /docs when modifying features
+-   Keep README.md in sync with new capabilities
+-   Read md files in /docs for context on project structure and guidelines
+
+## Architecture Decision Records
+
+Create ADRs in /docs/adr for:
+
+-   Major dependency changes
+-   Architectural pattern changes
+-   New integration patterns
+
+## Code Style & Patterns
+
+-   Follow C# coding conventions
+-   Use consistent naming conventions for files, classes, and methods
+-   Use `async`/`await` for asynchronous methods
+
+## Testing Standards
+
+-   After implmenting small chunks of tests, run all tests to ensure nothing is broken. The commands are 
+    ```bash
+    # Build the project
+    & "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" MI_GUI_WinUI.Tests\MI_GUI_WinUI.Tests.csproj
+
+    # Run all tests
+    & "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\VsTest.Console.exe" "MI_GUI_WinUI.Tests\bin\x64\Release\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll"
+    ```
+-   Make sure to follow the test plan structure and naming conventions

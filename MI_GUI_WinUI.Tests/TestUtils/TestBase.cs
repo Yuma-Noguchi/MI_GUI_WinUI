@@ -28,6 +28,8 @@ namespace MI_GUI_WinUI.Tests.TestUtils
             // Set up test directory
             TestDirectory = TestHelpers.CreateTestDirectory();
 
+            TestDataInitializer.InitializeTestData(TestDirectory);
+
             // Get logger
             Logger = ServiceProvider.GetRequiredService<ILogger<TestBase>>();
 

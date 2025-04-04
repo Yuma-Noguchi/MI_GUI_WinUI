@@ -9,5 +9,8 @@ namespace MI_GUI_WinUI.Services.Interfaces
         Task<List<Profile>> ReadProfilesFromJsonAsync(string folderPath);
         Task DeleteProfileAsync(string profileName, string folderPath);
         Task SaveProfileAsync(Profile profile, string folderPath);
+        Profile? GetProfileFromCache(string profileName);
+        void ClearCache();
+
     }
 }

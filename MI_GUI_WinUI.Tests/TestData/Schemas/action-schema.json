@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActionData Schema",
+  "type": "object",
+  "required": ["id", "name", "class", "method", "args"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the action"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name of the action"
+    },
+    "class": {
+      "type": "string",
+      "description": "Class name for the action, typically 'ds4_gamepad'",
+      "default": "ds4_gamepad"
+    },
+    "method": {
+      "type": "string",
+      "description": "Method name for the action, typically 'chain'",
+      "default": "chain"
+    },
+    "args": {
+      "type": "array",
+      "description": "List of action sequence items",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "required": ["press"],
+            "properties": {
+              "press": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "required": ["sleep"],
+            "properties": {
+              "sleep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

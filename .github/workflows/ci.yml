@@ -2,38 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
 
 jobs:
-  detect-gpu:
-    runs-on: windows-latest
-    outputs:
-      gpu-vendor: ${{ steps.gpu-detect.outputs.gpu-vendor }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: GPU Detection
-      id: gpu-detect
-      shell: pwsh
-      run: |
-        $gpu = Get-WmiObject Win32_VideoController
-        if ($gpu.Name -match "NVIDIA") {
-            echo "::set-output name=gpu-vendor::nvidia"
-        } elseif ($gpu.Name -match "AMD") {
-            echo "::set-output name=gpu-vendor::amd"
-        } elseif ($gpu.Name -match "Intel") {
-            echo "::set-output name=gpu-vendor::intel"
-        } else {
-            echo "::set-output name=gpu-vendor::none"
-        }
-
   build-and-test:
-    needs: detect-gpu
-    if: needs.detect-gpu.outputs.gpu-vendor != 'none'
     runs-on: windows-latest
     strategy:
       matrix:
@@ -48,9 +22,19 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
-        
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install Windows App SDK
+      shell: pwsh
+      run: |
+        # Install minimal required packages directly
+        nuget install Microsoft.WindowsAppSDK -Version 1.6.250205002 -OutputDirectory packages
+        nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.1742 -OutputDirectory packages
+
     - name: Cache NuGet packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
@@ -58,38 +42,71 @@ jobs:
           ${{ runner.os }}-nuget-
           
     - name: Restore
-      run: dotnet restore
-      
-    - name: Build
-      run: dotnet build --configuration ${{ matrix.configuration }} --no-restore
-      
-    - name: Run GPU Tests
       run: |
-        dotnet test `
-          --filter "TestCategory=RequiresGpu" `
-          --configuration ${{ matrix.configuration }} `
-          --no-build `
-          --verbosity normal `
-          --logger "trx;LogFileName=gpu-tests.trx" `
-          --collect:"XPlat Code Coverage"
-      env:
-        GPU_VENDOR: ${{ needs.detect-gpu.outputs.gpu-vendor }}
+        dotnet restore MI_GUI_WinUI.sln
+      
+    - name: Cache DirectXAdapterSelector build output
+      uses: actions/cache@v4
+      id: dx-adapter-cache
+      with:
+        path: |
+          x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll
+          x64/${{ matrix.configuration }}/DirectXAdapterSelector.pdb
+        key: ${{ runner.os }}-dxadapter-${{ matrix.configuration }}-${{ hashFiles('DirectXAdapterSelector/**/*.cpp', 'DirectXAdapterSelector/**/*.h', 'DirectXAdapterSelector/**/*.vcxproj') }}
+        restore-keys: |
+          ${{ runner.os }}-dxadapter-${{ matrix.configuration }}-
 
-    - name: Run Performance Tests
+    - name: Build DirectXAdapterSelector
+      if: steps.dx-adapter-cache.outputs.cache-hit != 'true'
       run: |
-        dotnet test `
-          --filter "TestCategory=Performance" `
-          --configuration ${{ matrix.configuration }} `
-          --no-build `
-          --verbosity normal `
-          --logger "trx;LogFileName=performance-tests.trx"
-          
-    - name: Run Benchmarks
+        # Only build if we didn't get a cache hit
+        Write-Host "Building DirectXAdapterSelector..."
+        msbuild DirectXAdapterSelector/DirectXAdapterSelector.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:OutDir="$(pwd)\x64\${{ matrix.configuration }}\"
+        
+        # Verify the DLL exists in the expected location
+        if (-Not (Test-Path "x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll")) {
+          Write-Error "DirectXAdapterSelector.dll was not built to the expected location"
+          exit 1
+        } else {
+          Write-Host "Successfully built DirectXAdapterSelector.dll to expected location"
+        }
+
+    - name: Verify DirectXAdapterSelector DLL
       run: |
-        dotnet run --project MI_GUI_WinUI.Tests `
-          --filter "*Benchmark*" `
-          --configuration Release `
-          -- --job short --runtimes net8.0
+        # This runs whether we got a cache hit or built it ourselves
+        if (-Not (Test-Path "x64/${{ matrix.configuration }}/DirectXAdapterSelector.dll")) {
+          Write-Error "DirectXAdapterSelector.dll not found at expected location"
+          exit 1
+        } else {
+          Write-Host "DirectXAdapterSelector.dll available at expected location"
+        }
+
+    - name: Build Main Solution
+      run: |
+        # Then build the main solution
+        msbuild MI_GUI_WinUI.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+      
+    - name: Run All Tests
+      if: success()
+      timeout-minutes: 15
+      shell: pwsh
+      run: |
+        # First, build the test project if it's not already built
+        msbuild MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+        
+        Write-Host "Running tests using VSTest.Console.exe"
+        dotnet test --no-build MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
+            --configuration ${{ matrix.configuration }} `
+            --platform ${{ matrix.platform }} `
+            --logger "trx;LogFileName=unit-tests.trx" `
+            --diag test_log.txt
+
+        # If tests had issues, we should still attempt to upload logs
+        if (Test-Path "test_log.txt") {
+            Write-Host "============= Test Diagnostics Log ============="
+            Get-Content "test_log.txt" | Select-Object -Last 100
+            Write-Host "============================================="
+        }
 
     - name: Upload Results
       if: always()

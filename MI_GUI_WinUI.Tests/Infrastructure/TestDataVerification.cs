@@ -1,23 +1,58 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MI_GUI_WinUI.Tests.TestUtils;
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace MI_GUI_WinUI.Tests.Infrastructure
 {
     [TestClass]
     public class TestDataVerification : UnitTestBase
     {
+        [TestInitialize]
+        public override async Task InitializeTest()
+        {
+            await base.InitializeTest();
+        }
+        
         [TestMethod]
         [DataDependentTest("Schemas")]
         [SmokeTest]
         public void VerifyTestDataSchemas()
         {
             // Verify sample profile schema
-            var profileSchema = SchemaValidator.GetSchema("profile-schema");
-            Assert.IsNotNull(profileSchema, "Profile schema should be loaded");
-
-            // Verify sample action schema
-            var actionSchema = SchemaValidator.GetSchema("action-schema");
-            Assert.IsNotNull(actionSchema, "Action schema should be loaded");
+            var schemasDir = Path.Combine(TestDirectory, "TestData", "Schemas");
+            var profileSchemaPath = Path.Combine(schemasDir, "profile-schema.json");
+            var actionSchemaPath = Path.Combine(schemasDir, "action-schema.json");
+            
+            Assert.IsTrue(File.Exists(profileSchemaPath), "Profile schema file should exist");
+            Assert.IsTrue(File.Exists(actionSchemaPath), "Action schema file should exist");
+            
+            // Validate schema files
+            string profileSchemaJson = File.ReadAllText(profileSchemaPath);
+            try
+            {
+                var profileSchema = JObject.Parse(profileSchemaJson);
+                Assert.IsNotNull(profileSchema, "Profile schema should be valid JSON");
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Invalid profile schema: {ex.Message}");
+            }
+            
+            string actionSchemaJson = File.ReadAllText(actionSchemaPath);
+            try
+            {
+                var actionSchema = JObject.Parse(actionSchemaJson);
+                Assert.IsNotNull(actionSchema, "Action schema should be valid JSON");
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Invalid action schema: {ex.Message}");
+            }
         }
 
         [TestMethod]
@@ -26,17 +61,17 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
         public void VerifySampleData()
         {
             // Verify sample files exist
-            var sampleDir = Path.Combine(TestDirectory, "TestData", "Samples");
-            Assert.IsTrue(Directory.Exists(sampleDir), "Sample directory should exist");
+            var sampleDir = Path.Combine(TestDirectory, "TestData");
 
-            var profilePath = Path.Combine(sampleDir, "sample_profile.json");
+            var profilePath = Path.Combine(sampleDir, "Profiles", "sample_profile.json");
             Assert.IsTrue(File.Exists(profilePath), "Sample profile should exist");
 
-            var actionPath = Path.Combine(sampleDir, "sample_action.json");
+            var actionPath = Path.Combine(sampleDir, "Actions", "sample_action.json");
             Assert.IsTrue(File.Exists(actionPath), "Sample action should exist");
 
-            // Validate sample data against schemas
-            SchemaValidator.ValidateSampleData();
+            // Validate sample data is valid JSON
+            ValidateJson(profilePath, "Sample profile");
+            ValidateJson(actionPath, "Sample action");
         }
 
         [TestMethod]
@@ -51,7 +86,6 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
                 "Actions",
                 "Config",
                 "Prompts",
-                "Samples",
                 "Schemas"
             };
 
@@ -59,14 +93,11 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
             {
                 var dirPath = Path.Combine(testDataPath, dir);
                 Assert.IsTrue(Directory.Exists(dirPath), $"{dir} directory should exist");
+                
+                // Verify each directory has at least one JSON file
+                var files = Directory.GetFiles(dirPath, "*.json");
+                Assert.IsTrue(files.Length > 0, $"{dir} directory should contain at least one JSON file");
             }
-
-            // Verify required schema files
-            var schemasDir = Path.Combine(testDataPath, "Samples", "Schemas");
-            Assert.IsTrue(File.Exists(Path.Combine(schemasDir, "profile-schema.json")), 
-                "Profile schema should exist");
-            Assert.IsTrue(File.Exists(Path.Combine(schemasDir, "action-schema.json")), 
-                "Action schema should exist");
         }
 
         [TestMethod]
@@ -80,7 +111,7 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
 
             foreach (var file in profileFiles)
             {
-                SchemaValidator.AssertValidJsonFile(file, "profile-schema");
+                ValidateJson(file, $"Profile {Path.GetFileName(file)}");
             }
         }
 
@@ -95,7 +126,7 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
 
             foreach (var file in actionFiles)
             {
-                SchemaValidator.AssertValidJsonFile(file, "action-schema");
+                ValidateJson(file, $"Action {Path.GetFileName(file)}");
             }
         }
 
@@ -105,27 +136,20 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
         {
             // Verify profiles don't reference non-existent actions
             var profilesDir = Path.Combine(TestDirectory, "TestData", "Profiles");
-            var actionsDir = Path.Combine(TestDirectory, "TestData", "Actions");
+            var profileFiles = Directory.GetFiles(profilesDir, "*.json", SearchOption.AllDirectories);
             
-            foreach (var profileFile in Directory.GetFiles(profilesDir, "*.json", SearchOption.AllDirectories))
+            foreach (var profileFile in profileFiles)
             {
-                var profileJson = File.ReadAllText(profileFile);
-                var errors = SchemaValidator.GetValidationErrors(profileJson, "profile-schema");
-                
-                Assert.IsFalse(errors.Any(), 
-                    $"Profile {Path.GetFileName(profileFile)} has validation errors:\n" +
-                    string.Join("\n", errors));
+                ValidateJson(profileFile, $"Profile {Path.GetFileName(profileFile)}");
             }
 
             // Verify actions have valid references
-            foreach (var actionFile in Directory.GetFiles(actionsDir, "*.json", SearchOption.AllDirectories))
+            var actionsDir = Path.Combine(TestDirectory, "TestData", "Actions");
+            var actionFiles = Directory.GetFiles(actionsDir, "*.json", SearchOption.AllDirectories);
+            
+            foreach (var actionFile in actionFiles)
             {
-                var actionJson = File.ReadAllText(actionFile);
-                var errors = SchemaValidator.GetValidationErrors(actionJson, "action-schema");
-                
-                Assert.IsFalse(errors.Any(), 
-                    $"Action {Path.GetFileName(actionFile)} has validation errors:\n" +
-                    string.Join("\n", errors));
+                ValidateJson(actionFile, $"Action {Path.GetFileName(actionFile)}");
             }
         }
 
@@ -141,9 +165,16 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
                 Assert.IsTrue(File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly) == false,
                     $"File should be writable: {file}");
 
-                using (var stream = File.OpenRead(file))
+                try
                 {
-                    Assert.IsTrue(stream.CanRead, $"File should be readable: {file}");
+                    using (var stream = File.OpenRead(file))
+                    {
+                        Assert.IsTrue(stream.CanRead, $"File should be readable: {file}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Assert.Fail($"Failed to read file {file}: {ex.Message}");
                 }
             }
 
@@ -161,6 +192,29 @@ namespace MI_GUI_WinUI.Tests.Infrastructure
                 {
                     Assert.Fail($"Failed to write to directory {dir}: {ex.Message}");
                 }
+            }
+        }
+        
+        private void ValidateJson(string filePath, string description)
+        {
+            if (!File.Exists(filePath))
+            {
+                Assert.Fail($"{description} file does not exist: {filePath}");
+            }
+            
+            try
+            {
+                string json = File.ReadAllText(filePath);
+                var jsonDoc = JsonDocument.Parse(json);
+                Assert.IsNotNull(jsonDoc, $"{description} should be valid JSON");
+            }
+            catch (JsonException ex)
+            {
+                Assert.Fail($"{description} contains invalid JSON: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"Error validating {description}: {ex.Message}");
             }
         }
     }

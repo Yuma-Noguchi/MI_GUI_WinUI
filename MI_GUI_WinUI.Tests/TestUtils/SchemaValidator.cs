@@ -21,9 +21,8 @@ namespace MI_GUI_WinUI.Tests.TestUtils
             return _schemas.GetOrAdd(schemaName, name =>
             {
                 var schemaPath = Path.Combine(
-                    Windows.ApplicationModel.Package.Current.InstalledLocation.Path,
+                    AppDomain.CurrentDomain.BaseDirectory,
                     "TestData",
-                    "Samples",
                     "Schemas",
                     $"{name}.json"
                 );

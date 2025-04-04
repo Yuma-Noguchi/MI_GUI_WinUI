@@ -22,6 +22,15 @@ MI_GUI_WinUI.Tests/
     └── ImageGenerationPerformanceTests.cs
 ```
 
+## Command to Run Tests
+```bash
+# Build the project
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" MI_GUI_WinUI.Tests\MI_GUI_WinUI.Tests.csproj
+
+# Run all tests
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\VsTest.Console.exe" "MI_GUI_WinUI.Tests\bin\x64\Release\net8.0-windows10.0.22621.0\MI_GUI_WinUI.Tests.dll"
+   ```
+
 ## Test Categories
 
 ### Unit Tests
