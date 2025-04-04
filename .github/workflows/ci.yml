@@ -96,7 +96,6 @@ jobs:
         
         Write-Host "Running tests using VSTest.Console.exe"
         dotnet test --no-build MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-            /-p:Platform=${{ matrix.platform }} `
             /--configuration ${{ matrix.configuration }} `
             /-logger "trx;LogFileName=unit-tests.trx" `
             /-diag test_log.txt
