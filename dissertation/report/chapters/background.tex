@@ -2,140 +2,158 @@
 
 \section{Gaming Accessibility}
 \subsection{Current State of Gaming Accessibility}
-Gaming accessibility has become increasingly important as video games become a more integral part of society. However, many games remain inaccessible to players with physical disabilities due to input method limitations.
+Gaming accessibility has evolved significantly over the past decade, transitioning from a niche concern to a mainstream consideration in game development. According to the Entertainment Software Association, 214 million Americans play video games regularly, with an estimated 46 million players having some form of disability \cite{esasurvey2022}. Despite this substantial market, a 2023 study by the AbleGamers Foundation found that 63\% of gamers with physical disabilities regularly encounter barriers that prevent full participation in gaming experiences \cite{ablegamers2023survey}.
 
-\subsection{Existing Accessibility Solutions}
-Various hardware and software solutions have been developed to address gaming accessibility:
+The gaming industry has begun addressing these challenges through both hardware and software solutions. Major platform holders like Microsoft have invested in accessibility research, resulting in products like the Xbox Adaptive Controller, which has demonstrated significant impact for users with motor disabilities. However, these solutions often require substantial financial investment or technical expertise to implement effectively. Furthermore, as games become increasingly complex, with intricate control schemes and rapid input requirements, the accessibility gap widens for players with physical limitations.
+
+\subsection{Input Method Adaptation}
+The adaptation of input methods represents one of the most significant areas of development in gaming accessibility. Traditional input devices like gamepads and keyboards present substantial barriers for users with motor disabilities, leading to the development of alternative interaction paradigms. 
+
+Gesture-based control systems have emerged as a promising approach, leveraging camera input to interpret body movements as control signals. These systems offer the advantage of adaptability to individual physical capabilities without requiring specialized hardware. Early implementations like the Microsoft Kinect demonstrated the potential of this approach but suffered from latency issues and limited precision that restricted their application in many gaming contexts.
+
+Voice control systems offer another alternative input pathway, with technologies like speech-to-text and voice command recognition enabling hands-free interaction. These systems have proven particularly valuable for users with upper limb disabilities but face challenges in high-speed gaming scenarios where rapid command input is necessary.
+
+Eye-tracking technologies represent a newer frontier in accessible input, with systems like Tobii Eye Tracker enabling screen navigation and selection through gaze direction. While highly effective for users with severe motor limitations, these systems remain costly and require careful calibration for individual users.
+
+The ideal approach combines multiple input modalities, allowing users to leverage their strongest physical capabilities while accommodating specific limitations. This multi-modal approach forms the foundation of the MotionInput system, which serves as the technical context for this project.
+
+\section{MotionInput System}
+\subsection{System Overview and Architecture}
+MotionInput, developed at University College London, represents a comprehensive solution for alternative computer input methods, bridging the gap between users' physical capabilities and digital interaction requirements. The system employs computer vision techniques to translate natural body movements into standard input commands, effectively simulating keyboard, mouse, gamepad, and touch inputs without requiring physical manipulation of traditional controllers.
+
+At its core, MotionInput utilizes a modular architecture consisting of:
+
 \begin{itemize}
-    \item Adaptive controllers (e.g., Xbox Adaptive Controller)
-    \item Motion control systems
-    \item Voice command interfaces
-    \item Eye-tracking technologies
+    \item \textbf{Input Processing Pipeline}: Captures and processes video input through computer vision algorithms
+    \item \textbf{Motion Translation Engine}: Converts detected movements to standardized input signals
+    \item \textbf{Application Interface Layer}: Connects transformed inputs to target applications
+    \item \textbf{Configuration System}: Manages user profiles and input mappings
 \end{itemize}
 
-\section{Artificial Intelligence in Accessibility}
-\subsection{Machine Learning Models}
-Overview of AI technologies used in accessibility:
-\begin{itemize}
-    \item Computer vision models for pose estimation
-    \item Real-time gesture recognition
-    \item Movement prediction algorithms
-    \item Transfer learning applications
-\end{itemize}
+This modular design allows MotionInput to support diverse input scenarios across applications ranging from productivity software to action games. However, the configuration system represents a significant technical complexity that has limited broader adoption.
 
-\subsection{ONNX Runtime}
-Detailed examination of ONNX (Open Neural Network Exchange):
-\begin{itemize}
-    \item Cross-platform model interoperability
-    \item Performance optimization capabilities
-    \item Integration with Windows applications
-    \item Hardware acceleration features
-\end{itemize}
+\subsection{Configuration Challenges}
+The current MotionInput configuration system relies on JSON-based profiles that define the mapping between detected movements and output commands. This approach offers significant flexibility but introduces substantial usability challenges. The configuration files follow a complex schema with nested structures representing input sources, trigger conditions, and output actions.
 
-\section{Stable Diffusion and Visual Generation}
-\subsection{Image Generation Technology}
-Analysis of Stable Diffusion and its applications:
-\begin{itemize}
-    \item Text-to-image generation
-    \item Image modification and inpainting
-    \item Style transfer capabilities
-    \item Real-time processing considerations
-\end{itemize}
+A sample configuration segment demonstrates this complexity:
 
-\subsection{Applications in User Interface Design}
-How generative AI enhances UI development:
-\begin{itemize}
-    \item Dynamic asset generation
-    \item Custom icon creation
-    \item Visual feedback generation
-    \item Accessibility enhancement through visual aids
-\end{itemize}
+\begin{verbatim}
+{
+  "profile_name": "Racing Game Configuration",
+  "input_sources": [
+    {
+      "source_type": "hand_tracking",
+      "parameters": {
+        "detection_confidence": 0.7,
+        "tracking_confidence": 0.5
+      },
+      "mappings": [
+        {
+          "gesture": "closed_fist",
+          "output": {
+            "type": "keyboard",
+            "key": "w",
+            "state": "pressed"
+          },
+          "conditions": {
+            "hand": "right",
+            "position": {
+              "y_min": 0.3,
+              "y_max": 0.7
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+\end{verbatim}
 
-\section{Motion Input Technologies}
-\subsection{Computer Vision in Human-Computer Interaction}
-Discussion of computer vision technologies in input methods:
-\begin{itemize}
-    \item MediaPipe integration for pose estimation
-    \item Real-time facial tracking systems
-    \item Hand and finger tracking precision
-    \item Movement detection algorithms
-\end{itemize}
+For users without programming experience, creating or modifying these configurations presents a significant barrier. Common issues include syntax errors, logical mapping mistakes, and difficulty visualizing the relationship between configuration changes and resulting behaviors. These challenges directly limit the effectiveness of the MotionInput system, particularly for its primary audience of users with disabilities who may not possess technical expertise.
 
-\subsection{MotionInput System Architecture}
-Technical analysis of the MotionInput system:
-\begin{itemize}
-    \item Core system components
-    \item AI model integration
-    \item Input processing pipeline
-    \item Profile configuration system
-\end{itemize}
-
-\section{Software Architecture and Design Patterns}
-\subsection{MVVM Pattern}
-Detailed analysis of the Model-View-ViewModel pattern:
-\begin{itemize}
-    \item Separation of concerns
-    \item Data binding mechanisms
-    \item Command patterns
-    \item State management
-    \item Unit testing advantages
-\end{itemize}
-
-\subsection{Clean Architecture}
-Principles of clean architecture in modern applications:
-\begin{itemize}
-    \item Dependency inversion
-    \item Use case driven development
-    \item Repository pattern
-    \item Interface segregation
-    \item Domain-driven design
-\end{itemize}
-
-\subsection{Design Patterns in C\#}
-Implementation patterns specific to C\# development:
-\begin{itemize}
-    \item Async/await patterns
-    \item Observer pattern with events
-    \item Factory patterns
-    \item Singleton and dependency injection
-    \item Command pattern implementation
-\end{itemize}
-
-\section{Modern GUI Development}
+\section{Modern UI Development for Accessibility}
 \subsection{WinUI 3 Framework}
-Analysis of WinUI 3 as a modern Windows UI framework:
-\begin{itemize}
-    \item XAML-based UI development
-    \item Integration with native Windows features
-    \item Performance optimization techniques
-    \item Accessibility implementation
-    \item MVVM toolkit integration
-\end{itemize}
+The WinUI 3 framework represents Microsoft's modern approach to Windows application development, offering significant advantages for accessibility-focused applications. As a native UI framework, WinUI 3 provides direct access to Windows accessibility features while delivering high performance rendering essential for real-time interaction systems.
 
-\subsection{AI-Enhanced User Interfaces}
-Emerging trends in AI-powered UIs:
-\begin{itemize}
-    \item Intelligent interface adaptation
-    \item Predictive user interaction
-    \item Context-aware assistance
-    \item Personalization through machine learning
-\end{itemize}
+WinUI 3 builds upon the Universal Windows Platform (UWP) design language while extending compatibility to Win32 applications through the Windows App SDK. This hybrid approach allows developers to leverage modern UI capabilities while maintaining compatibility with established Windows ecosystems. For accessibility applications like the MotionInput Configuration GUI, this balance is particularly valuable as it ensures compatibility with assistive technologies like screen readers and alternative input devices.
 
-\section{Related Work}
-\subsection{Similar Projects}
-Review of relevant accessibility and AI projects:
-\begin{itemize}
-    \item AI-powered accessibility tools
-    \item Computer vision-based input systems
-    \item Machine learning in gaming interfaces
-    \item Open-source AI integration examples
-\end{itemize}
+The framework's XAML-based declarative UI approach separates presentation from logic, simplifying the implementation of accessible interfaces. Built-in support for UI Automation, high contrast themes, keyboard navigation, and screen reader integration provides a solid foundation for accessibility compliance. These capabilities align directly with the project's requirement to make the configuration interface itself accessible to users with disabilities.
 
-\subsection{Technical Implementation Patterns}
-Key architectural considerations:
-\begin{itemize}
-    \item AI model deployment strategies
-    \item Real-time processing optimization
-    \item Cross-platform compatibility
-    \item Performance-accessibility balance
-\end{itemize}
+\subsection{MVVM Architectural Pattern}
+The Model-View-ViewModel (MVVM) pattern forms the architectural foundation of modern WinUI applications, providing a structured approach to separating UI concerns from business logic. In the context of the Configuration GUI project, MVVM offers several specific advantages:
+
+The pattern's clear separation of data models (representing configuration profiles and settings), ViewModels (handling UI logic and state), and Views (defining the visual interface) creates a maintainable codebase that can evolve with changing requirements. This separation is particularly valuable for accessibility applications, where alternative presentation layers may be needed for different user capabilities.
+
+MVVM's data binding mechanism creates a declarative relationship between UI elements and underlying data, reducing the need for imperative UI updates that can introduce accessibility issues. For configuration interfaces dealing with complex data structures, this binding approach simplifies development while improving reliability.
+
+The pattern's support for commands encapsulates user interactions in a way that facilitates both testing and accessibility. By defining commands as first-class objects, the interface can support multiple input methods (keyboard, pointer, voice) through a unified interaction model, essential for accessible design.
+
+\section{Artificial Intelligence in Accessibility Applications}
+\subsection{Computer Vision for Input Processing}
+Computer vision technologies form the foundation of MotionInput's ability to translate physical movements into digital commands. Recent advances in pose estimation have significantly improved the accuracy and responsiveness of vision-based input systems.
+
+The MediaPipe framework, developed by Google, has emerged as a leading solution for real-time body tracking, offering pre-trained models for hand tracking, pose estimation, and facial landmark detection. These models achieve sufficient accuracy for gaming input while maintaining performance suitable for consumer hardware. The MotionInput system leverages MediaPipe's hand tracking and pose estimation capabilities to detect physical gestures that can be mapped to game controls.
+
+Recent research by Zhang et al. (2022) demonstrates that pose estimation accuracy has reached levels comparable to dedicated motion capture systems, with average joint position errors below 20mm in typical usage scenarios \cite{zhang2022}. This precision enables complex gesture recognition suitable for gaming applications, though challenges remain in occlusion handling and varying lighting conditions.
+
+\subsection{ONNX Runtime for Model Deployment}
+The Open Neural Network Exchange (ONNX) Runtime represents a significant advancement in AI model deployment for accessibility applications. As an open-source, cross-platform inference engine, ONNX Runtime enables the efficient execution of machine learning models across diverse hardware configurations, essential for accessibility tools that must perform well on varying user systems.
+
+ONNX Runtime offers several key advantages for the Configuration GUI project:
+
+Hardware acceleration capabilities enable efficient execution of AI models on both CPU and GPU, with automatic fallback mechanisms that ensure functionality across device capabilities. This adaptability is crucial for accessibility applications that must serve users with diverse hardware configurations.
+
+The runtime's optimization capabilities automatically apply performance improvements based on the target hardware, including operator fusion, memory planning, and execution parallelization. For the real-time preview features planned in the Configuration GUI, these optimizations help maintain responsive performance even during complex AI operations.
+
+The cross-platform compatibility of ONNX models simplifies development and maintenance, allowing models to be trained using frameworks like PyTorch or TensorFlow and then deployed efficiently within the C\# application environment. This flexibility enables the incorporation of state-of-the-art AI techniques without requiring specialized expertise in multiple frameworks.
+
+\section{Generative AI for Interface Enhancement}
+\subsection{Stable Diffusion Technology}
+Stable Diffusion represents a breakthrough in text-to-image generation, employing a latent diffusion model to generate high-quality images from textual descriptions. Unlike earlier generative adversarial networks (GANs), Stable Diffusion operates by gradually denoising random latent representations guided by text embeddings, resulting in coherent, detailed images that align with specified descriptions.
+
+The technology has advanced rapidly since its introduction in 2022, with optimizations enabling deployment on consumer hardware through frameworks like ONNX Runtime. While initial implementations required substantial GPU resources, recent optimizations have reduced memory requirements and improved inference speed, making the technology viable for integration into interactive applications.
+
+For accessibility applications, Stable Diffusion offers unique capabilities to generate custom visual assets based on simple text prompts. This approach removes the need for specialized graphic design skills when creating custom interface elements, potentially empowering users with limited technical capabilities to personalize their experience.
+
+\subsection{Applications in Configuration Interfaces}
+Generative AI offers several potential applications in configuration interfaces, particularly for accessibility-focused systems:
+
+Automated icon generation can create visually distinct representations of different profiles or actions based on simple descriptions. This capability addresses the challenge of visual differentiation in configuration systems, where users may need to quickly distinguish between similar profiles through visual cues.
+
+Context-aware visual feedback can leverage image generation to provide intuitive representations of configuration outcomes. Rather than abstract descriptions of mappings between inputs and outputs, generated visuals can illustrate the expected behavior, reducing cognitive load for users.
+
+Personalized visual cues can be tailored to individual user preferences and perceptual capabilities, supporting accessibility needs like color vision deficiency or the need for high-contrast elements. This personalization extends beyond standard accessibility settings to create truly individualized interfaces.
+
+These applications demonstrate the potential for generative AI to enhance not just the aesthetic qualities of interfaces but their functional accessibility. By removing barriers to visual customization, these technologies align with the broader goal of making complex systems more approachable for diverse users.
+
+\section{Related Work and Research Gap}
+\subsection{Existing Configuration Interfaces}
+Several existing projects have addressed configuration challenges in accessibility tools, offering valuable insights for the MotionInput Configuration GUI. The Xbox Adaptive Controller's companion app provides a visual approach to button mapping, allowing users to create custom controller configurations through an intuitive drag-and-drop interface. While effective for hardware configuration, this approach doesn't address the complexity of gesture-based input systems.
+
+The AbleGamers organization has developed Enabled Play, a configuration tool for alternative input methods that includes visual feedback mechanisms. The system employs a modular approach to configuration, breaking complex mappings into manageable components. However, it lacks integration with computer vision systems and doesn't address the specific requirements of gesture-based input.
+
+Commercial gaming peripheral software like Razer Synapse and Logitech G HUB offer sophisticated visual configuration tools for input customization. These systems employ modern UI design principles and provide real-time feedback on configurations. However, they focus primarily on traditional input devices rather than alternative interaction methods.
+
+\subsection{Research Gap and Contribution}
+Analysis of existing solutions reveals a significant gap in configuration interfaces specifically designed for computer vision-based input systems. While general-purpose configuration tools and specialized hardware configuration systems exist, none adequately addresses the unique challenges of mapping physical gestures to game inputs through an accessible interface.
+
+The MotionInput Configuration GUI project addresses this gap by combining:
+
+1. Visual configuration approaches drawn from gaming peripheral software
+2. Accessibility considerations from specialized tools like Enabled Play
+3. AI-enhanced features that reduce technical barriers
+4. Direct integration with computer vision-based input processing
+
+This combination represents a novel approach to accessibility configuration that has not been previously implemented in a comprehensive system. By developing this solution, the project contributes both a practical tool for MotionInput users and a model for future accessibility configuration interfaces.
+
+\section{Summary and Implementation Context}
+This chapter has explored the theoretical foundations and existing work relevant to the MotionInput Configuration GUI project. The review has identified the significant accessibility challenges in gaming, examined the technical architecture of the MotionInput system, assessed relevant UI development frameworks and patterns, explored AI technologies applicable to the project, and analyzed related work to identify the research gap.
+
+This background establishes the context for the implementation phase, informing the project's approach to:
+
+1. Addressing the specific configuration challenges identified in the MotionInput system
+2. Leveraging WinUI 3 and MVVM to create an accessible, maintainable interface
+3. Integrating AI capabilities through ONNX Runtime and Stable Diffusion
+4. Applying design patterns that support both technical performance and accessibility
+
+The following chapters will build upon this foundation, detailing the requirements analysis, implementation approach, and evaluation methodology that together address the identified research gap.
