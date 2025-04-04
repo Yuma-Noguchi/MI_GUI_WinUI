@@ -96,9 +96,10 @@ jobs:
         
         Write-Host "Running tests using VSTest.Console.exe"
         dotnet test --no-build MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-            /--configuration ${{ matrix.configuration }} `
-            /-logger "trx;LogFileName=unit-tests.trx" `
-            /-diag test_log.txt
+            --configuration ${{ matrix.configuration }} `
+            --platform ${{ matrix.platform }} `
+            --logger "trx;LogFileName=unit-tests.trx" `
+            --diag test_log.txt
 
         # If tests had issues, we should still attempt to upload logs
         if (Test-Path "test_log.txt") {
