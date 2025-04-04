@@ -95,11 +95,7 @@ jobs:
         msbuild MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
         
         Write-Host "Running tests using VSTest.Console.exe"
-        dotnet test --no-build MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj `
-            --configuration ${{ matrix.configuration }} `
-            --platform ${{ matrix.platform }} `
-            --logger "trx;LogFileName=unit-tests.trx" `
-            --diag test_log.txt
+        dotnet test --no-build MI_GUI_WinUI.Tests/MI_GUI_WinUI.Tests.csproj --configuration Release -p:Platform=x64 --logger "trx;LogFileName=unit-tests.trx" 
 
         # If tests had issues, we should still attempt to upload logs
         if (Test-Path "test_log.txt") {
